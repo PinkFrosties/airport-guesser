@@ -1,5 +1,7 @@
 # Airport Guesser
 
+**Play it: https://pinkfrosties.github.io/airport-guesser/**
+
 A static, backend-free guessing game for phone and desktop: you get a locked satellite image of one airport and five attempts to name it. Every miss shows the distance to the answer, a compass arrow pointing from your guess toward it, and a proximity percentage. There is one shared Daily airport per UTC date, a separate Hard mode, and endless Practice. It is vanilla JS + Leaflet, installable as a PWA, and keeps stats in `localStorage`.
 
 ## How to play
