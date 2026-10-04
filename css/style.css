@@ -48,8 +48,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* board: image + panel */
 .board{display:flex;flex-direction:column;gap:16px}
 .stage{position:relative;height:var(--map-h);overflow:hidden;background:#e5e5ea;transition:height .3s var(--ease)}
-#map{position:absolute;inset:0;background:#e5e5ea;touch-action:pan-y}
-#map .leaflet-pane,#map .leaflet-control-container .leaflet-control-zoom{pointer-events:none}
+.sat{position:absolute;inset:0;background:#e5e5ea;touch-action:pan-y;visibility:hidden}
+.sat.front{visibility:visible}
+.sat .leaflet-pane,.sat .leaflet-control-container .leaflet-control-zoom{pointer-events:none}
 .leaflet-container{font-family:var(--sans);background:#e5e5ea}
 .leaflet-control-attribution{background:rgba(255,255,255,.8)!important;color:var(--muted)!important;font-size:10px;padding:2px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:10px 0 0 0}
 .leaflet-control-attribution a{color:var(--text)!important}
@@ -60,10 +61,19 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pip.miss{background:var(--muted);box-shadow:none}
 .pip.aid{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .pip.hit{background:var(--accent);box-shadow:none}
-.veil{position:absolute;inset:0;z-index:600;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;background:#f5f5f7;text-align:center;padding:24px}
+.veil{position:absolute;inset:0;z-index:600;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;text-align:center;padding:24px;opacity:1;transition:opacity .22s ease;
+  background:linear-gradient(110deg,#eceef2 30%,#f7f8fa 50%,#eceef2 70%) 0 0/220% 100%}
+.veil.loading{animation:shimmer 1.8s linear infinite}
+.veil.out{opacity:0;pointer-events:none}
 .veil p{margin:0;font-size:17px;font-weight:500;color:var(--text);max-width:30ch}
-.veil.loading p::after{content:"...";display:inline-block;width:1.2em;text-align:left;overflow:hidden;vertical-align:bottom;animation:dots 1.2s steps(4,end) infinite}
-@keyframes dots{0%{width:0}100%{width:1.2em}}
+.veil small{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;min-height:1.2em}
+.spinner,.progress{display:none}
+.veil.loading .spinner{display:block;width:30px;height:30px;border-radius:50%;border:3px solid rgba(60,60,67,.16);border-top-color:var(--accent);animation:spin .9s linear infinite}
+.veil.loading .progress{display:block;width:min(180px,60%);height:4px;border-radius:4px;background:rgba(60,60,67,.14);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent);border-radius:4px;transition:width .2s ease}
+.veil:not(.loading) small{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-120% 0}}
 
 /* buttons */
 .btn{border:0;background:var(--fill);border-radius:var(--r-md);min-height:50px;padding:0 22px;font-weight:600;transition:background .2s,transform .1s,opacity .2s,filter .2s}
@@ -203,6 +213,6 @@ html.kb #suggestions{max-height:calc(var(--vvh) - var(--map-h) - 110px);overflow
 html.kb .tools,html.kb .left{display:none}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-#map img.leaflet-tile{outline:1px solid transparent}
+.sat img.leaflet-tile{outline:1px solid transparent}
 
-#map .leaflet-tile{image-rendering:auto}
+.sat .leaflet-tile{image-rendering:auto}

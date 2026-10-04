@@ -1,0 +1,41 @@
+[
+  {
+    "airport": "Atlanta",
+    "n1": {
+      "tiles": 28,
+      "kb": 557,
+      "sharpness": 752
+    },
+    "n2": {
+      "tiles": 91,
+      "kb": 1722,
+      "sharpness": 2311
+    }
+  },
+  {
+    "airport": "General Dewitt Spain",
+    "n1": {
+      "tiles": 25,
+      "kb": 309,
+      "sharpness": 316
+    },
+    "n2": {
+      "tiles": 78,
+      "kb": 961,
+      "sharpness": 713
+    }
+  },
+  {
+    "airport": "Duqm",
+    "n1": {
+      "tiles": 32,
+      "kb": 427,
+      "sharpness": 299
+    },
+    "n2": {
+      "tiles": 98,
+      "kb": 1348,
+      "sharpness": 802
+    }
+  }
+]

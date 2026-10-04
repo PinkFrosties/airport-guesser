@@ -1,0 +1,58 @@
+{
+  "label": "after1",
+  "profile": "390px, DPR 3, Fast 4G (9 Mbit/s, 170 ms RTT)",
+  "rounds": {
+    "Atlanta": {
+      "requests": 28,
+      "uniqueTiles": 28,
+      "kb": 557,
+      "revealMs": 397,
+      "zoom": 13,
+      "n": 1,
+      "tilesInDom": 16,
+      "size": {
+        "x": 358,
+        "y": 371
+      }
+    },
+    "General Dewitt Spain": {
+      "requests": 25,
+      "uniqueTiles": 25,
+      "kb": 309,
+      "revealMs": 397,
+      "zoom": 15,
+      "n": 1,
+      "tilesInDom": 16,
+      "size": {
+        "x": 358,
+        "y": 371
+      }
+    },
+    "Duqm": {
+      "requests": 32,
+      "uniqueTiles": 32,
+      "kb": 427,
+      "revealMs": 415,
+      "zoom": 14,
+      "n": 1,
+      "tilesInDom": 16,
+      "size": {
+        "x": 358,
+        "y": 371
+      }
+    }
+  },
+  "cold": {
+    "requests": 32,
+    "uniqueTiles": 32,
+    "kb": 380,
+    "revealMs": 1509,
+    "airport": "Ixtapa-Zihuatanejo International Airport"
+  },
+  "zoomOut": {
+    "requests": 0,
+    "uniqueTiles": 0,
+    "kb": 0,
+    "revealMs": 813
+  }
+}

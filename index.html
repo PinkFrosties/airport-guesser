@@ -15,6 +15,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Airport Guesser">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+<link rel="preconnect" href="https://services.arcgisonline.com" crossorigin>
+<link rel="preload" href="data/airports.json" as="fetch" crossorigin>
+<link rel="modulepreload" href="js/app.js">
+<link rel="modulepreload" href="js/core.js">
+<link rel="modulepreload" href="js/store.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/satview.js">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -46,14 +54,18 @@
 
   <main class="board">
     <section class="stage card" id="stage">
-      <div id="map" role="img" aria-label="Satellite image of the mystery airport"></div>
+      <div id="map" class="sat front" role="img" aria-label="Satellite image of the mystery airport"></div>
+      <div id="map-wide" class="sat" aria-hidden="true"></div>
       <div class="hud" aria-live="polite">
         <span class="chip" id="hint-label">Airfield view</span>
         <span class="chip pips" id="pips" aria-label="Attempts used"></span>
       </div>
       <div class="veil" id="veil" hidden>
+        <div class="spinner" aria-hidden="true"></div>
         <p id="veil-msg">Loading imagery</p>
-        <button type="button" class="btn small" id="veil-retry" hidden>Retry</button>
+        <div class="progress" aria-hidden="true"><i id="veil-bar"></i></div>
+        <small id="veil-count"></small>
+        <button type="button" class="btn small" id="veil-retry" hidden>Tap to retry</button>
       </div>
     </section>
 

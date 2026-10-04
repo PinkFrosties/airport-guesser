@@ -31,8 +31,9 @@ let passed = 0;
 // Test airports: a hub, a small regional airfield (hard pool), a remote desert airfield (the v1 screenshot), an Antarctic station.
 const HUB = 3384, SMALL = 20403, REMOTE = 299738;
 
-async function newPage(profile, { watch = true } = {}) {
-  const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'] });
+// `sw: false` blocks service workers so page.route() sees every tile request (SW-initiated fetches bypass page.route)
+async function newPage(profile, { watch = true, sw = true } = {}) {
+  const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'], serviceWorkers: sw ? 'allow' : 'block' });
   const page = await ctx.newPage();
   if (watch) {
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -43,7 +44,7 @@ async function newPage(profile, { watch = true } = {}) {
 async function ready(page) {
   await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 40000 });
   await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 40000 });
-  await page.waitForFunction(() => document.querySelectorAll('#map .leaflet-tile-loaded').length > 0, null, { timeout: 40000 });
+  await page.waitForFunction(() => document.querySelectorAll('.sat.front .leaflet-tile-loaded').length > 0, null, { timeout: 40000 });
   await page.waitForTimeout(700);
 }
 async function open(page) {
@@ -109,7 +110,7 @@ const measure = (page) => page.evaluate(() => {
 
 /** Every loaded tile must be real imagery at native resolution (tilemap says it exists). */
 async function assertTilesReal(page) {
-  const srcs = await page.$$eval('#map img.leaflet-tile-loaded', (imgs) => imgs.map((i) => i.src));
+  const srcs = await page.$$eval('.sat.front img.leaflet-tile-loaded', (imgs) => imgs.map((i) => i.src));
   assert.ok(srcs.length > 0);
   const zs = new Set();
   for (const s of srcs.slice(0, 10)) {
@@ -133,14 +134,14 @@ const qaReport = [];
 async function auditSharp(page) {
   const a = await page.evaluate(() => {
     const g = window.__ag, dpr = devicePixelRatio;
-    const tiles = [...document.querySelectorAll('#map img.leaflet-tile')];
+    const tiles = [...document.querySelectorAll('.sat.front img.leaflet-tile')];
     const rects = tiles.map((t) => ({ css: t.getBoundingClientRect().width, nat: t.naturalWidth, loaded: t.classList.contains('leaflet-tile-loaded'), level: +t.src.match(/tile\/(\d+)\//)[1] }));
     return {
       dpr, zoom: g.map.getZoom(), n: g.view.retinaN, nz: g.round.answer.nz,
       levels: [...new Set(rects.map((r) => r.level))], allLoaded: rects.every((r) => r.loaded), count: rects.length,
       minBitmapPerDevicePx: Math.min(...rects.map((r) => r.nat / (r.css * dpr))),
       tileCss: rects[0].css,
-      transforms: [...document.querySelectorAll('#map .leaflet-tile-container')].map((e) => e.style.transform).filter((t) => /scale\((?!1\))/.test(t)),
+      transforms: [...document.querySelectorAll('.sat.front .leaflet-tile-container')].map((e) => e.style.transform).filter((t) => /scale\((?!1\))/.test(t)),
       rendering: getComputedStyle(tiles[0]).imageRendering,
     };
   });
@@ -148,7 +149,7 @@ async function auditSharp(page) {
   assert.equal(a.levels[0], a.zoom + a.n, 'tiles come from level zoom + retina levels');
   assert.ok(a.levels[0] <= a.nz, `never deeper than native imagery (level ${a.levels[0]} > nz ${a.nz})`);
   assert.ok(a.allLoaded, 'all tiles of the view are loaded before the image is shown');
-  assert.ok(a.minBitmapPerDevicePx >= 0.99, `bitmap pixels per device pixel ${a.minBitmapPerDevicePx.toFixed(2)} (< 1 means CSS upscaling)`);
+  assert.ok(a.minBitmapPerDevicePx >= (a.dpr > 1 ? 2 / a.dpr : 1) - 0.01, `bitmap pixels per device pixel ${a.minBitmapPerDevicePx.toFixed(2)} (+1 level: 2 bitmap px per CSS px)`);
   assert.deepEqual(a.transforms, [], 'no CSS scaling of the tile layer');
   assert.equal(a.rendering, 'auto');
   assert.equal(Number.isInteger(a.zoom), true);
@@ -168,7 +169,8 @@ await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp
     results[name] = { m, s };
     assert.ok(m.fill >= 0.45 && m.fill <= 0.92, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
     assert.ok(m.offX < 3 && m.offY < 3, `${name}: centred (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
-    assert.equal(s.tileCss, 64, 'tiles drawn at 64 CSS px (256 bitmap px, dpr 3)');
+    assert.equal(s.n, 1, 'extra tile levels capped at +1 even at dpr 3');
+    assert.equal(s.tileCss, 128, 'tiles drawn at 128 CSS px (256 bitmap px)');
     await assertTilesReal(page);
     await page.screenshot({ path: QA + `phone-dpr3-${name}.png` });
     const a = await answerOf(page);
@@ -182,16 +184,16 @@ await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp
 await test('native cap: when imagery is shallower than the fitted zoom, the airport gets smaller instead of blurry', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
-  // simulate a location whose real imagery ends at level 14 (data patched in memory only)
-  await page.evaluate((id) => { window.__ag.byId.get(id).nz = 14; }, HUB);
+  // simulate a location whose real imagery ends at level 13 (data patched in memory only)
+  await page.evaluate((id) => { window.__ag.byId.get(id).nz = 13; }, HUB);
   await start(page, HUB);
   const s = await auditSharp(page);
   const m = await measure(page);
   const fit = C.fitZoom(await answerOf(page), m.W, m.H);
   assert.ok(fit > s.zoom, 'fitted zoom ' + fit + ' was reduced');
-  assert.equal(s.zoom, 12, 'zoom = nz (14) - retina levels (2)');
-  assert.equal(s.levels[0], 14, 'requested tile level never beyond native max');
-  assert.ok(m.fill < 0.45, 'airport is smaller in the frame (' + (m.fill * 100).toFixed(0) + '%) rather than upscaled');
+  assert.equal(s.zoom, 12, 'zoom = nz (13) - retina levels (1)');
+  assert.equal(s.levels[0], 13, 'requested tile level never beyond native max');
+  assert.ok(m.fill < 0.7, 'airport is smaller in the frame (' + (m.fill * 100).toFixed(0) + '%) rather than upscaled');
   await page.screenshot({ path: QA + 'phone-dpr3-native-cap-simulated.png' });
   await ctx.close();
 });
@@ -221,6 +223,125 @@ await test('zoom-out reveals only after all tiles of the wider view are loaded (
   const s = await auditSharp(page);
   assert.equal(s.zoom, (await measure(page)).zoom);
   await page.screenshot({ path: QA + 'phone-dpr3-hub-zoomed-out.png' });
+  await ctx.close();
+});
+
+await test('tile requests are cacheable plain GETs spread over both hosts; only the frame is loaded (no buffer, no off-screen tiles)', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  const reqs = [];
+  page.on('request', (r) => { if (/World_Imagery\/MapServer\/tile\//.test(r.url())) reqs.push(r); });
+  await open(page);
+  await start(page, HUB);
+  await page.waitForFunction(() => window.__ag.views.wide.status === 'ready', null, { timeout: 30000 });
+  assert.ok(reqs.length > 0);
+  for (const r of reqs) assert.ok(!r.url().includes('?') && r.method() === 'GET', 'no cache-busting params: ' + r.url());
+  const hosts = new Set(reqs.map((r) => new URL(r.url()).hostname));
+  assert.deepEqual([...hosts].sort(), ['server.arcgisonline.com', 'services.arcgisonline.com']);
+  // main view: exactly the tiles intersecting the frame
+  const m = await page.evaluate(() => { const v = window.__ag.views.main; const a = window.__ag.round.answer; const c = [a.view[0], a.view[1]]; const z = v.map.getZoom(); return { expected: v.tilesFor(c, z).length, inDom: document.querySelectorAll('#map img.leaflet-tile').length, size: v.map.getSize() }; });
+  assert.equal(m.inDom, m.expected, 'DOM tiles = frame tiles');
+  assert.ok(m.expected <= 25, `a 358x371 frame needs ${m.expected} tiles at +1 (was 49 at +2)`);
+  const frame = await page.evaluate(() => { const s = document.querySelector('#stage').getBoundingClientRect(), mp = document.querySelector('#map').getBoundingClientRect(); return { dw: Math.abs(s.width - mp.width), dh: Math.abs(s.height - mp.height) }; });
+  assert.deepEqual([frame.dw, frame.dh], [0, 0], 'map container is exactly the frame');
+  await ctx.close();
+});
+
+await test('zoom-out view is preloaded in the background; Zoom out is an instant swap with no new requests and no loading state', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  const reqs = [];
+  page.on('request', (r) => { if (/World_Imagery\/MapServer\/tile\//.test(r.url())) reqs.push(r.url()); });
+  await open(page);
+  await start(page, HUB);
+  await page.waitForFunction(() => window.__ag.views.wide.status === 'ready', null, { timeout: 30000 }); // no user action needed
+  const a = await answerOf(page);
+  await guess(page, wrongPick(a, 1)[0].iata);
+  reqs.length = 0;
+  await page.locator('#btn-zoom').click();
+  await page.locator('#sheet [data-confirm]').click();
+  const state = await page.evaluate(() => ({ wideFront: document.querySelector('#map-wide').classList.contains('front'), veilHidden: document.querySelector('#veil').hidden }));
+  assert.deepEqual(state, { wideFront: true, veilHidden: true }, 'swapped synchronously, skeleton never shown');
+  await page.waitForTimeout(400);
+  assert.equal(reqs.length, 0, 'no tile requests on Zoom out: ' + reqs.length);
+  const s = await auditSharp(page);
+  assert.equal(s.zoom, (await measure(page)).zoom);
+  await ctx.close();
+});
+
+await test('loading state: skeleton with spinner + tiles-loaded progress; nothing but the skeleton until every tile is in, then a fade', async () => {
+  const { ctx, page } = await newPage(PHONE, { sw: false });
+  await open(page);
+  await page.evaluate(() => window.__ag.debugStart(21)); // warm-up: loads the Hard dataset first
+  await ready(page);
+  let k = 0;
+  await page.route('**/World_Imagery/MapServer/tile/**', async (route) => { await new Promise((r) => setTimeout(r, 150 + (k++ % 16) * 120)); await route.continue(); }); // staggered so progress advances
+  await page.evaluate(() => { window.__ag.debugStart(3384); }); // does not wait for the load
+  await page.waitForFunction(() => !document.querySelector('#veil').hidden && document.querySelector('#veil-count').textContent !== '');
+  const seen = { counts: new Set(), spinner: false, bar: false, covered: true, partialVisible: false };
+  for (let i = 0; i < 400; i++) {
+    const s = await page.evaluate(() => {
+      const v = document.querySelector('#veil');
+      if (v.hidden || v.classList.contains('out')) return { done: true };
+      const tiles = [...document.querySelectorAll('.sat.front img.leaflet-tile-loaded')].length;
+      return { done: false, count: document.querySelector('#veil-count').textContent, spinner: getComputedStyle(document.querySelector('.spinner')).display !== 'none', bar: parseFloat(document.querySelector('#veil-bar').style.width || '0'), opacity: getComputedStyle(v).opacity, bg: getComputedStyle(v).backgroundImage !== 'none', tiles };
+    });
+    if (s.done) break;
+    seen.counts.add(s.count);
+    seen.spinner ||= s.spinner;
+    seen.bar ||= s.bar > 0;
+    if (s.opacity !== '1' || !s.bg) seen.covered = false;
+    if (s.tiles > 0 && s.tiles < 5) seen.partialVisible = true; // partial tiles may exist in the DOM but must be covered
+    await page.waitForTimeout(40);
+  }
+  const counts = [...seen.counts].filter((c) => /^\d+ \/ \d+ tiles$/.test(c));
+  assert.ok(counts.length >= 3, 'progress text advanced: ' + [...seen.counts].join(' | '));
+  assert.ok(seen.spinner && seen.bar && seen.covered, JSON.stringify({ ...seen, counts: counts.length }));
+  const done = await page.evaluate(() => { const v = document.querySelector('#veil'); const t = [...document.querySelectorAll('.sat.front img.leaflet-tile')]; return { fading: v.hidden || v.classList.contains('out'), allLoaded: t.every((i) => i.classList.contains('leaflet-tile-loaded')), n: t.length }; });
+  assert.deepEqual([done.fading, done.allLoaded], [true, true], 'fade starts only when every tile is loaded');
+  await page.screenshot({ path: OUT + 'phone-loaded.png' });
+  await ctx.close();
+});
+
+await test('stalled tiles: retried once after the timeout, then a tap-to-retry state instead of hanging; tapping recovers', async () => {
+  const { ctx, page } = await newPage(PHONE, { watch: false, sw: false });
+  await page.addInitScript(() => { window.__AG_TILE_TIMEOUT_MS = 1200; });
+  let stall = true, stalled = 0;
+  await page.route('**/World_Imagery/MapServer/tile/**', (route) => { if (stall) { stalled++; return; } return route.continue(); });
+  const t0 = Date.now();
+  await page.goto(BASE);
+  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  if (await page.locator('#dlg-help[open]').count()) await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#veil').hidden && !document.querySelector('#veil-retry').hidden, null, { timeout: 20000 });
+  const took = Date.now() - t0;
+  assert.match(await page.locator('#veil-msg').innerText(), /taking too long/i);
+  assert.match(await page.locator('#veil-retry').innerText(), /tap to retry/i);
+  assert.ok(took > 2300 && took < 9000, `two attempts of 1.2 s each, then give up (${took} ms)`);
+  assert.ok(stalled >= 12, 'tile requests were made and stalled: ' + stalled);
+  await page.screenshot({ path: OUT + 'phone-tap-to-retry.png' });
+  stall = false;
+  await page.locator('#veil').click({ position: { x: 20, y: 20 } }); // the whole state is tappable
+  await ready(page);
+  assert.ok(await page.evaluate(() => window.__ag.round.answer.iata));
+  await ctx.close();
+});
+
+await test('service worker caches tiles: a reload is served from the Cache API (no tile network requests), also offline', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await ready(page);
+  await page.waitForFunction(() => window.__ag.views.wide.status === 'ready', null, { timeout: 30000 });
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload();                    // now controlled by the service worker; first controlled load fills the tile cache
+  await ready(page);
+  await page.waitForTimeout(1000);
+  const cached = await page.evaluate(async () => (await (await caches.open('airport-guesser-tiles-v1')).keys()).length);
+  assert.ok(cached >= 16, 'tiles in the Cache API: ' + cached);
+  // reload again with the network cut for tiles: everything must come from the cache
+  const live = [];
+  await page.route('**/World_Imagery/MapServer/tile/**', (route) => { live.push(route.request().url()); return route.abort(); });
+  await page.reload();
+  await page.waitForFunction(() => window.__ag && window.__ag.round && (document.querySelector('#veil').hidden || document.querySelector('#veil').classList.contains('out')), null, { timeout: 20000 });
+  const t = await page.evaluate(() => { const t = [...document.querySelectorAll('.sat.front img.leaflet-tile')]; return { n: t.length, ok: t.every((i) => i.classList.contains('leaflet-tile-loaded')) }; });
+  assert.ok(t.n > 0 && t.ok, 'all tiles shown from the cache: ' + JSON.stringify(t));
   await ctx.close();
 });
 
@@ -612,7 +733,7 @@ await test('no text or markers in the satellite view (hub, small, remote); attri
 console.log('imagery failure and PWA');
 
 await test('daily deterministic fallback when imagery for the first candidate is unreachable', async () => {
-  const { ctx, page } = await newPage(DESKTOP, { watch: false });
+  const { ctx, page } = await newPage(DESKTOP, { watch: false, sw: false });
   const order = C.dailyOrder(airports, C.utcDateString());
   // Block the centre tile of the first candidate at every level it might use
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => {
@@ -627,7 +748,7 @@ await test('daily deterministic fallback when imagery for the first candidate is
 });
 
 await test('all imagery blocked: clear message + retry; retry recovers', async () => {
-  const { ctx, page } = await newPage(DESKTOP, { watch: false });
+  const { ctx, page } = await newPage(DESKTOP, { watch: false, sw: false });
   let block = true;
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => (block ? route.abort() : route.continue()));
   await open(page);

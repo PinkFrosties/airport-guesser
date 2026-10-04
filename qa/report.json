@@ -5,10 +5,10 @@
     "pool": "daily",
     "dpr": 3,
     "zoomUsed": 13,
-    "tileLevelRequested": 15,
+    "tileLevelRequested": 14,
     "nativeMaxLevel": 19,
     "fillPct": 69,
-    "bitmapPxPerDevicePx": 1.33
+    "bitmapPxPerDevicePx": 0.67
   },
   {
     "airport": "General Dewitt Spain Airport",
@@ -16,10 +16,10 @@
     "pool": "hard",
     "dpr": 3,
     "zoomUsed": 15,
-    "tileLevelRequested": 17,
+    "tileLevelRequested": 16,
     "nativeMaxLevel": 19,
     "fillPct": 78,
-    "bitmapPxPerDevicePx": 1.33
+    "bitmapPxPerDevicePx": 0.67
   },
   {
     "airport": "Duqm International Airport",
@@ -27,9 +27,9 @@
     "pool": "daily",
     "dpr": 3,
     "zoomUsed": 14,
-    "tileLevelRequested": 16,
+    "tileLevelRequested": 15,
     "nativeMaxLevel": 18,
     "fillPct": 88,
-    "bitmapPxPerDevicePx": 1.33
+    "bitmapPxPerDevicePx": 0.67
   }
 ]

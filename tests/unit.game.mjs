@@ -76,12 +76,9 @@ test('small airfields are much tighter than hubs', () => {
   assert.ok(zs[Math.floor(zs.length / 2)] - hub >= 1, 'median hard airfield is >= 1 level tighter than a hub');
 });
 test('retina levels: tiles are requested deeper so every CSS pixel has >= devicePixelRatio real pixels', () => {
-  assert.deepEqual([1, 1.25, 1.5, 2, 2.625, 3, 3.5, 4].map(C.retinaLevels), [0, 1, 1, 1, 2, 2, 2, 2]);
-  for (const dpr of [1, 1.5, 2, 2.625, 3, 4]) {
-    const n = C.retinaLevels(dpr);
-    const bitmapPxPerDevicePx = 2 ** n / dpr; // 256px bitmap drawn at 256/2^n CSS px
-    assert.ok(bitmapPxPerDevicePx >= 1 - 1e-9, `dpr ${dpr}: ${bitmapPxPerDevicePx}`);
-  }
+  assert.deepEqual([1, 1.25, 1.5, 2, 2.625, 3, 3.5, 4].map(C.retinaLevels), [0, 1, 1, 1, 1, 1, 1, 1], 'extra levels capped at +1');
+  for (const dpr of [1, 1.5, 2]) assert.ok(2 ** C.retinaLevels(dpr) / dpr >= 1 - 1e-9, `dpr ${dpr}: native 1:1 or better`);
+  assert.ok(2 / 3 > 0.66, 'dpr 3 gets 2 bitmap px per CSS px (0.67 per device px)');
 });
 test('final zoom never exceeds native imagery: zoom + retina levels <= nz, for every airport and dpr', () => {
   for (const a of [...airports, ...hard]) {

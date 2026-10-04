@@ -1,5 +1,6 @@
 // Minimal static file server for local development and tests.  Usage: node scripts/serve.mjs [port]
 import http from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
@@ -19,8 +20,13 @@ export function createServer() {
       const file = normalize(join(root, p));
       if (!file.startsWith(root) || file.includes(`${root}${'/node_modules'}`)) throw new Error('forbidden');
       if (!(await stat(file)).isFile()) throw new Error('nf');
-      res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(await readFile(file));
+      const type = TYPES[extname(file)] || 'application/octet-stream';
+      let body = await readFile(file);
+      const headers = { 'Content-Type': type, 'Cache-Control': 'no-cache' };
+      // like GitHub Pages: compress text assets
+      if (/^text\/|json|manifest|svg/.test(type) && /gzip/.test(req.headers['accept-encoding'] || '')) { body = gzipSync(body); headers['Content-Encoding'] = 'gzip'; }
+      res.writeHead(200, headers);
+      res.end(body);
     } catch {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');

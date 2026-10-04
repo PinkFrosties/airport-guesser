@@ -203,10 +203,11 @@ export function fitZoom(a, W, H, { minZoom = 8, maxZoom = 19 } = {}) {
 }
 
 /**
- * Extra tile levels to request so every CSS pixel is backed by >= devicePixelRatio real pixels:
- * level = zoom + n with tiles drawn at 256/2^n CSS px. dpr 1 -> 0, 1.5-2 -> 1, 2.01-4 -> 2.
+ * Extra tile levels to request: level = zoom + n, tiles drawn at 256/2^n CSS px. Capped at +1 (2 bitmap pixels per CSS
+ * pixel): +2 would give a bit more detail on 3x screens but needs 3-4x as many tiles and is what made loading slow.
+ * dpr 1 -> 0; above 1 -> 1.
  */
-export const retinaLevels = (dpr) => Math.min(2, Math.max(0, Math.ceil(Math.log2(Math.max(1, dpr)) - 1e-9)));
+export const retinaLevels = (dpr) => (dpr > 1.0001 ? 1 : 0);
 
 /** Highest map zoom whose tiles (level zoom+n) are still real, native-resolution imagery at this airport. */
 export const maxSharpZoom = (a, n) => a.nz - n;

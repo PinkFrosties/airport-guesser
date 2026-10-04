@@ -28,13 +28,23 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 - Light, Apple-inspired design, responsive on phone and desktop
 - Zoom fitted per airport to its runway extent, capped at native tile resolution so images stay sharp
-- Retina-sharp imagery: tiles are requested at the screen's pixel density, never upscaled
+- Retina-sharp imagery: tiles are requested at the screen's pixel density (up to +1 level), never CSS-upscaled beyond that
+- Fast loading: only the visible tiles, background preload of the zoom-out view, service-worker tile cache
 - Desktop layout: image left, guess panel right
 - Distance and direction feedback on every wrong guess
 - Optional hints and one-time zoom-out, each costing a guess
 - Installable PWA that works offline (map tiles need a network)
 
 ## Changelog
+
+### v1.1.2 (load speed)
+- Image appears in about 0.6 s on Fast 4G (was 1.8-2.4 s), cold page load to image in about 1.2 s (was 4.3 s)
+- Extra tile levels capped at +1 (16 tiles per view instead of 42-49); +2 gave slightly finer detail at 3x but tripled the load
+- Only the frame is loaded; tiles are plain cacheable GETs spread over two Esri hosts; preconnect and preloaded data
+- The zoom-out view loads in the background, so Zoom out is an instant swap
+- Loading skeleton with spinner and tiles-loaded progress; fade-in only when every tile is in
+- Service worker caches map tiles (Cache API); a reload is instant and works offline for seen airports
+- 10 s stall timeout, one automatic retry, then a tap-to-retry state
 
 ### v1.1.1 (image quality)
 - Fixed blurry images on phones: tiles are now requested 1-2 levels deeper (by devicePixelRatio) and drawn at 256/2^n CSS px, so every device pixel is backed by a real pixel
@@ -95,9 +105,18 @@ python scripts/build_data.py     # add --refresh to re-download sources
 - `data/airports-hard.json`, the **Hard pool** (9,548 airports): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
 - **Per-airport view box.** `view` is `[lat, lon, width m, height m]`: the bounding box of the runway endpoints (falling back to runway length around the reference point). The client picks the zoom at which that box fills about 75% of the actual image area, in half-level steps so tiles are never upscaled, and `rw` is the number of open runways (for the hint).
 - **Native resolution (`nz`).** At build time the Esri `tilemap` service is probed for each airport: `nz` is the deepest tile level at which a 7x7 block of tiles around the airfield is real imagery (not the grey "map data not yet available" placeholder). Results are cached in `scripts/.cache/native_zoom.json`; `--refresh-zoom` re-probes and `--verify` spot-checks the tilemap against real tile downloads.
-- **Sharp rendering.** Tiles are requested `n` levels deeper than the map zoom (n = 0, 1 or 2 for devicePixelRatio 1, up to 2, up to 4) and drawn at 256/2^n CSS px, so each CSS pixel has at least devicePixelRatio real pixels. The map zoom is a whole number, and the zoom used is `min(fit-to-airfield zoom, nz - n)`: a smaller airport in the frame beats a blurry upscale.
+- **Sharp rendering.** Tiles are requested `n` levels deeper than the map zoom (n = 0 for devicePixelRatio 1, otherwise 1; +2 was dropped in v1.1.2 for load speed) and drawn at 256/2^n CSS px. The map zoom is a whole number, and the zoom used is `min(fit-to-airfield zoom, nz - n)`: a smaller airport in the frame beats a blurry upscale.
 - **Quality filter.** Both pools drop airports where, on a reference 358x371 phone at devicePixelRatio 3, real imagery cannot show the airfield at 45% or more of the frame (Daily 3,244 to 3,230, Hard 9,765 to 9,548). The filter is device-independent so everyone gets the same Daily.
 - **Practice sets.** OurAirports has no passenger numbers, so "Top 100" is ranked by a connectivity proxy: route counts in [OpenFlights](https://github.com/jpatokal/openflights) `routes.dat` (ODbL). "Large" is all large airports, "Mid-size" is medium airports.
+
+## Performance
+
+```bash
+node tests/perf.mjs [label]        # 390px, DPR 3, Fast 4G (9 Mbit/s, 170 ms RTT): requests, KB and time-to-reveal
+node tests/quality-compare.mjs     # +1 vs +2 tile levels at DPR 3: requests, KB, sharpness score, side-by-side shots
+```
+
+Results are written to `qa/`. Esri serves tiles over HTTP/1.1, so tiles alternate between `server.` and `services.arcgisonline.com` to double the parallel connections.
 
 ## Imagery provider
 

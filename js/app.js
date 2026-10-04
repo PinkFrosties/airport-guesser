@@ -1,10 +1,11 @@
 import * as C from './core.js';
 import * as S from './store.js';
 import { IMAGERY, GAME } from './config.js';
+import { createSatView } from './satview.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = {
-  map: $('#map'), hint: $('#hint-label'), pips: $('#pips'), veil: $('#veil'), veilMsg: $('#veil-msg'), veilRetry: $('#veil-retry'),
+  map: $('#map'), mapWide: $('#map-wide'), veilBar: $('#veil-bar'), veilCount: $('#veil-count'), hint: $('#hint-label'), pips: $('#pips'), veil: $('#veil'), veilMsg: $('#veil-msg'), veilRetry: $('#veil-retry'),
   form: $('#guess-form'), input: $('#guess-input'), btn: $('#guess-btn'), list: $('#suggestions'),
   guesses: $('#guesses'), result: $('#result'), play: $('#play'), stage: $('#stage'), left: $('#left'),
   tools: $('#tools'), btnHint: $('#btn-hint'), btnZoom: $('#btn-zoom'), sheet: $('#sheet'),
@@ -21,14 +22,19 @@ const game = {
   selected: null, token: 0, lastPracticeId: null,
 };
 window.__ag = game; // convenience for tests/debugging; the dataset is client-side anyway
-Object.defineProperty(game, 'zoom', { get: () => (map ? map.getZoom() : null) });
-Object.defineProperty(game, 'map', { get: () => map });
+game.config = IMAGERY; // tests may shorten the tile timeout
+game.retinaOverride = null; // tests may force the extra tile levels
+Object.defineProperty(game, 'zoom', { get: () => (frontView().map ? frontView().map.getZoom() : null) });
+Object.defineProperty(game, 'map', { get: () => frontView().map });
+Object.defineProperty(game, 'views', { get: () => views });
 Object.defineProperty(game, 'view', {
   get() {
-    if (!map || !game.round) return null;
-    const s = map.getSize();
+    const v = frontView();
+    if (!v.map || !game.round) return null;
+    const s = v.map.getSize();
     const a = game.round.answer;
-    return { W: s.x, H: s.y, zoom: map.getZoom(), fill: C.fillAt(a, s.x, s.y, map.getZoom()), retinaN, dpr: window.devicePixelRatio, tileLevel: map.getZoom() + retinaN, nz: a.nz };
+    const n = v.retinaLevels;
+    return { W: s.x, H: s.y, zoom: v.map.getZoom(), fill: C.fillAt(a, s.x, s.y, v.map.getZoom()), retinaN: n, dpr: window.devicePixelRatio, tileLevel: v.map.getZoom() + n, nz: a.nz };
   },
 });
 
@@ -59,134 +65,96 @@ function toast(msg) {
 }
 
 // ---------- map (locked: no pan, zoom, drag, keys or controls) ----------
-// Sharp rendering: tiles are requested `retinaN` levels deeper than the map zoom and drawn at 256/2^retinaN CSS px,
-// so each CSS pixel is backed by >= devicePixelRatio real pixels (never a CSS-upscaled bitmap). Zoom is a whole number,
-// so Leaflet never applies a scale transform to the tile layer, and fallback tiles from other zoom levels are never kept.
-let map = null, layer = null, tileStats = { ok: 0, err: 0 }, retinaN = 0;
-
+// Two stacked, identical-size satellite views: `main` (the airfield) and `wide` (the zoom-out). The wide one is loaded
+// in the background once the main view is complete, so Zoom out is just a visibility swap.
 const dprNow = () => window.devicePixelRatio || 1;
-const tileUrl = (z, x, y) =>
-  IMAGERY.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', (IMAGERY.subdomains || '')[0] || '');
+const retinaNow = () => (game.retinaOverride != null ? game.retinaOverride : C.retinaLevels(dprNow()));
+let awaiting = null; // the view the loading skeleton is currently waiting for
 
-const SharpTiles = L.TileLayer.extend({
-  _retainParent() { return false; },   // no blurry lower-zoom stand-ins while tiles load
-  _retainChildren() { return false; },
-});
-
-function makeLayer(n) {
-  const l = new SharpTiles(IMAGERY.url, {
-    attribution: IMAGERY.attribution, subdomains: IMAGERY.subdomains || 'abc',
-    tileSize: 256 / 2 ** n, zoomOffset: n, minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n,
-    keepBuffer: 0, updateWhenIdle: true, updateWhenZooming: false, detectRetina: false,
-  });
-  l.on('loading', () => { tileStats = { ok: 0, err: 0 }; });
-  l.on('tileload', () => { tileStats.ok++; });
-  l.on('tileerror', () => { tileStats.err++; });
-  l.on('load', () => {
-    if (veilIsBlocking) return; // a round is being prepared: its own messages take precedence
-    if (tileStats.err > 0 && tileStats.err >= tileStats.ok) showVeil('Imagery failed to load. Check your connection.', true);
-    else hideVeil(); // every tile of the view is in: now (and only now) reveal the image
-  });
-  return l;
+const views = {
+  main: createSatView({ container: el.map, imagery: IMAGERY, onProgress: (d, t) => { if (awaiting === views.main) setProgress(d, t); } }),
+  wide: createSatView({ container: el.mapWide, imagery: IMAGERY, onProgress: (d, t) => { if (awaiting === views.wide) setProgress(d, t); } }),
+};
+const frontView = () => (game.round && game.round.zoomed && !game.round.done ? views.wide : views.main);
+function setFront() {
+  const f = frontView();
+  for (const v of Object.values(views)) v.container.classList.toggle('front', v === f);
 }
 
-function ensureMap() {
-  if (map) return;
-  retinaN = C.retinaLevels(dprNow());
-  map = L.map(el.map, {
-    zoomControl: false, attributionControl: true, dragging: false, touchZoom: false, scrollWheelZoom: false,
-    doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false, zoomSnap: 1, zoomDelta: 1,
-    zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false, inertia: false,
-    minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom, worldCopyJump: false,
-  });
-  map.attributionControl.setPrefix(false);
-  layer = makeLayer(retinaN).addTo(map);
-  map.setView([20, 0], 2, { animate: false });
-}
-
-/** devicePixelRatio can change (browser zoom, moving between monitors): rebuild the tile layer for the new density. */
-function syncRetina() {
-  const n = C.retinaLevels(dprNow());
-  if (!map || n === retinaN) return false;
-  retinaN = n;
-  map.removeLayer(layer);
-  layer = makeLayer(n).addTo(map);
-  return true;
-}
-
-let veilIsBlocking = false; // true while a round is being prepared
+// loading skeleton: spinner + progress (tiles loaded / total); fades out only when every tile is in
+let hideTimer;
 function showVeil(msg, retry = false, loading = false) {
+  clearTimeout(hideTimer);
+  el.veil.classList.remove('out');
   el.veilMsg.textContent = msg;
   el.veil.classList.toggle('loading', loading);
   el.veilRetry.hidden = !retry;
   el.veil.hidden = false;
 }
-function hideVeil() { el.veil.hidden = true; }
-
-el.veilRetry.addEventListener('click', () => {
-  if (game.round) {
-    tileStats = { ok: 0, err: 0 };
-    showVeil('Loading imagery', false, true);
-    layer.redraw();
-  } else {
-    startMode();
-  }
-});
-
-const mapSize = () => { ensureMap(); map.invalidateSize(); const s = map.getSize(); return { W: Math.max(s.x, 200), H: Math.max(s.y, 150) }; };
-
-/** Zoom for the round at the current frame size: fitted to the airfield, never deeper than real imagery supports. */
-function roundZoom(r) {
-  const { W, H } = mapSize();
-  const z = C.finalZoom(r.answer, W, H, retinaN, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - retinaN });
-  return r.zoomed && !r.done ? C.zoomedOut(z) : z;
+function hideVeil() {
+  if (el.veil.hidden) return;
+  el.veil.classList.add('out');
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { el.veil.hidden = true; el.veil.classList.remove('out'); }, 240);
+}
+function setProgress(done, total) {
+  el.veilBar.style.width = total ? `${Math.round((100 * done) / total)}%` : '0%';
+  el.veilCount.textContent = total ? `${done} / ${total} tiles` : '';
 }
 
-/**
- * Show the round's view. The image stays covered (veil) until every tile of the final view has loaded, so the player
- * never sees half-loaded or interpolated tiles.
- */
-let viewToken = 0;
-function renderMapForRound() {
-  const r = game.round;
+const retryAction = () => (game.round ? presentRound() : startMode());
+el.veilRetry.addEventListener('click', (e) => { e.stopPropagation(); retryAction(); });
+el.veil.addEventListener('click', () => { if (!el.veilRetry.hidden) retryAction(); }); // the whole state is tappable
+
+function syncRetina() {
+  const n = retinaNow();
+  for (const v of Object.values(views)) v.setRetina(n);
+}
+
+/** Centre + zooms for an airport at the current frame size: fitted to the airfield, never deeper than real imagery. */
+function viewParams(a) {
   syncRetina();
-  const z = roundZoom(r);
-  const center = [r.answer.view[0], r.answer.view[1]];
-  const c = map.getCenter();
-  const same = map.getZoom() === z && Math.abs(c.lat - center[0]) < 1e-7 && Math.abs(c.lng - center[1]) < 1e-7;
-  el.hint.textContent = r.zoomed && !r.done ? 'Wider view' : 'Airfield view';
-  if (same) return;
-  tileStats = { ok: 0, err: 0 };
+  const n = views.main.retinaLevels;
+  const { W, H } = views.main.size();
+  const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n });
+  return { center: [a.view[0], a.view[1]], zMain: z, zWide: C.zoomedOut(z), W, H };
+}
+
+let presentToken = 0;
+/** Show the round's current view (airfield, or the wider one after Zoom out); resolves with the load status. */
+async function presentRound() {
+  const r = game.round;
+  if (!r) return 'idle';
+  const my = ++presentToken;
+  setFront();
+  const { center, zMain, zWide } = viewParams(r.answer);
+  const wide = r.zoomed && !r.done;
+  const v = wide ? views.wide : views.main;
+  const z = wide ? zWide : zMain;
+  el.hint.textContent = wide ? 'Wider view' : 'Airfield view';
+  if (v.isReady(center, z)) { hideVeil(); preloadWider(); return 'ok'; }
+  awaiting = v;
   showVeil('Loading imagery', false, true);
-  map.setView(center, z, { animate: false });
-  const token = ++viewToken;
-  // 'load' normally reveals the image; this covers views whose tiles were all cached (no event fires)
-  setTimeout(() => { if (token === viewToken && !veilIsBlocking && tileStats.err === 0 && !layer.isLoading()) hideVeil(); }, 400);
+  setProgress(0, v.tilesFor(center, z).length);
+  const res = await v.load(center, z);
+  if (my !== presentToken || res === 'superseded') return res;
+  return finishLoad(res);
 }
 
-function probeTile(a, z) {
-  return new Promise((resolve) => {
-    const t = C.tileCoords(a.view[0], a.view[1], z + retinaN);
-    const img = new Image();
-    let finished = false;
-    const done = (ok) => { if (!finished) { finished = true; clearTimeout(timer); resolve(ok); } };
-    const timer = setTimeout(() => done(false), IMAGERY.probeTimeoutMs);
-    img.onload = () => done(img.naturalWidth > 0);
-    img.onerror = () => done(false);
-    img.src = tileUrl(t.z, t.x, t.y);
-  });
+function finishLoad(res) {
+  if (res === 'ok') { hideVeil(); preloadWider(); }
+  else if (res === 'timeout') showVeil('Imagery is taking too long to load.', true);
+  else showVeil('Imagery failed to load. Check your connection.', true);
+  return res;
 }
 
-/**
- * Can this airport be shown sharply right now? The pool is pre-filtered at build time (`nz` = native imagery level),
- * so this only re-checks the frame fill on this device and that the tile server answers.
- */
-async function resolveView(a) {
-  const { W, H } = mapSize();
-  const z = C.finalZoom(a, W, H, retinaN, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - retinaN });
-  if (C.fillAt(a, W, H, z) < C.MIN_FILL * 0.8) return null; // a much narrower frame than the reference phone
-  if (!(await probeTile(a, z))) return null;
-  return { z };
+/** Warm the zoom-out view in the background once the main view is complete. */
+function preloadWider() {
+  const r = game.round;
+  if (!r || r.done || r.zoomed || !C.canSpend(spent(r))) return;
+  const { center, zWide } = viewParams(r.answer);
+  if (views.wide.isReady(center, zWide) || views.wide.status === 'loading') return;
+  views.wide.load(center, zWide).catch(() => {});
 }
 
 // ---------- rounds ----------
@@ -234,14 +202,13 @@ async function startMode() {
   clearSelection();
   closeList();
   closeSheet();
-  ensureMap();
   game.round = null;
   renderChrome();
-  veilIsBlocking = true;
+  awaiting = views.main;
+  showVeil('Loading imagery', false, true);
 
   if (game.hard && !(await ensureHard())) {
     if (token !== game.token) return;
-    veilIsBlocking = false;
     showVeil('Could not load the Hard mode airports. Check your connection and retry.', true);
     return;
   }
@@ -257,10 +224,9 @@ async function startMode() {
       const r = restoreRound(kind, saved);
       if (r) {
         game.round = r;
-        showVeil('Loading imagery', false, true);
-        await resolveView(r.answer); // warms the tile cache; the saved airport is kept regardless
-        if (token !== game.token) return;
-        return enterRound(token);
+        renderAll();
+        await presentRound();
+        return;
       }
     }
   }
@@ -270,22 +236,32 @@ async function startMode() {
     ? C.practiceOrder(pool, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId)
     : C.dailyOrder(pool, date, game.hard ? 'hard:' : '');
 
-  showVeil('Loading imagery', false, true);
+  // Start loading the first candidate's tiles right away. A candidate whose tiles still fail after one retry is skipped
+  // (deterministic fallback order for the Daily); a stalled network stops here with a tap-to-retry state.
   let answer = null;
+  game.round = null;
   for (const cand of order.slice(0, GAME.maxProbeAttempts)) {
-    const res = await resolveView(cand);
+    const { center, zMain, W, H } = viewParams(cand);
+    if (C.fillAt(cand, W, H, zMain) < C.MIN_FILL * 0.8) continue; // frame far narrower than the reference phone
+    awaiting = views.main;
+    setFront();
+    setProgress(0, views.main.tilesFor(center, zMain).length);
+    const res = await views.main.load(center, zMain);
     if (token !== game.token) return;
-    if (res) { answer = cand; break; }
+    if (res === 'ok') { answer = cand; break; }
+    if (res === 'timeout') return showVeil('Imagery is taking too long to load.', true);
   }
   if (!answer) {
-    veilIsBlocking = false;
     showVeil('Satellite imagery is unavailable right now. Check your connection and retry.', true);
     return;
   }
   const r = newRound(kind, date, answer);
   game.round = r;
   if (kind === 'practice') game.lastPracticeId = answer.id; else persist();
-  enterRound(token);
+  renderAll();
+  setFront();
+  hideVeil();
+  preloadWider();
 }
 
 /** Test hook: start a practice round on a specific airport (the data is client-side anyway). */
@@ -294,23 +270,20 @@ game.debugStart = async (id) => {
   closeSheet(); clearSelection(); closeList();
   if (!game.hardLoaded) await ensureHard();
   const a = game.byId.get(id);
-  const res = await resolveView(a);
-  const r = newRound('practice', null, a);
-  game.round = r;
-  enterRound(token);
-  return res;
-};
-
-function enterRound(token) {
-  if (token !== game.token) return;
-  veilIsBlocking = false;
-  tileStats = { ok: 0, err: 0 };
+  game.round = null;
+  const { center, zMain } = viewParams(a);
+  awaiting = views.main;
   showVeil('Loading imagery', false, true);
-  renderMapForRound();
+  setProgress(0, views.main.tilesFor(center, zMain).length);
+  setFront();
+  const res = await views.main.load(center, zMain);
+  if (token !== game.token) return { status: 'superseded' };
+  game.round = newRound('practice', null, a);
   renderAll();
-  // 'load' reveals the image once every tile is in; this only covers a fully cached view
-  setTimeout(() => { if (token === game.token && tileStats.err === 0 && !layer.isLoading()) hideVeil(); }, 2500);
-}
+  setFront();
+  if (res === 'ok') { hideVeil(); preloadWider(); } else finishLoad(res);
+  return { status: res, z: zMain };
+};
 
 function persist() {
   const r = game.round;
@@ -327,7 +300,7 @@ function afterSpend({ zoomChanged = false } = {}) {
   persist();
   if (r.done) S.recordResult(r.kind, r.won, spent(r), r.date || todayKey());
   closeSheet();
-  if (zoomChanged || r.done) renderMapForRound();
+  if (zoomChanged || r.done) presentRound();
   renderAll(true);
   if (r.done) el.result.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
@@ -686,12 +659,12 @@ function onViewport() {
   const was = root.classList.contains('kb');
   root.classList.toggle('kb', kb);
   if (kb && !was) requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  if (map && kb !== was) refit(320);
+  if (kb !== was) refit(320);
 }
 /** The locked view is fitted to the viewport, so re-fit whenever the image area changes size. */
 function refit(delay = 150) {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (map && game.round) renderMapForRound(); }, delay);
+  resizeTimer = setTimeout(() => { if (game.round) presentRound(); }, delay);
 }
 if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewport);
 window.addEventListener('resize', () => { onViewport(); refit(); });
