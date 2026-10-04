@@ -9,17 +9,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'icons');
 mkdirSync(out, { recursive: true });
 
-// Two crossing runways inside a ring, on the app's dark background. `inset` shrinks art for the maskable safe zone.
+// Two crossing runways inside a ring, on the accent-blue background. `inset` shrinks art for the maskable safe zone.
 const svg = ({ rounded, scale }) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" ${rounded ? 'rx="112"' : ''} fill="#0c0e11"/>
+  <rect width="512" height="512" ${rounded ? 'rx="112"' : ''} fill="#0071e3"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
-    <circle cx="256" cy="256" r="170" fill="none" stroke="#ffb23f" stroke-width="14"/>
+    <circle cx="256" cy="256" r="170" fill="none" stroke="#ffffff" stroke-width="14"/>
     <g transform="rotate(-18 256 256)">
-      <rect x="238" y="112" width="36" height="288" rx="5" fill="#ece8df"/>
-      <path d="M256 126V386" stroke="#0c0e11" stroke-width="4" stroke-dasharray="20 16"/>
+      <rect x="238" y="112" width="36" height="288" rx="5" fill="#ffffff"/>
+      <path d="M256 126V386" stroke="#0071e3" stroke-width="4" stroke-dasharray="20 16"/>
     </g>
     <g transform="rotate(48 256 256) translate(0 24)">
-      <rect x="245" y="156" width="22" height="170" rx="4" fill="#ffb23f"/>
+      <rect x="245" y="156" width="22" height="170" rx="4" fill="#bcd9f8"/>
     </g>
   </g>
 </svg>`;

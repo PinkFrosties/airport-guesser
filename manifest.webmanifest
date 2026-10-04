@@ -1,13 +1,13 @@
 {
   "name": "Airport Guesser",
   "short_name": "Airports",
-  "description": "Name the airport from a satellite image. Five guesses, with distance and direction clues.",
+  "description": "Name the airport from a satellite image. Five attempts, with distance and direction clues.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0c0e11",
-  "theme_color": "#0c0e11",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
