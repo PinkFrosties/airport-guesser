@@ -499,7 +499,7 @@ await test('mobile layout: image on top, panel below; light theme; system font; 
     return {
       stackedOk: st.bottom <= pn.top + 1 && Math.abs(st.left - pn.left) < 2,
       stageH: st.height, vw: innerWidth, overflowX: document.documentElement.scrollWidth > innerWidth,
-      bg, font: getComputedStyle(document.body).fontFamily, foot: document.querySelector('.foot').innerText,
+      bg, font: getComputedStyle(document.body).fontFamily, foot: document.querySelector('.foot span').innerText,
       attrib: document.querySelector('.leaflet-control-attribution').innerText,
       attribVisible: at.width > 40 && at.height > 5 && at.bottom <= st.bottom + 1 && at.right <= st.right + 1,
       inputFs: parseFloat(getComputedStyle(document.querySelector('#guess-input')).fontSize),

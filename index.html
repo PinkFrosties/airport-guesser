@@ -5,7 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Airport Guesser</title>
 <meta name="description" content="Name the airport from a satellite image. Five attempts, with distance and direction clues.">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f5f5f7">
+<script>
+/* Resolve the theme before first paint (no flash of the wrong theme). Keep in sync with js/theme.js. */
+(function () {
+  var r = document.documentElement, pref = 'system';
+  try { var v = localStorage.getItem('airportGuesser.theme.v1'); if (v === 'light' || v === 'dark') pref = v; } catch (e) {}
+  var dark = pref === 'dark' || (pref === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  var theme = dark ? 'dark' : 'light';
+  r.setAttribute('data-theme', theme); r.setAttribute('data-theme-pref', pref);
+  r.style.colorScheme = theme; r.style.backgroundColor = dark ? '#000000' : '#f5f5f7'; /* stopgap until the stylesheet loads */
+  var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', dark ? '#000000' : '#f5f5f7');
+})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -23,6 +36,7 @@
 <link rel="modulepreload" href="js/store.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/satview.js">
+<link rel="modulepreload" href="js/theme.js">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -101,7 +115,14 @@
     </section>
   </main>
 
-  <footer class="foot">Created by Kevin Pahud</footer>
+  <footer class="foot">
+    <span>Created by Kevin Pahud</span>
+    <div class="seg seg-sm" id="theme-seg" role="group" aria-label="Appearance">
+      <button type="button" data-theme-pref="system" aria-pressed="true">System</button>
+      <button type="button" data-theme-pref="light" aria-pressed="false">Light</button>
+      <button type="button" data-theme-pref="dark" aria-pressed="false">Dark</button>
+    </div>
+  </footer>
 </div>
 
 <dialog id="dlg-help" aria-labelledby="help-title">

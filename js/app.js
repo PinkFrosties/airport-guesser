@@ -2,6 +2,7 @@ import * as C from './core.js';
 import * as S from './store.js';
 import { IMAGERY, GAME } from './config.js';
 import { createSatView } from './satview.js';
+import { initTheme, setPref } from './theme.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = {
@@ -671,6 +672,14 @@ window.addEventListener('resize', () => { onViewport(); refit(); });
 el.input.addEventListener('blur', () => setTimeout(onViewport, 50));
 el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();
+
+// ---------- theme ----------
+const themeSeg = $('#theme-seg');
+function markTheme({ pref }) {
+  for (const b of themeSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.themePref === pref));
+}
+themeSeg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) markTheme(setPref(b.dataset.themePref)); });
+initTheme(markTheme); // also follows the OS setting live while on System
 
 // ---------- boot ----------
 async function boot() {

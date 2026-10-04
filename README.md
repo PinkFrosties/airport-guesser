@@ -33,9 +33,15 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 - Desktop layout: image left, guess panel right
 - Distance and direction feedback on every wrong guess
 - Optional hints and one-time zoom-out, each costing a guess
+- Light and dark themes, follows system setting with manual override
 - Installable PWA that works offline (map tiles need a network)
 
 ## Changelog
+
+### v1.2.2 (system theme)
+- Light and dark themes in the same Apple style; follows the OS setting live, with a System / Light / Dark switch in the footer (stored in localStorage)
+- All colours are CSS variables (design tokens); the theme is applied before first paint, so there is no flash of the wrong theme
+- `color-scheme: light dark` and a per-theme browser-bar colour; WCAG AA contrast verified in both themes (`tests/theme.mjs`)
 
 ### v1.1.2 (load speed)
 - Image appears in about 0.6 s on Fast 4G (was 1.8-2.4 s), cold page load to image in about 1.2 s (was 4.3 s)
@@ -79,6 +85,7 @@ Any static server works. A service worker only registers on `localhost` or HTTPS
 npm install                      # dev-only: Playwright + the vendored Leaflet source
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
+node tests/theme.mjs             # light/dark, live OS switching, no-flash, WCAG AA contrast, QA screenshots
 node tests/e2e.mjs               # headless Playwright: phone 390x844 and desktop 1280x800 (needs network for Esri tiles)
 ```
 
