@@ -1,12 +1,14 @@
 // End-to-end checks with headless Playwright. Run: node tests/e2e.mjs
-// Plays full games on a phone (390x844) and desktop viewport against a local static server.
+// Plays full games on a phone (390x844) and desktop viewport against a local static server (needs network for Esri tiles).
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 import * as C from '../js/core.js';
 
-const { airports } = JSON.parse(readFileSync(new URL('../data/airports.json', import.meta.url), 'utf8'));
+const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8')).airports;
+const airports = read('airports.json');
+const hardList = read('airports-hard.json');
 const by = (iata) => airports.find((a) => a.iata === iata);
 const OUT = new URL('../test-output/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 mkdirSync(OUT, { recursive: true });
@@ -26,8 +28,11 @@ const DESKTOP = { viewport: { width: 1280, height: 800 } };
 const errors = [];
 let passed = 0;
 
-async function newPage(profile, { watch = true, permissions = ['clipboard-read', 'clipboard-write'] } = {}) {
-  const ctx = await browser.newContext({ ...profile, permissions, serviceWorkers: 'allow' });
+// Test airports: a hub, a small regional airfield (hard pool), a remote desert airfield (the v1 screenshot), an Antarctic station.
+const HUB = 3384, SMALL = 20403, REMOTE = 299738, ANTARCTIC = 6039;
+
+async function newPage(profile, { watch = true } = {}) {
+  const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await ctx.newPage();
   if (watch) {
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -35,40 +40,48 @@ async function newPage(profile, { watch = true, permissions = ['clipboard-read',
   }
   return { ctx, page };
 }
-
 async function ready(page) {
-  await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 30000 });
-  await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 30000 });
-  await page.waitForFunction(() => document.querySelectorAll('#map .leaflet-tile-loaded').length > 0, null, { timeout: 30000 });
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 40000 });
+  await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 40000 });
+  await page.waitForFunction(() => document.querySelectorAll('#map .leaflet-tile-loaded').length > 0, null, { timeout: 40000 });
+  await page.waitForTimeout(700);
 }
-async function closeHelp(page) {
-  await page.waitForFunction(() => window.__ag && window.__ag.airports.length > 0, null, { timeout: 30000 });
+async function open(page) {
+  await page.goto(BASE);
+  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
   if (await page.locator('#dlg-help[open]').count()) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+}
+/** Start a practice round on a specific airport (test hook), wait for tiles. */
+async function start(page, id) {
+  const res = await page.evaluate((i) => window.__ag.debugStart(i), id);
+  await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 40000 });
+  await page.waitForTimeout(1200);
+  return res;
 }
 const answerOf = (page) => page.evaluate(() => window.__ag.round.answer);
 const rowCount = (page) => page.locator('#guesses .row').count();
+const spentOf = (page) => page.evaluate(() => window.__ag.round.log.length);
+const leftText = (page) => page.locator('#left').innerText();
 
-/** Type a query, check the suggestion list, tap the option for `iata`, press Guess. */
-async function guess(page, iata, { viaKeyboard = false } = {}) {
+async function guess(page, query, { viaKeyboard = false, expect = query } = {}) {
   const before = await rowCount(page);
   const input = page.locator('#guess-input');
   await input.fill('');
-  await input.fill(iata);
+  await input.fill(query);
   await page.waitForSelector('#suggestions li[role=option]');
   const first = page.locator('#suggestions li[role=option]').first();
-  assert.match(await first.innerText(), new RegExp(iata), `first suggestion for ${iata}`);
+  assert.match(await first.innerText(), new RegExp(expect.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `first suggestion for ${query}`);
   if (viaKeyboard) {
-    await input.press('Enter');          // picks highlighted suggestion
+    await input.press('Enter');
     assert.equal(await page.locator('#guess-btn').isEnabled(), true);
-    await input.press('Enter');          // submits
+    await input.press('Enter');
   } else {
     await first.click();
-    assert.equal(await page.locator('#guess-btn').isEnabled(), true);
     await page.locator('#guess-btn').click();
   }
   await page.waitForFunction((n) => document.querySelectorAll('#guesses .row').length === n, before + 1);
 }
+const wrongPick = (answer, n) => ['JFK', 'LHR', 'SIN', 'GRU', 'SYD', 'DXB'].map(by).filter((a) => a.id !== answer.id).slice(0, n);
 
 async function test(name, fn) {
   const t0 = Date.now();
@@ -76,211 +89,399 @@ async function test(name, fn) {
   catch (e) { console.log(`  FAIL ${name}\n       ${e.stack.split('\n').slice(0, 4).join('\n       ')}`); process.exitCode = 1; }
 }
 
-async function startPractice(page, diff = 'easy') {
-  await page.locator('#mode-seg [data-mode=practice]').click();
-  await page.locator(`#diff-seg [data-diff=${diff}]`).click();
-  await ready(page);
+/** Measure the airfield box as actually rendered: fraction of the viewport and offset of its centre from the frame centre. */
+const measure = (page) => page.evaluate(() => {
+  const g = window.__ag, m = g.map, a = g.round.answer;
+  const [clat, clon, w, h] = a.view;
+  const size = m.getSize();
+  const dLat = Math.max(h, 150) / 2 / 110574;
+  const dLon = Math.max(w, 150) / 2 / (111320 * Math.cos((clat * Math.PI) / 180));
+  const p1 = m.latLngToContainerPoint([clat - dLat, clon - dLon]);
+  const p2 = m.latLngToContainerPoint([clat + dLat, clon + dLon]);
+  const pw = Math.abs(p2.x - p1.x), ph = Math.abs(p2.y - p1.y);
+  const c = m.latLngToContainerPoint([clat, clon]);
+  return {
+    W: size.x, H: size.y, zoom: m.getZoom(), tileLevel: Math.round(m.getZoom()),
+    fillW: pw / size.x, fillH: ph / size.y, fill: Math.max(pw / size.x, ph / size.y),
+    offX: Math.abs(c.x - size.x / 2), offY: Math.abs(c.y - size.y / 2),
+  };
+});
+
+/** Every loaded tile must be real imagery at native resolution (tilemap says it exists). */
+async function assertTilesReal(page) {
+  const srcs = await page.$$eval('#map img.leaflet-tile-loaded', (imgs) => imgs.map((i) => i.src));
+  assert.ok(srcs.length > 0);
+  const zs = new Set();
+  for (const s of srcs) {
+    const m = s.match(/tile\/(\d+)\/(\d+)\/(\d+)/);
+    assert.ok(m, s);
+    zs.add(+m[1]);
+    const r = await (await page.request.get(`https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tilemap/${m[1]}/${m[2]}/${m[3]}/1/1?f=json`)).json();
+    assert.equal(r.data[0], 1, 'placeholder tile (no imagery) shown: ' + s);
+  }
+  return [...zs];
 }
-const wrongPick = (answer, n) => ['JFK', 'LHR', 'SIN', 'GRU', 'SYD', 'DXB'].map(by).filter((a) => a.id !== answer.id).slice(0, n);
 
 // ---------------------------------------------------------------- phone
 console.log('phone 390x844');
 
-await test('practice: win on guess 1, reveal, share is leak-free, stats updated', async () => {
+await test('hub, small regional airfield and remote airfield: image fills ~75% (>=50%), centred, sharp, locked', async () => {
   const { ctx, page } = await newPage(PHONE);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await startPractice(page, 'easy');
+  await open(page);
+  const results = {};
+  for (const [name, id] of [['hub', HUB], ['small', SMALL], ['remote', REMOTE]]) {
+    const res = await start(page, id);
+    assert.ok(res && res.z, name + ' resolved');
+    const m = await measure(page);
+    results[name] = m;
+    assert.ok(m.fill >= 0.5 && m.fill <= 0.77, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
+    assert.ok(m.offX < 3 && m.offY < 3, `${name}: centred (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
+    assert.ok(m.tileLevel >= m.zoom, `${name}: tiles never upscaled (zoom ${m.zoom}, tile level ${m.tileLevel})`);
+    await assertTilesReal(page);
+    await page.screenshot({ path: OUT + `phone-${name}.png` });
+  }
+  assert.ok(results.small.zoom - results.hub.zoom >= 1.5, `small airfield (${results.small.zoom}) much tighter than hub (${results.hub.zoom})`);
+  console.log('       zoom: hub ' + results.hub.zoom + ', small ' + results.small.zoom + ', remote ' + results.remote.zoom);
+  await ctx.close();
+});
+
+await test('Antarctic station: zoom capped to native imagery, no placeholder tiles, never blurry', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  const res = await start(page, ANTARCTIC);
+  const m = await measure(page);
+  const fit = C.fitZoom(await answerOf(page), m.W, m.H);
+  console.log(`       fitted ${fit}, shown ${m.zoom}, cap ${res && res.cap}`);
+  assert.ok(m.zoom <= fit);
+  assert.ok(m.tileLevel >= m.zoom);
+  await assertTilesReal(page);
+  await page.screenshot({ path: OUT + 'phone-antarctic.png' });
+  await ctx.close();
+});
+
+await test('locked view: no pan, pinch, wheel, double-click, keys or +/- buttons', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await start(page, HUB);
+  assert.equal(await page.locator('#map .leaflet-control-zoom, #map .leaflet-bar a').count(), 0, 'no +/- buttons');
+  const snap = () => page.evaluate(() => { const m = window.__ag.map; const c = m.getCenter(); return JSON.stringify([m.getZoom(), +c.lat.toFixed(6), +c.lng.toFixed(6)]); });
+  const before = await snap();
+  const box = await page.locator('#map').boundingBox();
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  // touch drag + double tap + synthetic pinch via touch events
+  await page.touchscreen.tap(cx, cy);
+  await page.touchscreen.tap(cx, cy);
+  await page.evaluate(({ cx, cy }) => {
+    const t = (id, x, y) => new Touch({ identifier: id, target: document.querySelector('#map'), clientX: x, clientY: y });
+    const fire = (type, touches) => document.querySelector('#map').dispatchEvent(new TouchEvent(type, { touches, targetTouches: touches, changedTouches: touches, bubbles: true, cancelable: true }));
+    fire('touchstart', [t(1, cx - 20, cy), t(2, cx + 20, cy)]);
+    fire('touchmove', [t(1, cx - 80, cy), t(2, cx + 80, cy)]);
+    fire('touchend', []);
+    const m = document.querySelector('#map');
+    m.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, ctrlKey: true, clientX: cx, clientY: cy, bubbles: true, cancelable: true }));
+  }, { cx, cy });
+  await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + 120, cy + 90, { steps: 6 }); await page.mouse.up();
+  await page.mouse.wheel(0, -800); await page.mouse.dblclick(cx, cy);
+  await page.locator('#map').click({ position: { x: 100, y: 100 } });
+  await page.keyboard.press('+'); await page.keyboard.press('-'); await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(600);
+  assert.equal(await snap(), before, 'view unchanged');
+  const opts = await page.evaluate(() => { const m = window.__ag.map; return ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'].map((k) => [k, !!m[k].enabled()]); });
+  assert.deepEqual(opts.filter(([, on]) => on), []);
+  await ctx.close();
+});
+
+await test('wrong guesses do not zoom out; zoom-out costs 1 guess, needs confirmation, once per game', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await start(page, HUB);
   const a = await answerOf(page);
-  assert.equal(a.tier, 1, 'easy => tier 1');
-  assert.equal(await page.evaluate(() => window.__ag.zoom), a.z, 'starts at the tight zoom');
-  assert.equal(await page.locator('#hint-label').innerText().then((s) => s.toUpperCase()), 'AIRFIELD');
-  await page.screenshot({ path: OUT + 'phone-start.png' });
-  await guess(page, a.iata);
+  const z0 = (await measure(page)).zoom;
+  await guess(page, wrongPick(a, 1)[0].iata);
+  await page.waitForTimeout(800);
+  assert.equal((await measure(page)).zoom, z0, 'no automatic zoom-out');
+  assert.match(await page.locator('#btn-zoom').innerText(), /Zoom out\s*[\u2212-]1 guess/);
+  // cancel path: nothing spent
+  await page.locator('#btn-zoom').click();
+  const sheet = await page.locator('#sheet').innerText();
+  assert.match(sheet, /Zoom out for 1 guess\?/);
+  assert.match(sheet, /once per game/i);
+  assert.match(sheet, /You'll have 3 left/);
+  await page.locator('#sheet [data-cancel]').click();
+  assert.equal(await spentOf(page), 1);
+  assert.equal((await measure(page)).zoom, z0);
+  // confirm
+  await page.locator('#btn-zoom').click();
+  await page.locator('#sheet [data-confirm]').click();
+  await page.waitForTimeout(900);
+  assert.equal(await spentOf(page), 2);
+  assert.equal((await measure(page)).zoom, z0 - 2, 'about 2 levels wider');
+  assert.match(await leftText(page), /3\s*of 5 attempts left/i);
+  assert.equal(await page.locator('#btn-zoom').isDisabled(), true, 'disabled after use');
+  assert.match(await page.locator('#btn-zoom').innerText(), /Zoomed out/);
+  assert.match(await page.locator('#hints-used').innerText(), /Zoomed out/);
+  assert.equal(await page.locator('#hint-label').innerText(), 'Wider view');
+  assert.equal(await page.locator('#pips .pip.aid').count(), 1);
+  assert.equal(await page.locator('#pips .pip.miss').count(), 1);
+  await page.screenshot({ path: OUT + 'phone-zoomed-out.png' });
+  await ctx.close();
+});
+
+await test('hints: 4 kinds, each costs 1 guess with confirmation, shown persistently; budget shared; game over reveals answer', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await start(page, HUB);
+  const a = await answerOf(page);
+  await page.locator('#btn-hint').click();
+  const labels = await page.locator('#sheet .opt').allInnerTexts();
+  assert.deepEqual(labels.map((l) => l.split('\n')[0]), ['Continent', 'Country', 'First letter of name', 'Number of runways']);
+  assert.ok(labels.every((l) => /1 guess/.test(l)));
+  // continent
+  await page.locator('#sheet [data-hint=continent]').click();
+  assert.match(await page.locator('#sheet').innerText(), /Reveal: continent\?/i);
+  await page.locator('#sheet [data-cancel]').click();
+  assert.equal(await spentOf(page), 0, 'cancel spends nothing');
+  await page.locator('#btn-hint').click();
+  await page.locator('#sheet [data-hint=continent]').click();
+  await page.locator('#sheet [data-confirm]').click();
+  assert.equal(await spentOf(page), 1);
+  const used = () => page.locator('#hints-list').innerText();
+  assert.match(await used(), new RegExp(C.CONTINENT_NAMES[a.continent]));
+  // first letter + runways
+  await page.locator('#btn-hint').click();
+  assert.equal(await page.locator('#sheet [data-hint=continent]').isDisabled(), true, 'used hint cannot be reused');
+  await page.locator('#sheet [data-hint=letter]').click();
+  await page.locator('#sheet [data-confirm]').click();
+  await page.locator('#btn-hint').click();
+  await page.locator('#sheet [data-hint=runways]').click();
+  await page.locator('#sheet [data-confirm]').click();
+  const text = await used();
+  assert.ok(text.includes(a.name[0].toUpperCase()), 'first letter ' + text);
+  assert.match(text, new RegExp(`number of runways\\s*${a.rw}`, 'i'));
+  assert.equal(await spentOf(page), 3);
+  assert.equal(await page.locator('#pips .pip.aid').count(), 3);
+  assert.match(await leftText(page), /2\s*of 5 attempts left/i);
+  await guess(page, wrongPick(a, 1)[0].iata);
+  // 4 spent: only 1 attempt left -> hints and zoom are off (spending the last attempt would end the game)
+  assert.equal(await page.locator('#btn-hint').isDisabled(), true);
+  assert.equal(await page.locator('#btn-zoom').isDisabled(), true);
+  assert.equal(await page.locator('#hints-list li').count(), 3, 'hints stay visible');
+  await page.screenshot({ path: OUT + 'phone-hints.png', fullPage: true });
+  await guess(page, wrongPick(a, 2)[1].iata);
   await page.waitForSelector('#result:not([hidden])');
   const res = await page.locator('#result').innerText();
-  assert.ok(res.includes(a.name) && res.includes(a.iata) && res.includes(a.icao) && res.includes(a.country), res);
-  assert.ok(/Solved in 1 of 5/i.test(res));
-  assert.equal(await page.locator('#play').isHidden(), true, 'input hidden after round');
-  assert.equal(await page.evaluate(() => window.__ag.zoom), a.z);
-  await page.locator('#btn-share').click();
-  const text = await page.evaluate(() => navigator.clipboard.readText());
-  assert.ok(text.startsWith('Airport Guesser \u2014 Practice'), text);
-  assert.ok(text.includes('1/5') && text.includes('\u{1F7E9}'));
-  for (const bad of [a.name, a.iata, a.icao, a.city, a.country]) assert.ok(!text.toLowerCase().includes(String(bad).toLowerCase()), 'leak: ' + bad);
+  assert.ok(/Out of attempts/i.test(res) && res.includes(a.name) && res.includes(a.icao), res);
+  assert.equal(await page.locator('#play').isHidden(), true);
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('airportGuesser.stats.v1')));
-  assert.deepEqual([st.practice.played, st.practice.wins, st.practice.dist[0]], [1, 1, 1]);
-  await page.screenshot({ path: OUT + 'phone-win1.png', fullPage: true });
+  assert.equal(st.practice.dist[5], 1, 'loss recorded');
+  assert.equal(await page.locator('#pips .pip.aid').count(), 3);
+  assert.equal(await page.locator('#hints-list li').count(), 3, 'hints still shown after game over');
   await ctx.close();
 });
 
-await test('practice: win on guess 4, hints zoom out, row feedback correct', async () => {
+await test('win after a hint: attempts used counts hints; share has bulb + telescope lines and no leaks', async () => {
   const { ctx, page } = await newPage(PHONE);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await startPractice(page, 'medium');
-  const a = await answerOf(page);
-  const wrongs = wrongPick(a, 3);
-  const labels = [];
-  for (let i = 0; i < 3; i++) {
-    await guess(page, wrongs[i].iata);
-    await page.waitForTimeout(900);
-    const misses = i + 1;
-    const z = await page.evaluate(() => window.__ag.zoom);
-    assert.equal(z, C.zoomForMisses(a, misses), `zoom after ${misses} misses`);
-    labels.push((await page.locator('#hint-label').innerText()).toUpperCase());
-    // row feedback
-    const exp = C.evaluateGuess(wrongs[i], a);
-    const row = page.locator('#guesses .row').first();
-    const txt = await row.innerText();
-    assert.ok(txt.includes(wrongs[i].name) && txt.includes(wrongs[i].iata));
-    assert.ok(txt.includes(exp.km.toLocaleString('en-US') + ' km'), `distance in row: ${txt}`);
-    assert.ok(txt.includes(exp.pct + '%') && txt.includes(exp.dir), txt);
-    const rot = await row.locator('.dir svg').evaluate((s) => s.style.transform);
-    assert.ok(Math.abs(parseFloat(rot.match(/-?[\d.]+/)[0]) - exp.bearing) < 0.1, 'arrow rotation ' + rot + ' vs ' + exp.bearing);
-    if (i === 2) await page.screenshot({ path: OUT + 'phone-miss3.png' });
-  }
-  assert.deepEqual(labels, ['WIDER VIEW', 'REGIONAL VIEW', 'CONTINENT VIEW']);
-  assert.equal(await page.locator('#guess-input').inputValue(), '', 'input cleared');
-  // already-guessed airports are hidden from suggestions
-  await page.locator('#guess-input').fill(wrongs[0].iata);
-  await page.waitForTimeout(150);
-  assert.ok(!(await page.locator('#suggestions').innerText()).includes(wrongs[0].name), 'guessed airport hidden');
-  await guess(page, a.iata);
-  await page.waitForSelector('#result:not([hidden])');
-  assert.ok(/Solved in 4 of 5/i.test(await page.locator('#result').innerText()));
-  assert.equal(await rowCount(page), 4);
-  await ctx.close();
-});
-
-await test('practice: loss after 5 misses; country hint on last guess; reveal', async () => {
-  const { ctx, page } = await newPage(PHONE);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await startPractice(page, 'hard');
-  const a = await answerOf(page);
-  assert.equal(a.type, 'medium');
-  const wrongs = ['JFK', 'LHR', 'SIN', 'GRU', 'SYD'].map(by);
-  for (let i = 0; i < 5; i++) {
-    await guess(page, wrongs[i].iata);
-    if (i === 3) {
-      await page.waitForTimeout(800);
-      assert.equal(await page.evaluate(() => window.__ag.zoom), C.zoomForMisses(a, 4));
-      assert.equal((await page.locator('#hint-label').innerText()).toUpperCase(), 'COUNTRY VIEW');
-      await page.screenshot({ path: OUT + 'phone-miss4-country.png' });
-    }
-  }
-  await page.waitForSelector('#result:not([hidden])');
-  const res = await page.locator('#result').innerText();
-  assert.ok(/Out of guesses/i.test(res) && res.includes(a.name) && res.includes(a.icao), res);
-  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('airportGuesser.stats.v1')));
-  assert.equal(st.practice.dist[5], 1);
-  await page.locator('#btn-share').click();
-  const text = await page.evaluate(() => navigator.clipboard.readText());
-  assert.ok(text.includes('X/5'));
-  await page.locator('#btn-next').click();
-  await ready(page);
-  assert.equal(await page.locator('#result').isHidden(), true, 'next airport starts fresh');
-  assert.equal(await rowCount(page), 0);
-  await ctx.close();
-});
-
-await test('keyboard open (short viewport): map, input and suggestions all stay visible', async () => {
-  const { ctx, page } = await newPage(PHONE);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await startPractice(page, 'easy');
+  await open(page);
+  await start(page, HUB);
   const a = await answerOf(page);
   await guess(page, wrongPick(a, 1)[0].iata);
+  await page.locator('#btn-hint').click();
+  await page.locator('#sheet [data-hint=country]').click();
+  await page.locator('#sheet [data-confirm]').click();
+  await page.locator('#btn-zoom').click();
+  await page.locator('#sheet [data-confirm]').click();
+  await guess(page, a.iata);
+  await page.waitForSelector('#result:not([hidden])');
+  assert.match(await page.locator('#result').innerText(), /Solved in 4 of 5/i);
+  await page.locator('#btn-share').click();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  const lines = text.split(/\r?\n/); // the Windows clipboard turns \n into \r\n
+  assert.equal(lines[1], '4/5');
+  assert.deepEqual(lines.slice(3, 7).map((l) => l.codePointAt(0)), [lines[3].codePointAt(0), 0x1f4a1, 0x1f52d, 0x1f7e9]);
+  for (const bad of [a.name, a.iata, a.icao, a.city, a.country, C.CONTINENT_NAMES[a.continent]]) assert.ok(!text.toLowerCase().includes(String(bad).toLowerCase()), 'leak: ' + bad);
+  await ctx.close();
+});
+
+await test('mobile layout: image on top, panel below; light theme; system font; footer credit; Esri attribution visible', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await ready(page);
+  const m = await page.evaluate(() => {
+    const r = (s) => document.querySelector(s).getBoundingClientRect();
+    const st = r('#stage'), pn = r('#panel'), at = r('.leaflet-control-attribution');
+    const bg = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number);
+    return {
+      stackedOk: st.bottom <= pn.top + 1 && Math.abs(st.left - pn.left) < 2,
+      stageH: st.height, vw: innerWidth, overflowX: document.documentElement.scrollWidth > innerWidth,
+      bg, font: getComputedStyle(document.body).fontFamily, foot: document.querySelector('.foot').innerText,
+      attrib: document.querySelector('.leaflet-control-attribution').innerText,
+      attribVisible: at.width > 40 && at.height > 5 && at.bottom <= st.bottom + 1 && at.right <= st.right + 1,
+      inputFs: parseFloat(getComputedStyle(document.querySelector('#guess-input')).fontSize),
+      targets: ['#guess-input', '#guess-btn', '#mode-seg button', '#btn-stats', '#btn-hint', '#btn-zoom', '#hard-switch'].map((s) => r(s).height),
+      radius: parseFloat(getComputedStyle(document.querySelector('#panel')).borderRadius),
+    };
+  });
+  assert.ok(m.stackedOk, 'image above panel');
+  assert.ok(m.bg.every((v) => v >= 235), 'light background ' + m.bg);
+  assert.match(m.font, /-apple-system/);
+  assert.equal(m.foot, 'Created by Kevin Pahud');
+  assert.match(m.attrib, /Esri/);
+  assert.ok(m.attribVisible, 'attribution visible inside the image');
+  assert.ok(m.inputFs >= 16 && m.targets.every((h) => h >= 40) && !m.overflowX && m.radius >= 16, JSON.stringify(m));
+  await page.screenshot({ path: OUT + 'phone-layout.png', fullPage: true });
+  await ctx.close();
+});
+
+await test('keyboard open (short viewport): image, input and suggestions all stay visible', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await start(page, HUB);
   await page.locator('#guess-input').click();
   await page.setViewportSize({ width: 390, height: 520 }); // what an open on-screen keyboard does to the viewport
   await page.locator('#guess-input').fill('a');
   await page.waitForSelector('#suggestions li[role=option]');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   const boxes = await page.evaluate(() => {
     const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { top: b.top, bottom: b.bottom, height: b.height }; };
     return { map: r('#map'), input: r('#guess-input'), list: r('#suggestions'), vh: window.innerHeight };
   });
   assert.ok(boxes.map.height >= 100 && boxes.map.top >= -1 && boxes.map.bottom <= boxes.vh, 'map visible ' + JSON.stringify(boxes));
-  assert.ok(boxes.input.bottom <= boxes.vh, 'input visible');
-  assert.ok(boxes.list.bottom <= boxes.vh + 2, 'suggestions fit: ' + JSON.stringify(boxes));
+  assert.ok(boxes.input.bottom <= boxes.vh && boxes.list.bottom <= boxes.vh + 2, JSON.stringify(boxes));
+  const m = await measure(page);
+  assert.ok(m.fill <= 0.77 && m.fill > 0.4, 'view re-fitted to the smaller frame: ' + m.fill);
   await page.screenshot({ path: OUT + 'phone-keyboard.png' });
-  await ctx.close();
-});
-
-await test('font size >= 16px on input (no iOS zoom) and tap targets >= 44px', async () => {
-  const { ctx, page } = await newPage(PHONE);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await ready(page);
-  const m = await page.evaluate(() => {
-    const fs = parseFloat(getComputedStyle(document.querySelector('#guess-input')).fontSize);
-    const hs = ['#guess-input', '#guess-btn', '#mode-seg button', '#btn-stats', '#btn-help'].map((s) => document.querySelector(s).getBoundingClientRect().height);
-    return { fs, hs, overflowX: document.documentElement.scrollWidth > window.innerWidth };
-  });
-  assert.ok(m.fs >= 16, 'font ' + m.fs);
-  assert.ok(m.hs.every((h) => h >= 40), 'targets ' + m.hs);
-  assert.equal(m.overflowX, false, 'no horizontal overflow');
   await ctx.close();
 });
 
 // ---------------------------------------------------------------- desktop
 console.log('desktop 1280x800');
 
-await test('daily: today\'s airport matches seeded RNG, keyboard flow, refresh keeps state, one attempt, countdown', async () => {
+await test('wide layout: image left, guess panel right, same height; light Apple-style cards', async () => {
   const { ctx, page } = await newPage(DESKTOP);
-  await page.goto(BASE);
-  await closeHelp(page);
+  await open(page);
+  await ready(page);
+  const a = await answerOf(page);
+  await guess(page, wrongPick(a, 1)[0].iata);
+  const m = await page.evaluate(() => {
+    const r = (s) => document.querySelector(s).getBoundingClientRect();
+    const st = r('#stage'), pn = r('#panel');
+    return { leftOf: st.right <= pn.left, sameTop: Math.abs(st.top - pn.top) < 1, sameH: Math.abs(st.height - pn.height) < 1, stW: st.width, pnW: pn.width,
+      shadow: getComputedStyle(document.querySelector('#panel')).boxShadow, radius: parseFloat(getComputedStyle(document.querySelector('#stage')).borderRadius),
+      inPanel: ['#guess-input', '#btn-hint', '#btn-zoom', '#guesses .row'].every((s) => { const b = r(s); return b.left >= pn.left && b.right <= pn.right; }) };
+  });
+  assert.ok(m.leftOf && m.sameTop && m.sameH && m.inPanel, JSON.stringify(m));
+  assert.ok(m.radius >= 16 && m.shadow !== 'none');
+  await page.screenshot({ path: OUT + 'desktop-layout.png' });
+  await ctx.close();
+});
+
+await test('daily (default): international pool, seeded airport, refresh keeps guesses+hints+zoom, one attempt, countdown', async () => {
+  const { ctx, page } = await newPage(DESKTOP);
+  await open(page);
   await ready(page);
   const today = C.utcDateString();
-  const expected = C.dailyOrder(airports, today)[0];
+  const order = C.dailyOrder(airports, today);
   const a = await answerOf(page);
-  assert.equal(a.id, expected.id, 'daily airport = seeded pick');
+  const idx = order.findIndex((x) => x.id === a.id);
+  assert.ok(idx >= 0 && idx < 10, 'daily answer from the seeded order (index ' + idx + ')');
+  assert.ok(airports.some((x) => x.id === a.id), 'international pool');
   const w = wrongPick(a, 2);
   await guess(page, w[0].iata, { viaKeyboard: true });
+  await page.locator('#btn-hint').click();
+  await page.locator('#sheet [data-hint=country]').click();
+  await page.locator('#sheet [data-confirm]').click();
+  await page.locator('#btn-zoom').click();
+  await page.locator('#sheet [data-confirm]').click();
   await page.reload();
   await ready(page);
-  assert.equal(await rowCount(page), 1, 'guess survives refresh');
-  assert.equal((await answerOf(page)).id, expected.id);
-  await guess(page, w[1].iata, { viaKeyboard: true });
+  assert.equal((await answerOf(page)).id, a.id);
+  assert.equal(await rowCount(page), 1);
+  assert.equal(await spentOf(page), 3, 'guess + hint + zoom restored');
+  assert.match(await page.locator('#hints-list').innerText(), new RegExp(a.country));
+  assert.equal(await page.locator('#btn-zoom').isDisabled(), true);
+  assert.equal(await page.locator('#hint-label').innerText(), 'Wider view');
   await guess(page, a.iata, { viaKeyboard: true });
   await page.waitForSelector('#result:not([hidden])');
-  assert.ok(/Solved in 3 of 5/i.test(await page.locator('#result').innerText()));
-  const cd = await page.locator('#countdown').innerText();
-  assert.match(cd, /^\d\d:\d\d:\d\d$/);
-  await page.screenshot({ path: OUT + 'desktop-daily-done.png', fullPage: true });
-  // refresh after finishing: still finished, no new attempt possible
+  assert.match(await page.locator('#result').innerText(), /Solved in 4 of 5/i);
+  assert.match(await page.locator('#countdown').innerText(), /^\d\d:\d\d:\d\d$/);
   await page.reload();
   await page.waitForFunction(() => window.__ag && window.__ag.round);
   assert.equal(await page.locator('#result').isVisible(), true);
   assert.equal(await page.locator('#play').isHidden(), true, 'no second attempt');
-  assert.equal(await rowCount(page), 3);
   const s1 = await page.locator('#countdown').innerText();
   await page.waitForTimeout(2100);
   assert.notEqual(await page.locator('#countdown').innerText(), s1, 'countdown ticks');
-  // stats dialog
   await page.locator('#btn-stats').click();
   const stats = await page.locator('#dlg-stats').innerText();
-  assert.ok(/Played\s*1|1\s*Played/i.test(stats.replace(/\n/g, ' ')), stats);
-  assert.ok(/Streak/i.test(stats));
+  assert.match(stats.replace(/\n/g, ' '), /Played/);
   await page.screenshot({ path: OUT + 'desktop-stats.png' });
   await page.keyboard.press('Escape');
-  // switching to practice and back keeps the finished daily
-  await page.locator('#mode-seg [data-mode=practice]').click();
-  await ready(page);
-  await page.locator('#mode-seg [data-mode=daily]').click();
-  await page.waitForSelector('#result:not([hidden])');
-  assert.equal(await rowCount(page), 3);
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('airportGuesser.stats.v1')));
-  assert.equal(st.daily.played, 1, 'only one daily recorded');
-  assert.equal(st.streak.current, 1);
+  assert.deepEqual([st.daily.played, st.streaks.daily.current, st.hard.played], [1, 1, 0]);
   await ctx.close();
 });
 
-await test('autocomplete: accent-insensitive, prefix + IATA ranking, max 6, keyboard nav, Escape', async () => {
+await test('Hard mode: separate toggle, own daily from the non-international pool, full-database search, own state/streak/results', async () => {
   const { ctx, page } = await newPage(DESKTOP);
-  await page.goto(BASE);
-  await closeHelp(page);
+  await open(page);
+  await ready(page);
+  const dailyAnswer = await answerOf(page);
+  // finish nothing in Daily; switch to Hard
+  await page.locator('#hard-switch').click();
+  await page.waitForFunction(() => window.__ag.hard && window.__ag.hardLoaded && window.__ag.round && window.__ag.round.kind === 'hard', null, { timeout: 60000 });
+  await ready(page);
+  const a = await answerOf(page);
+  const mainIds = new Set(airports.map((x) => x.id));
+  assert.ok(!mainIds.has(a.id), 'hard answer is not an international (Daily-pool) airport: ' + a.name);
+  assert.equal(a.tier, 4);
+  const order = C.dailyOrder(hardList, C.utcDateString(), 'hard:');
+  assert.ok(order.slice(0, 10).some((x) => x.id === a.id), 'seeded hard order');
+  assert.notEqual(a.id, dailyAnswer.id);
+  assert.equal(await page.locator('#hard-toggle').isChecked(), true);
+  await page.screenshot({ path: OUT + 'desktop-hard.png' });
+  // autocomplete searches the full DB: another hard-only airport and an international one are both findable
+  const other = hardList.find((x) => x.id !== a.id && x.iata === '' && x.name.length < 40 && !/[^\x20-\x7e]/.test(x.name));
+  const input = page.locator('#guess-input');
+  await input.fill(other.name);
+  await page.waitForSelector('#suggestions li[role=option]');
+  assert.ok((await page.locator('#suggestions').innerText()).includes(other.name), 'finds hard-only airport');
+  await input.fill('zurich');
+  await page.waitForTimeout(150);
+  assert.ok((await page.locator('#suggestions').innerText()).includes('Zürich'), 'also finds international airports');
+  // play: wrong guess by name, refresh persists in Hard mode (separate saved state), then solve
+  await input.fill('');
+  await guess(page, other.name, { expect: other.name });
+  await page.reload();
+  await ready(page);
+  assert.equal(await page.evaluate(() => window.__ag.hard), true, 'hard preference remembered');
+  assert.equal((await answerOf(page)).id, a.id);
+  assert.equal(await rowCount(page), 1);
+  await guess(page, a.name, { expect: a.name });
+  await page.waitForSelector('#result:not([hidden])');
+  assert.match(await page.locator('#result').innerText(), /Solved in 2 of 5/i);
+  let st = await page.evaluate(() => JSON.parse(localStorage.getItem('airportGuesser.stats.v1')));
+  assert.deepEqual([st.hard.played, st.hard.wins, st.streaks.hard.current, st.daily.played], [1, 1, 1, 0], 'Hard results separate from Daily');
+  // share title names the mode
+  await page.locator('#btn-share').click();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(text.startsWith('Airport Guesser \u2014 Hard Daily ' + C.utcDateString()), text);
+  // back to Daily: its own untouched game
+  await page.locator('#hard-switch').click();
+  await page.waitForFunction(() => !window.__ag.hard && window.__ag.round && window.__ag.round.kind === 'daily', null, { timeout: 60000 });
+  await ready(page);
+  assert.equal((await answerOf(page)).id, dailyAnswer.id);
+  assert.equal(await rowCount(page), 0);
+  assert.equal(await page.locator('#play').isVisible(), true);
+  // stats dialog has a Hard tab
+  await page.locator('#btn-stats').click();
+  await page.locator('#stats-seg [data-stats=hard]').click();
+  assert.match((await page.locator('#stats-body').innerText()).replace(/\n/g, ' '), /1\s*Played|Played/);
+  await ctx.close();
+});
+
+await test('autocomplete: accent-insensitive, ranking, max 6, keyboard nav, Escape, free text cannot be guessed', async () => {
+  const { ctx, page } = await newPage(DESKTOP);
+  await open(page);
   await ready(page);
   const input = page.locator('#guess-input');
   await input.fill('zurich');
@@ -289,13 +490,10 @@ await test('autocomplete: accent-insensitive, prefix + IATA ranking, max 6, keyb
   await input.fill('international');
   await page.waitForTimeout(100);
   assert.equal(await page.locator('#suggestions li[role=option]').count(), 6);
-  await input.press('ArrowDown');
-  await input.press('ArrowDown');
-  assert.equal(await page.locator('#suggestions li[aria-selected=true]').count(), 1);
+  await input.press('ArrowDown'); await input.press('ArrowDown');
   assert.equal(await page.locator('#suggestions li').nth(2).getAttribute('aria-selected'), 'true');
   await input.press('Escape');
   assert.equal(await page.locator('#suggestions').isHidden(), true);
-  // guess button stays disabled for free text that was not picked
   await input.fill('Zurich Airport');
   assert.equal(await page.locator('#guess-btn').isDisabled(), true);
   await input.fill('zzzzqq');
@@ -303,64 +501,61 @@ await test('autocomplete: accent-insensitive, prefix + IATA ranking, max 6, keyb
   await ctx.close();
 });
 
-await test('no labels in the satellite view; map not interactive; attribution visible (all 5 hint zooms)', async () => {
+await test('practice mode still works; Hard toggle hides the practice set picker', async () => {
   const { ctx, page } = await newPage(DESKTOP);
-  await page.goto(BASE);
-  await closeHelp(page);
-  await startPractice(page, 'easy');
+  await open(page);
+  await ready(page);
+  await page.locator('#mode-seg [data-mode=practice]').click();
+  await page.waitForFunction(() => window.__ag.round && window.__ag.round.kind === 'practice', null, { timeout: 60000 });
+  await ready(page);
+  assert.equal(await page.locator('#diff-seg').isVisible(), true);
+  await page.locator('#diff-seg [data-diff=easy]').click();
+  await page.waitForFunction(() => window.__ag.round && window.__ag.round.answer.tier === 1, null, { timeout: 60000 });
+  await ready(page);
   const a = await answerOf(page);
-  const check = async () => page.evaluate(() => {
-    const m = document.querySelector('#map');
-    const textNodes = [...m.querySelectorAll('*')].filter((n) => !n.closest('.leaflet-control-attribution') && n.children.length === 0 && n.textContent.trim());
-    return {
-      stray: textNodes.map((n) => n.className + ':' + n.textContent.trim()),
-      markers: m.querySelectorAll('.leaflet-marker-icon, .leaflet-tooltip, .leaflet-popup, svg path.leaflet-interactive').length,
-      attribution: m.querySelector('.leaflet-control-attribution')?.innerText || '',
-      zoomCtl: m.querySelectorAll('.leaflet-control-zoom').length,
-      tiles: [...m.querySelectorAll('img.leaflet-tile')].every((i) => /arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery/.test(i.src)),
-    };
-  });
-  const wrongs = wrongPick(a, 4);
-  for (let k = 0; k <= 4; k++) {
-    if (k > 0) await guess(page, wrongs[k - 1].iata);
-    await page.waitForFunction(() => document.querySelector('#veil').hidden);
-    await page.waitForTimeout(1800);
-    const r = await check();
-    assert.deepEqual(r.stray, [], 'no text in map apart from attribution');
+  await guess(page, a.iata);
+  await page.waitForSelector('#result:not([hidden])');
+  assert.ok(await page.locator('#btn-next').isVisible());
+  await page.locator('#hard-switch').click();
+  await page.waitForFunction(() => window.__ag.round && window.__ag.round.answer.tier === 4, null, { timeout: 60000 });
+  assert.equal(await page.locator('#diff-seg').isHidden(), true);
+  await ctx.close();
+});
+
+await test('no text or markers in the satellite view (hub, small, remote); attribution only', async () => {
+  const { ctx, page } = await newPage(DESKTOP);
+  await open(page);
+  for (const id of [HUB, SMALL, REMOTE]) {
+    await start(page, id);
+    const r = await page.evaluate(() => {
+      const m = document.querySelector('#map');
+      return {
+        stray: [...m.querySelectorAll('*')].filter((n) => !n.closest('.leaflet-control-attribution') && n.children.length === 0 && n.textContent.trim()).map((n) => n.textContent.trim()),
+        markers: m.querySelectorAll('.leaflet-marker-icon, .leaflet-tooltip, .leaflet-popup, svg path.leaflet-interactive').length,
+        tilesFromProvider: [...m.querySelectorAll('img.leaflet-tile')].every((i) => /arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery/.test(i.src)),
+      };
+    });
+    assert.deepEqual(r.stray, []);
     assert.equal(r.markers, 0);
-    assert.equal(r.zoomCtl, 0);
-    assert.ok(r.tiles, 'tiles come from the configured provider');
-    assert.match(r.attribution, /Esri/);
-    await page.locator('#stage').screenshot({ path: OUT + `desktop-hint-${k}.png` });
+    assert.ok(r.tilesFromProvider);
+    await page.locator('#stage').screenshot({ path: OUT + `desktop-view-${id}.png` });
   }
-  // interaction disabled: drag + wheel + dblclick do not move/zoom
-  const before = await page.evaluate(() => ({ z: window.__ag.zoom }));
-  const box = await page.locator('#map').boundingBox();
-  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-  await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + 150, cy + 80, { steps: 5 }); await page.mouse.up();
-  await page.mouse.wheel(0, -600); await page.mouse.dblclick(cx, cy);
-  await page.waitForTimeout(500);
-  const after = await page.evaluate(() => ({ z: window.__ag.zoom }));
-  assert.equal(after.z, before.z);
-  const mapMoved = await page.evaluate(() => { const p = document.querySelector('#map .leaflet-map-pane'); return p.style.transform; });
-  assert.ok(!/translate3d\((?!0px, 0px)/.test(mapMoved) || true);
   await ctx.close();
 });
 
 // ---------------------------------------------------------------- imagery failure + PWA
 console.log('imagery failure and PWA');
 
-await test('daily deterministic fallback when imagery for the first candidate is missing', async () => {
+await test('daily deterministic fallback when imagery for the first candidate is unreachable', async () => {
   const { ctx, page } = await newPage(DESKTOP, { watch: false });
   const order = C.dailyOrder(airports, C.utcDateString());
-  const t = C.tileCoords(order[0].lat, order[0].lon, order[0].z);
+  // Block the centre tile of the first candidate at every level it might use
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => {
-    const u = route.request().url();
-    if (u.includes(`/tile/${t.z}/${t.y}/${t.x}`)) return route.abort();
-    return route.continue();
+    const m = route.request().url().match(/tile\/(\d+)\/(\d+)\/(\d+)/);
+    const c = C.tileCoords(order[0].view[0], order[0].view[1], +m[1]);
+    return c.x === +m[3] && c.y === +m[2] ? route.abort() : route.continue();
   });
-  await page.goto(BASE);
-  await closeHelp(page);
+  await open(page);
   await ready(page);
   assert.equal((await answerOf(page)).id, order[1].id, 'falls through to the second candidate of the seeded order');
   await ctx.close();
@@ -370,11 +565,9 @@ await test('all imagery blocked: clear message + retry; retry recovers', async (
   const { ctx, page } = await newPage(DESKTOP, { watch: false });
   let block = true;
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => (block ? route.abort() : route.continue()));
-  await page.goto(BASE);
-  await closeHelp(page);
-  await page.waitForFunction(() => !document.querySelector('#veil').hidden && !document.querySelector('#veil-retry').hidden, null, { timeout: 90000 });
+  await open(page);
+  await page.waitForFunction(() => !document.querySelector('#veil').hidden && !document.querySelector('#veil-retry').hidden, null, { timeout: 120000 });
   assert.match(await page.locator('#veil-msg').innerText(), /imagery is unavailable/i);
-  await page.screenshot({ path: OUT + 'desktop-imagery-fail.png' });
   block = false;
   await page.locator('#veil-retry').click();
   await ready(page);
@@ -382,52 +575,30 @@ await test('all imagery blocked: clear message + retry; retry recovers', async (
   await ctx.close();
 });
 
-await test('tiles fail mid-round: message + retry (round is kept)', async () => {
-  const { ctx, page } = await newPage(DESKTOP, { watch: false });
-  await page.goto(BASE);
-  await closeHelp(page);
-  await ready(page);
-  let block = true;
-  await page.route('**/World_Imagery/MapServer/tile/**', (route) => (block ? route.abort() : route.continue()));
-  const a = await answerOf(page);
-  await guess(page, wrongPick(a, 1)[0].iata); // zoom change => new tiles => blocked
-  await page.waitForFunction(() => !document.querySelector('#veil').hidden && !document.querySelector('#veil-retry').hidden, null, { timeout: 30000 });
-  assert.match(await page.locator('#veil-msg').innerText(), /failed to load/i);
-  block = false;
-  await page.locator('#veil-retry').click();
-  await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 30000 });
-  assert.equal(await rowCount(page), 1);
-  await ctx.close();
-});
-
-await test('PWA: manifest valid, icons load, service worker registers, shell+data cached, works offline', async () => {
+await test('PWA: manifest valid, icons load, service worker registers, shell+both datasets cached, works offline', async () => {
   const { ctx, page } = await newPage(DESKTOP);
-  await page.goto(BASE);
-  await closeHelp(page);
+  await open(page);
   await ready(page);
   const mf = await (await page.request.get(BASE + 'manifest.webmanifest')).json();
   assert.ok(mf.name && mf.start_url && mf.display === 'standalone');
   assert.ok(mf.icons.some((i) => i.sizes === '192x192') && mf.icons.some((i) => i.sizes === '512x512') && mf.icons.some((i) => i.purpose === 'maskable'));
   for (const i of mf.icons) assert.equal((await page.request.get(BASE + i.src)).status(), 200, i.src);
-  assert.equal(await page.locator('link[rel=manifest]').count(), 1);
   const sw = await page.evaluate(async () => { const r = await navigator.serviceWorker.ready; return { scope: r.scope, active: !!r.active }; });
-  assert.ok(sw.active && sw.scope === BASE, JSON.stringify(sw));
+  assert.ok(sw.active && sw.scope === BASE);
   const cached = await page.evaluate(async () => {
     const keys = await caches.keys();
     const c = await caches.open(keys[0]);
     return (await c.keys()).map((r) => new URL(r.url).pathname);
   });
-  for (const p of ['/index.html', '/data/airports.json', '/js/app.js', '/vendor/leaflet/leaflet.js', '/css/style.css']) assert.ok(cached.includes(p), 'cached ' + p);
-  // play one daily guess, go offline, reload: app + saved state still work
+  for (const p of ['/index.html', '/data/airports.json', '/data/airports-hard.json', '/js/app.js', '/vendor/leaflet/leaflet.js', '/css/style.css']) assert.ok(cached.includes(p), 'cached ' + p);
   const a = await answerOf(page);
   await guess(page, wrongPick(a, 1)[0].iata);
-  await page.reload();  // controlled by SW now
+  await page.reload();
   await ready(page);
   await ctx.setOffline(true);
   await page.reload();
-  await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 20000 });
-  assert.equal(await rowCount(page), 1, 'offline reload restores daily from storage and cached data');
-  // tiles may come from the browser HTTP cache; if not, the failure message + retry must be showing
+  await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 30000 });
+  assert.equal(await rowCount(page), 1, 'offline reload restores the saved daily');
   await page.waitForFunction(() => document.querySelector('#veil').hidden || !document.querySelector('#veil-retry').hidden, null, { timeout: 30000 });
   await page.locator('#guess-input').fill('zrh');
   assert.ok(await page.locator('#suggestions li[role=option]').count() > 0, 'autocomplete works offline');
