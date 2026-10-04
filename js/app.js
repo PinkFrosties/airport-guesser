@@ -6,31 +6,47 @@ const $ = (sel) => document.querySelector(sel);
 const el = {
   map: $('#map'), hint: $('#hint-label'), pips: $('#pips'), veil: $('#veil'), veilMsg: $('#veil-msg'), veilRetry: $('#veil-retry'),
   form: $('#guess-form'), input: $('#guess-input'), btn: $('#guess-btn'), list: $('#suggestions'),
-  guesses: $('#guesses'), result: $('#result'), play: $('#play'), stage: $('#stage'),
-  modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), toast: $('#toast'),
+  guesses: $('#guesses'), result: $('#result'), play: $('#play'), stage: $('#stage'), left: $('#left'),
+  tools: $('#tools'), btnHint: $('#btn-hint'), btnZoom: $('#btn-zoom'), sheet: $('#sheet'),
+  hintsUsed: $('#hints-used'), hintsList: $('#hints-list'),
+  modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), hardToggle: $('#hard-toggle'), toast: $('#toast'),
   dlgHelp: $('#dlg-help'), dlgStats: $('#dlg-stats'), statsBody: $('#stats-body'), statsSeg: $('#stats-seg'),
 };
 
 const game = {
-  airports: [], byId: new Map(), index: [],
-  mode: 'daily', diff: 'medium',
-  round: null, // { mode, date, answer, results: [], done, won }
+  main: [], hardList: [], hardLoaded: false,
+  byId: new Map(), mainIndex: [], fullIndex: [],
+  mode: 'daily', hard: false, diff: 'medium',
+  round: null, // { kind, date, answer, log, results, hints, zoomed, done, won, cap }
   selected: null, token: 0, lastPracticeId: null,
 };
 window.__ag = game; // convenience for tests/debugging; the dataset is client-side anyway
 Object.defineProperty(game, 'zoom', { get: () => (map ? map.getZoom() : null) });
+Object.defineProperty(game, 'map', { get: () => map });
+Object.defineProperty(game, 'view', {
+  get() {
+    if (!map || !game.round) return null;
+    const s = map.getSize();
+    const a = game.round.answer;
+    return { W: s.x, H: s.y, zoom: map.getZoom(), fill: C.fillAt(a, s.x, s.y, map.getZoom()), tileLevel: C.tileLevel(map.getZoom()) };
+  },
+});
+
+const kindOf = () => (game.mode === 'practice' ? 'practice' : game.hard ? 'hard' : 'daily');
+const spent = (r) => r.log.length;
 
 // ---------- prefs ----------
-const PREFS_KEY = 'airportGuesser.prefs.v1';
+const PREFS_KEY = 'airportGuesser.prefs.v2';
 function loadPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     if (p.mode === 'daily' || p.mode === 'practice') game.mode = p.mode;
     if (C.DIFFICULTIES[p.diff]) game.diff = p.diff;
+    game.hard = p.hard === true;
   } catch { /* ignore */ }
 }
 function savePrefs() {
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ mode: game.mode, diff: game.diff })); } catch { /* ignore */ }
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ mode: game.mode, diff: game.diff, hard: game.hard })); } catch { /* ignore */ }
 }
 
 // ---------- toast ----------
@@ -42,20 +58,19 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.toast.classList.remove('show'), 2200);
 }
 
-// ---------- map ----------
+// ---------- map (locked: no pan, zoom, drag, keys or controls) ----------
+let map = null, layer = null, tileStats = { ok: 0, err: 0 };
 // Leaflet drops a setView issued while a zoom animation is running, so re-apply the wanted view when it ends.
 let desired = null;
-let map = null, layer = null, tileStats = { ok: 0, err: 0 };
 
-function tileUrl(z, x, y) {
-  return IMAGERY.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', (IMAGERY.subdomains || '')[0] || '');
-}
+const tileUrl = (z, x, y) =>
+  IMAGERY.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', (IMAGERY.subdomains || '')[0] || '');
 
 function ensureMap() {
   if (map) return;
   map = L.map(el.map, {
     zoomControl: false, attributionControl: true, dragging: false, touchZoom: false, scrollWheelZoom: false,
-    doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false, zoomSnap: 1, zoomAnimation: true,
+    doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false, zoomSnap: 0.5, zoomDelta: 0.5, zoomAnimation: true,
     fadeAnimation: true, inertia: false, minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom, worldCopyJump: false,
   });
   map.attributionControl.setPrefix(false);
@@ -70,6 +85,7 @@ function ensureMap() {
   layer.on('tileload', () => { tileStats.ok++; });
   layer.on('tileerror', () => { tileStats.err++; });
   layer.on('load', () => {
+    if (veilIsBlocking) return; // a round is being prepared: its own messages take precedence
     if (tileStats.err > 0 && tileStats.err >= tileStats.ok) showVeil('Imagery failed to load. Check your connection.', true);
     else if (!veilIsBlocking) hideVeil();
   });
@@ -96,20 +112,47 @@ el.veilRetry.addEventListener('click', () => {
   }
 });
 
-function renderMapForRound(animate) {
-  const r = game.round;
-  const misses = r.done ? 0 : r.results.length; // reveal at the tight zoom when the round is over
-  const z = C.zoomForMisses(r.answer, misses);
-  ensureMap();
-  map.invalidateSize();
-  desired = { center: [r.answer.lat, r.answer.lon], zoom: z };
-  map.setView(desired.center, z, { animate: !!animate });
-  el.hint.textContent = r.done ? 'Airfield' : C.HINT_LABELS[Math.min(misses, 4)];
+const mapSize = () => { ensureMap(); map.invalidateSize(); const s = map.getSize(); return { W: Math.max(s.x, 200), H: Math.max(s.y, 150) }; };
+
+/** Zoom for the round at the current viewport size: fitted to the airfield, never beyond what imagery supports. */
+function roundZoom(r) {
+  const { W, H } = mapSize();
+  const fit = C.fitZoom(r.answer, W, H, { maxZoom: IMAGERY.maxZoom, minZoom: IMAGERY.minZoom });
+  const z = Math.min(fit, r.cap);
+  return r.zoomed && !r.done ? C.zoomedOut(z) : z;
 }
 
-function probeImagery(a) {
+function renderMapForRound(animate) {
+  const r = game.round;
+  const z = roundZoom(r);
+  desired = { center: [r.answer.view[0], r.answer.view[1]], zoom: z };
+  map.setView(desired.center, z, { animate: !!animate });
+  el.hint.textContent = r.zoomed && !r.done ? 'Wider view' : 'Airfield view';
+}
+
+// ---------- imagery availability ----------
+const tilemapCache = new Map();
+/** true = every tile in the block exists, false = some missing (placeholder), null = could not tell. */
+async function tilesAvailable(block) {
+  if (!IMAGERY.tilemapUrl) return null;
+  const url = IMAGERY.tilemapUrl.replace('{z}', block.z).replace('{y}', block.y).replace('{x}', block.x).replace('{w}', block.w).replace('{h}', block.h);
+  if (tilemapCache.has(url)) return tilemapCache.get(url);
+  let result = null;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6000);
+    const res = await fetch(url, { signal: ctl.signal });
+    clearTimeout(t);
+    const j = await res.json();
+    if (Array.isArray(j.data) && j.data.length) result = j.data.every((v) => v === 1);
+  } catch { /* unknown */ }
+  if (result !== null) tilemapCache.set(url, result);
+  return result;
+}
+
+function probeTile(a, z) {
   return new Promise((resolve) => {
-    const t = C.tileCoords(a.lat, a.lon, a.z);
+    const t = C.tileCoords(a.view[0], a.view[1], C.tileLevel(z));
     const img = new Image();
     let finished = false;
     const done = (ok) => { if (!finished) { finished = true; clearTimeout(timer); resolve(ok); } };
@@ -120,57 +163,141 @@ function probeImagery(a) {
   });
 }
 
+/**
+ * Pick the zoom for airport `a`: the fitted zoom, stepped down (a whole tile level at a time) until all tiles
+ * covering the viewport exist at native resolution. Returns { z, cap } or null when the best sharp view would
+ * show the airfield too small (< 20% of the viewport) or imagery is unreachable.
+ */
+async function resolveView(a) {
+  const { W, H } = mapSize();
+  const fit = C.fitZoom(a, W, H, { maxZoom: IMAGERY.maxZoom, minZoom: IMAGERY.minZoom });
+  let z = fit;
+  while (z >= IMAGERY.minZoom && C.fillAt(a, W, H, z) >= 0.2) {
+    const L = C.tileLevel(z);
+    const avail = await tilesAvailable(C.tileBlock(a, W, H, z, L));
+    if (avail !== false) {
+      if (!(await probeTile(a, z))) return null;
+      return { z, cap: z === fit ? Infinity : z };
+    }
+    z = L - 1; // tiles missing at this level: go down whole levels until they exist
+  }
+  return null;
+}
+
 // ---------- rounds ----------
-const keyOf = (mode) => (mode === 'daily' ? C.utcDateString() : null);
+const todayKey = () => C.utcDateString();
+
+async function ensureHard() {
+  if (game.hardLoaded) return true;
+  showVeil('Loading airports', false, true);
+  try {
+    const res = await fetch('data/airports-hard.json');
+    if (!res.ok) throw new Error(res.status);
+    game.hardList = (await res.json()).airports;
+  } catch {
+    return false;
+  }
+  for (const a of game.hardList) game.byId.set(a.id, a);
+  game.fullIndex = C.prepareIndex([...game.main, ...game.hardList]);
+  game.hardLoaded = true;
+  return true;
+}
+
+function newRound(kind, date, answer) {
+  return { kind, date, answer, log: [], results: [], hints: [], zoomed: false, done: false, won: false, cap: Infinity };
+}
+
+function restoreRound(kind, saved) {
+  const answer = game.byId.get(saved.id);
+  if (!answer) return null;
+  const r = newRound(kind, saved.date, answer);
+  for (const e of saved.log) {
+    if (e.t === 'g' && game.byId.has(e.id)) r.results.push(C.evaluateGuess(game.byId.get(e.id), answer));
+    else if (e.t === 'h' && C.HINTS.some((h) => h.key === e.k)) r.hints.push(e.k);
+    else if (e.t === 'z') r.zoomed = true;
+    else continue;
+    r.log.push(e);
+  }
+  r.done = !!saved.done;
+  r.won = !!saved.won;
+  return r;
+}
 
 async function startMode() {
   const token = ++game.token;
   stopCountdown();
   clearSelection();
   closeList();
+  closeSheet();
   ensureMap();
   game.round = null;
   renderChrome();
+  veilIsBlocking = true;
 
-  // Resume today's daily from storage (no probing needed: the airport was fixed when first played).
-  if (game.mode === 'daily') {
-    const date = keyOf('daily');
-    const saved = S.loadDaily();
-    if (saved && saved.date === date && game.byId.has(saved.id)) {
-      const answer = game.byId.get(saved.id);
-      const results = [];
-      for (const gid of saved.guesses) {
-        const g = game.byId.get(gid);
-        if (g) results.push(C.evaluateGuess(g, answer));
+  if (game.hard && !(await ensureHard())) {
+    if (token !== game.token) return;
+    veilIsBlocking = false;
+    showVeil('Could not load the Hard mode airports. Check your connection and retry.', true);
+    return;
+  }
+  if (token !== game.token) return;
+
+  const kind = kindOf();
+  const pool = game.hard ? game.hardList : game.main;
+
+  // Resume today's daily from storage: the airport was fixed when first played.
+  if (kind !== 'practice') {
+    const saved = S.loadDaily(kind);
+    if (saved && saved.date === todayKey()) {
+      const r = restoreRound(kind, saved);
+      if (r) {
+        game.round = r;
+        showVeil('Loading imagery', false, true);
+        const res = await resolveView(r.answer);
+        if (token !== game.token) return;
+        r.cap = res ? res.cap : Infinity;
+        return enterRound(token);
       }
-      game.round = { mode: 'daily', date, answer, results, done: !!saved.done, won: !!saved.won };
-      return enterRound(token);
     }
   }
 
-  const order = game.mode === 'daily'
-    ? C.dailyOrder(game.airports, keyOf('daily'))
-    : C.practiceOrder(game.airports, game.diff).filter((a) => a.id !== game.lastPracticeId);
+  const date = kind === 'practice' ? null : todayKey();
+  const order = kind === 'practice'
+    ? C.practiceOrder(pool, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId)
+    : C.dailyOrder(pool, date, game.hard ? 'hard:' : '');
 
-  veilIsBlocking = true;
   showVeil('Loading imagery', false, true);
-  let answer = null;
+  let answer = null, res = null;
   for (const cand of order.slice(0, GAME.maxProbeAttempts)) {
-    if (await probeImagery(cand)) { answer = cand; break; }
+    res = await resolveView(cand);
     if (token !== game.token) return;
+    if (res) { answer = cand; break; }
   }
-  if (token !== game.token) return;
-  veilIsBlocking = false;
   if (!answer) {
+    veilIsBlocking = false;
     showVeil('Satellite imagery is unavailable right now. Check your connection and retry.', true);
     return;
   }
-  const date = keyOf(game.mode);
-  game.round = { mode: game.mode, date, answer, results: [], done: false, won: false };
-  if (game.mode === 'daily') persistDaily();
-  else game.lastPracticeId = answer.id;
+  const r = newRound(kind, date, answer);
+  r.cap = res.cap;
+  game.round = r;
+  if (kind === 'practice') game.lastPracticeId = answer.id; else persist();
   enterRound(token);
 }
+
+/** Test hook: start a practice round on a specific airport (the data is client-side anyway). */
+game.debugStart = async (id) => {
+  const token = ++game.token;
+  closeSheet(); clearSelection(); closeList();
+  if (!game.hardLoaded) await ensureHard();
+  const a = game.byId.get(id);
+  const res = await resolveView(a);
+  const r = newRound('practice', null, a);
+  r.cap = res ? res.cap : Infinity;
+  game.round = r;
+  enterRound(token);
+  return res;
+};
 
 function enterRound(token) {
   if (token !== game.token) return;
@@ -183,56 +310,146 @@ function enterRound(token) {
   setTimeout(() => { if (token === game.token && tileStats.err === 0) hideVeil(); }, 2500);
 }
 
-function persistDaily() {
+function persist() {
   const r = game.round;
-  S.saveDaily({ date: r.date, id: r.answer.id, guesses: r.results.map((x) => x.id), done: r.done, won: r.won });
+  if (r.kind === 'practice') return;
+  S.saveDaily(r.kind, { date: r.date, id: r.answer.id, log: r.log, done: r.done, won: r.won });
 }
 
-// ---------- guessing ----------
-function submitGuess() {
+/** Common tail of every spend (guess / hint / zoom-out): check for the end, save, redraw. */
+function afterSpend({ zoomChanged = false } = {}) {
   const r = game.round;
-  const g = game.selected;
-  if (!r || r.done || !g) return;
-  const res = C.evaluateGuess(g, r.answer);
-  r.results.push(res);
-  clearSelection();
-  closeList();
-  if (res.correct) { r.done = true; r.won = true; }
-  else if (r.results.length >= C.MAX_GUESSES) { r.done = true; r.won = false; }
-  if (r.mode === 'daily') persistDaily();
-  if (r.done) S.recordResult(r.mode, r.won, r.results.length, r.date);
-  renderMapForRound(true);
+  const last = r.results[r.results.length - 1];
+  if (last && last.correct && r.log[r.log.length - 1].t === 'g') { r.done = true; r.won = true; }
+  else if (spent(r) >= C.MAX_GUESSES) { r.done = true; r.won = false; }
+  persist();
+  if (r.done) S.recordResult(r.kind, r.won, spent(r), r.date || todayKey());
+  closeSheet();
+  if (zoomChanged || r.done) renderMapForRound(true);
   renderAll(true);
   if (r.done) el.result.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  else if (!coarse()) el.input.focus();
+}
+
+function submitGuess() {
+  const r = game.round, g = game.selected;
+  if (!r || r.done || !g) return;
+  r.results.push(C.evaluateGuess(g, r.answer));
+  r.log.push({ t: 'g', id: g.id });
+  clearSelection();
+  closeList();
+  afterSpend();
+  if (!r.done && !coarse()) el.input.focus();
+}
+
+function useHint(key) {
+  const r = game.round;
+  if (!r || r.done || !C.canSpend(spent(r)) || r.hints.includes(key)) return;
+  r.hints.push(key);
+  r.log.push({ t: 'h', k: key });
+  afterSpend();
+}
+
+function useZoomOut() {
+  const r = game.round;
+  if (!r || r.done || r.zoomed || !C.canSpend(spent(r))) return;
+  r.zoomed = true;
+  r.log.push({ t: 'z' });
+  afterSpend({ zoomChanged: true });
 }
 
 const coarse = () => window.matchMedia('(pointer: coarse)').matches;
+
+// ---------- hint / zoom sheet (menu + confirmation) ----------
+let sheet = null; // null | { type: 'hints' } | { type: 'confirm', what: 'zoom' | 'hint', key }
+function closeSheet() { sheet = null; renderSheet(); }
+function renderSheet() {
+  const r = game.round;
+  if (!sheet || !r || r.done) { el.sheet.hidden = true; el.sheet.innerHTML = ''; return; }
+  const left = C.attemptsLeft(spent(r));
+  const after = `You'll have ${left - 1} left.`;
+  let html = '';
+  if (sheet.type === 'hints') {
+    html = `<h4>Need a hint?</h4><p>Each hint costs 1 guess. ${left} left.</p><div class="opts">${C.HINTS.map((h) => {
+      const used = r.hints.includes(h.key);
+      const off = used || !C.hintAvailable(h, r.answer);
+      return `<button type="button" class="opt" data-hint="${h.key}" ${off ? 'disabled' : ''}>${h.label}<small>${used ? 'Already used' : off ? 'Not available' : '−1 guess'}</small></button>`;
+    }).join('')}</div><button type="button" class="cancel" data-cancel>Cancel</button>`;
+  } else if (sheet.what === 'zoom') {
+    html = `<h4>Zoom out for 1 guess?</h4><p>Shows a wider view. You can do this once per game. ${after}</p>
+      <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Zoom out (−1 guess)</button></div>`;
+  } else {
+    const h = C.HINTS.find((x) => x.key === sheet.key);
+    html = `<h4>Reveal: ${h.label.toLowerCase()}?</h4><p>This costs 1 guess. ${after}</p>
+      <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Reveal (−1 guess)</button></div>`;
+  }
+  el.sheet.innerHTML = html;
+  el.sheet.hidden = false;
+}
+el.sheet.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.hasAttribute('data-cancel')) closeSheet();
+  else if (t.dataset.hint) { sheet = { type: 'confirm', what: 'hint', key: t.dataset.hint }; renderSheet(); }
+  else if (t.hasAttribute('data-confirm')) { if (sheet.what === 'zoom') useZoomOut(); else useHint(sheet.key); }
+});
+el.btnHint.addEventListener('click', () => { closeList(); sheet = sheet && sheet.type === 'hints' ? null : { type: 'hints' }; renderSheet(); });
+el.btnZoom.addEventListener('click', () => { closeList(); sheet = { type: 'confirm', what: 'zoom' }; renderSheet(); });
 
 // ---------- rendering ----------
 const arrowSvg = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4M5.5 10.5 12 4l6.5 6.5"/></svg>';
 const fmt = (n) => n.toLocaleString('en-US');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const codeOf = (a) => a.iata || a.icao;
 
 function renderChrome() {
   for (const b of el.modeSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.mode === game.mode));
-  el.diffSeg.hidden = game.mode !== 'practice';
+  el.hardToggle.checked = game.hard;
+  el.diffSeg.hidden = !(game.mode === 'practice' && !game.hard);
   for (const b of el.diffSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.diff === game.diff));
+  el.input.placeholder = game.hard ? 'Search all airports' : 'Airport, city or code';
 }
 
 function renderAll(animateLast = false) {
   const r = game.round;
   renderChrome();
   if (!r) return;
-  // pips
+  const used = spent(r);
+
+  // pips: one per attempt spent, in order
   el.pips.innerHTML = '';
   for (let i = 0; i < C.MAX_GUESSES; i++) {
+    const e = r.log[i];
     const p = document.createElement('i');
-    p.className = 'pip' + (r.results[i] ? (r.results[i].correct ? ' hit' : ' miss') : '');
+    let cls = '';
+    if (e) {
+      if (e.t === 'g') cls = r.results.find((x) => x.id === e.id)?.correct ? ' hit' : ' miss';
+      else cls = ' aid';
+    }
+    p.className = 'pip' + cls;
     el.pips.appendChild(p);
   }
-  el.pips.setAttribute('aria-label', `${r.results.length} of ${C.MAX_GUESSES} guesses used`);
-  // rows
+  el.pips.setAttribute('aria-label', `${used} of ${C.MAX_GUESSES} attempts used`);
+  el.left.innerHTML = `<b>${C.attemptsLeft(used)}</b> of ${C.MAX_GUESSES} attempts left`;
+
+  // tools
+  const canSpend = C.canSpend(used);
+  const anyHint = C.HINTS.some((h) => !r.hints.includes(h.key) && C.hintAvailable(h, r.answer));
+  el.btnHint.disabled = !canSpend || !anyHint;
+  el.btnZoom.disabled = !canSpend || r.zoomed;
+  el.btnZoom.innerHTML = r.zoomed ? 'Zoomed out' : 'Zoom out <span class="cost">−1 guess</span>';
+  el.btnHint.title = canSpend ? '' : 'Hints need at least 2 attempts left';
+
+  // used hints
+  const chips = [];
+  if (r.zoomed) chips.push(['View', 'Zoomed out']);
+  for (const key of r.hints) {
+    const h = C.HINTS.find((x) => x.key === key);
+    chips.push([h.label, h.value(r.answer)]);
+  }
+  el.hintsUsed.hidden = chips.length === 0;
+  el.hintsList.innerHTML = chips.map(([k, v]) => `<li><span>${esc(k)}</span><b>${esc(v)}</b></li>`).join('');
+
+  // guess rows (newest on top)
   el.guesses.innerHTML = '';
   r.results.forEach((res, i) => {
     const g = game.byId.get(res.id);
@@ -241,7 +458,7 @@ function renderAll(animateLast = false) {
     if (!(animateLast && i === r.results.length - 1)) li.style.animation = 'none';
     li.innerHTML = `
       <span class="n">${i + 1}</span>
-      <div class="who"><span class="nm">${esc(g.name)}</span><span class="code">${esc(g.iata)}</span></div>
+      <div class="who"><span class="nm">${esc(g.name)}</span><span class="code">${esc(codeOf(g))}</span></div>
       <div class="nums">${res.correct ? '<b>Correct</b>' : `<b>${fmt(res.km)} km</b><span>${res.pct}%</span>`}<span class="bar"><i style="width:${res.pct}%"></i></span></div>
       <div class="dir" aria-label="${res.correct ? 'Correct' : `Answer is ${res.dir} of this airport`}">${arrowSvg}<span>${res.correct ? 'HIT' : res.dir}</span></div>`;
     if (!res.correct) {
@@ -249,9 +466,10 @@ function renderAll(animateLast = false) {
       svg.style.transform = 'rotate(0deg)';
       requestAnimationFrame(() => requestAnimationFrame(() => { svg.style.transform = `rotate(${res.bearing.toFixed(1)}deg)`; }));
     }
-    el.guesses.prepend(li); // newest on top
+    el.guesses.prepend(li);
   });
   el.play.hidden = r.done;
+  renderSheet();
   renderResult();
 }
 
@@ -264,19 +482,19 @@ function renderResult() {
   el.result.className = 'result' + (r.won ? '' : ' lost');
   const place = [a.city, a.country].filter(Boolean).join(', ');
   el.result.innerHTML = `
-    <p class="eyebrow">${r.won ? `Solved in ${r.results.length} of ${C.MAX_GUESSES}` : 'Out of guesses'}</p>
+    <p class="eyebrow">${r.won ? `Solved in ${spent(r)} of ${C.MAX_GUESSES}` : 'Out of attempts'}</p>
     <h2>${esc(a.name)}</h2>
-    <p class="codes">${esc(a.iata)} <span>/</span> ${esc(a.icao)}</p>
+    <p class="codes">${esc([a.iata, a.icao].filter(Boolean).join(' / '))}</p>
     <p class="where">${esc(place)}</p>
     <div class="acts">
       <button type="button" class="btn primary" id="btn-share">Share</button>
-      ${r.mode === 'practice' ? '<button type="button" class="btn" id="btn-next">Next airport</button>' : ''}
+      ${r.kind === 'practice' ? '<button type="button" class="btn" id="btn-next">Next airport</button>' : ''}
     </div>
-    ${r.mode === 'daily' ? '<p class="next">Next airport in <b id="countdown">--:--:--</b></p>' : ''}`;
+    ${r.kind !== 'practice' ? '<p class="next">Next airport in <b id="countdown">--:--:--</b></p>' : ''}`;
   $('#btn-share').addEventListener('click', share);
   const next = $('#btn-next');
   if (next) next.addEventListener('click', () => startMode());
-  if (r.mode === 'daily') startCountdown();
+  if (r.kind !== 'practice') startCountdown();
 }
 
 // ---------- countdown ----------
@@ -296,11 +514,19 @@ function startCountdown() {
 }
 
 // ---------- share ----------
+function shareTitle(r) {
+  if (r.kind === 'daily') return `Daily ${r.date}`;
+  if (r.kind === 'hard') return `Hard Daily ${r.date}`;
+  return game.hard ? 'Hard Practice' : `Practice · ${C.DIFFICULTIES[game.diff].label}`;
+}
+function shareEntries(r) {
+  const byId = new Map(r.results.map((x) => [x.id, x]));
+  return r.log.map((e) => (e.t === 'g' ? byId.get(e.id) : e.t === 'h' ? { hint: true } : { zoom: true }));
+}
 async function share() {
   const r = game.round;
-  const title = r.mode === 'daily' ? `Daily ${r.date}` : `Practice · ${C.DIFFICULTIES[game.diff].label}`;
   const url = /^https?:/.test(location.protocol) ? location.origin + location.pathname : '';
-  const text = C.buildShareText({ results: r.results, won: r.won, title, url });
+  const text = C.buildShareText({ entries: shareEntries(r), won: r.won, title: shareTitle(r), url });
   try {
     await navigator.clipboard.writeText(text);
     return toast('Copied to clipboard');
@@ -318,9 +544,9 @@ async function share() {
 
 // ---------- autocomplete ----------
 let active = -1, shown = [];
+const searchIndex = () => (game.hard && game.hardLoaded ? game.fullIndex : game.mainIndex);
 const hl = (text, q) => {
-  // highlight by locating the normalised query in an accent-insensitive way
-  const nq = C.normalize(q);
+  const nq = C.normalize(q).replace(/ /g, '');
   if (!nq) return esc(text);
   // stripped = accent-free lowercase text; pos[i] = index in `text` that produced stripped[i]
   let stripped = '';
@@ -329,9 +555,9 @@ const hl = (text, q) => {
     const chunk = C.normalize(text[i]).replace(/ /g, '');
     for (const ch of chunk) { stripped += ch; pos.push(i); }
   }
-  const idx = stripped.indexOf(nq.replace(/ /g, ''));
+  const idx = stripped.indexOf(nq);
   if (idx < 0) return esc(text);
-  const start = pos[idx], end = pos[idx + nq.replace(/ /g, '').length - 1] + 1;
+  const start = pos[idx], end = pos[idx + nq.length - 1] + 1;
   return esc(text.slice(0, start)) + '<mark>' + esc(text.slice(start, end)) + '</mark>' + esc(text.slice(end));
 };
 
@@ -339,18 +565,16 @@ function renderList() {
   const q = el.input.value;
   if (game.selected || !q.trim()) return closeList();
   const exclude = new Set(game.round ? game.round.results.map((r) => r.id) : []);
-  shown = C.search(game.index, q, { exclude, limit: 6 });
+  shown = C.search(searchIndex(), q, { exclude, limit: 6 });
   active = shown.length ? 0 : -1;
   el.list.innerHTML = '';
-  if (!shown.length) {
-    el.list.innerHTML = '<li class="noresults" role="presentation">No matching airport</li>';
-  }
+  if (!shown.length) el.list.innerHTML = '<li class="noresults" role="presentation">No matching airport</li>';
   shown.forEach((a, i) => {
     const li = document.createElement('li');
     li.id = 'opt-' + i;
     li.setAttribute('role', 'option');
     li.setAttribute('aria-selected', String(i === active));
-    li.innerHTML = `<span class="s-name">${hl(a.name, q)}</span><span class="s-meta"><b>${esc(a.iata)}</b> &middot; ${esc(a.icao)} &middot; ${esc(a.city ? a.city + ', ' : '')}${esc(a.countryCode)}</span>`;
+    li.innerHTML = `<span class="s-name">${hl(a.name, q)}</span><span class="s-meta"><b>${esc(codeOf(a))}</b> &middot; ${esc(a.city ? a.city + ', ' : '')}${esc(a.countryCode)}</span>`;
     li.setAttribute('aria-label', C.suggestionLabel(a));
     li.addEventListener('pointerdown', (e) => e.preventDefault()); // keep input focus
     li.addEventListener('click', () => choose(a));
@@ -374,7 +598,7 @@ function setActive(i) {
 }
 function choose(a) {
   game.selected = a;
-  el.input.value = `${a.name} (${a.iata})`;
+  el.input.value = `${a.name} (${codeOf(a)})`;
   el.btn.disabled = false;
   closeList();
   if (coarse()) el.input.blur(); else el.input.focus();
@@ -411,20 +635,21 @@ function renderStats() {
   const st = S.loadStats();
   const m = st[statsTab];
   const rate = m.played ? Math.round((100 * m.wins) / m.played) : 0;
-  const streak = S.displayStreak(st, C.utcDateString());
   const max = Math.max(1, ...m.dist);
   const tiles = [['Played', m.played], ['Win rate', rate + '%']];
-  if (statsTab === 'daily') tiles.push(['Streak', streak.current], ['Best', streak.best]);
-  else tiles.push(['Wins', m.wins], ['Losses', m.dist[5]]);
+  if (statsTab !== 'practice') {
+    const streak = S.displayStreak(st, statsTab, C.utcDateString());
+    tiles.push(['Streak', streak.current], ['Best', streak.best]);
+  } else tiles.push(['Wins', m.wins], ['Losses', m.dist[5]]);
   const labels = ['1', '2', '3', '4', '5', 'X'];
   const top = Math.max(...m.dist);
   el.statsBody.innerHTML = `
     <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
-    <div class="dist"><h3>Guess distribution</h3>
+    <div class="dist"><h3>Attempts used</h3>
       ${m.dist.map((n, i) => `<div class="drow${n && n === top ? ' top' : ''}"><span>${labels[i]}</span><div class="track"><div class="fill" style="width:${Math.max(n ? 8 : 0, (100 * n) / max)}%">${n || ''}</div></div></div>`).join('')}
     </div>`;
 }
-$('#btn-stats').addEventListener('click', () => { statsTab = game.mode; renderStats(); el.dlgStats.showModal(); });
+$('#btn-stats').addEventListener('click', () => { statsTab = kindOf(); renderStats(); el.dlgStats.showModal(); });
 el.statsSeg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { statsTab = b.dataset.stats; renderStats(); } });
 $('#btn-help').addEventListener('click', () => el.dlgHelp.showModal());
 for (const d of [el.dlgHelp, el.dlgStats]) d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
@@ -435,6 +660,7 @@ el.modeSeg.addEventListener('click', (e) => {
   if (!b || b.dataset.mode === game.mode) return;
   game.mode = b.dataset.mode; savePrefs(); startMode();
 });
+el.hardToggle.addEventListener('change', () => { game.hard = el.hardToggle.checked; savePrefs(); startMode(); });
 el.diffSeg.addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b || b.dataset.diff === game.diff) return;
@@ -445,7 +671,7 @@ el.diffSeg.addEventListener('click', (e) => {
 // The on-screen keyboard shrinks the visual viewport (iOS) or the layout viewport (Android). Either way, while the
 // input is focused and the viewport is much shorter than at rest, switch to a compact layout (smaller map, no chrome)
 // so the image, the input and the suggestions all stay on screen.
-let restH = 0, restW = 0;
+let restH = 0, restW = 0, resizeTimer;
 function onViewport() {
   const vv = window.visualViewport;
   const h = vv ? vv.height : window.innerHeight;
@@ -458,10 +684,15 @@ function onViewport() {
   const was = root.classList.contains('kb');
   root.classList.toggle('kb', kb);
   if (kb && !was) requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  if (map && kb !== was) setTimeout(() => map.invalidateSize(), 320);
+  if (map && kb !== was) refit(320);
+}
+/** The locked view is fitted to the viewport, so re-fit whenever the image area changes size. */
+function refit(delay = 150) {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (map && game.round) renderMapForRound(false); }, delay);
 }
 if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewport);
-window.addEventListener('resize', () => { onViewport(); if (map) map.invalidateSize(); });
+window.addEventListener('resize', () => { onViewport(); refit(); });
 el.input.addEventListener('blur', () => setTimeout(onViewport, 50));
 el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();
@@ -474,15 +705,14 @@ async function boot() {
   try {
     const res = await fetch('data/airports.json');
     if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    game.airports = data.airports;
+    game.main = (await res.json()).airports;
   } catch {
     showVeil('Could not load the airport data.', true);
     el.veilRetry.onclick = () => location.reload();
     return;
   }
-  for (const a of game.airports) game.byId.set(a.id, a);
-  game.index = C.prepareIndex(game.airports);
+  for (const a of game.main) game.byId.set(a.id, a);
+  game.mainIndex = C.prepareIndex(game.main);
   if (!S.hasSeenHelp()) { el.dlgHelp.showModal(); S.markHelpSeen(); }
   await startMode();
 }
