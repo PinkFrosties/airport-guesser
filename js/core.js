@@ -106,7 +106,7 @@ export function search(index, query, { exclude = new Set(), limit = 6 } = {}) {
 }
 
 export function suggestionLabel(a) {
-  return `${a.name} · ${a.iata} · ${a.city ? a.city + ', ' : ''}${a.countryCode}`;
+  return `${a.name} · ${a.iata || a.icao} · ${a.city ? a.city + ', ' : ''}${a.countryCode}`;
 }
 
 // ---------- seeded RNG / daily ----------
@@ -144,51 +144,99 @@ export function addDays(dateStr, n) {
 export const msUntilNextUtcDay = (now = new Date()) =>
   Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime();
 
-export const DAILY_POOL = (airports) => airports.filter((a) => a.type === 'large').sort((a, b) => a.id - b.id);
-
-/** Deterministic ordering of the pool for a UTC date. Element 0 is the airport of the day;
- *  later elements are the fallback order if imagery for earlier ones is unavailable. */
-export function dailyOrder(airports, dateStr) {
-  const pool = DAILY_POOL(airports);
-  const rnd = mulberry32(hashSeed('airport-guesser:' + dateStr));
-  for (let i = pool.length - 1; i > 0; i--) {
+/** Deterministic ordering of `pool` for a UTC date. Element 0 is the airport of the day; later elements are
+ *  the fallback order if imagery for earlier ones is unusable. `salt` gives each pool its own daily. */
+export function dailyOrder(pool, dateStr, salt = '') {
+  const list = [...pool].sort((a, b) => a.id - b.id);
+  const rnd = mulberry32(hashSeed('airport-guesser:' + salt + dateStr));
+  for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    [list[i], list[j]] = [list[j], list[i]];
   }
-  return pool;
+  return list;
 }
 
 export const DIFFICULTIES = {
-  easy: { label: 'Easy', filter: (a) => a.tier === 1 },
-  medium: { label: 'Medium', filter: (a) => a.type === 'large' },
-  hard: { label: 'Hard', filter: (a) => a.type === 'medium' },
+  easy: { label: 'Top 100', filter: (a) => a.tier === 1 },
+  medium: { label: 'Large', filter: (a) => a.type === 'large' },
+  hard: { label: 'Mid-size', filter: (a) => a.type === 'medium' },
 };
 
 /** Random candidate order for practice (all candidates, shuffled). */
-export function practiceOrder(airports, difficulty, rnd = Math.random) {
-  const pool = airports.filter(DIFFICULTIES[difficulty].filter);
-  for (let i = pool.length - 1; i > 0; i--) {
+export function practiceOrder(pool, difficulty, rnd = Math.random) {
+  const list = difficulty && DIFFICULTIES[difficulty] ? pool.filter(DIFFICULTIES[difficulty].filter) : [...pool];
+  for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    [list[i], list[j]] = [list[j], list[i]];
   }
-  return pool;
+  return list;
 }
+
+// ---------- locked view: zoom that fits the airfield ----------
+export const FILL = 0.75;
+export const MIN_BOX_M = 150; // never zoom in tighter than a 150 m airfield
+const MPP_Z0 = 156543.03392; // metres per pixel at zoom 0 on the equator
+
+/** Pixels per metre at zoom z, latitude lat. */
+export const pxPerMetre = (z, lat) => 2 ** z / (MPP_Z0 * Math.cos(rad(lat)));
+
+/** Fraction (0..1+) of the viewport's limiting dimension that the airfield box occupies at zoom z. */
+export function fillAt(a, W, H, z) {
+  const [clat, , w, h] = a.view;
+  const k = pxPerMetre(z, clat);
+  return Math.max((Math.max(w, MIN_BOX_M) * k) / W, (Math.max(h, MIN_BOX_M) * k) / H);
+}
+
+/**
+ * Zoom at which the airfield box fills ~75% of the viewport. Quantised DOWN to half-levels: Leaflet picks tiles
+ * at round(zoom), so x.5 uses the next level's tiles scaled down (sharp) and integers use native tiles; the
+ * result therefore never upscales tiles, and fills 53-75%.
+ */
+export function fitZoom(a, W, H, { fill = FILL, minZoom = 8, maxZoom = 19 } = {}) {
+  const [clat, , w, h] = a.view;
+  const ppm = Math.min((fill * W) / Math.max(w, MIN_BOX_M), (fill * H) / Math.max(h, MIN_BOX_M));
+  const z = Math.log2(ppm * MPP_Z0 * Math.cos(rad(clat)));
+  return Math.max(minZoom, Math.min(maxZoom, Math.floor(z * 2) / 2));
+}
+
+/** The map tile level used to render zoom z (what Leaflet will request). */
+export const tileLevel = (z) => Math.round(z);
+
+/** Tile block (at level L) covering the viewport when the view is at zoom z, plus a one-tile margin. */
+export function tileBlock(a, W, H, z, L = tileLevel(z)) {
+  const [clat, clon] = a.view;
+  const n = 2 ** L;
+  const latR = rad(clat);
+  const fx = ((clon + 180) / 360) * n;
+  const fy = ((1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2) * n;
+  const scale = 2 ** (z - L);
+  const hx = W / 2 / (256 * scale) + 1;
+  const hy = H / 2 / (256 * scale) + 1;
+  const x0 = Math.max(0, Math.floor(fx - hx));
+  const x1 = Math.min(n - 1, Math.floor(fx + hx));
+  const y0 = Math.max(0, Math.floor(fy - hy));
+  const y1 = Math.min(n - 1, Math.floor(fy + hy));
+  return { z: L, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+export const ZOOM_OUT_LEVELS = 2;
+export const zoomedOut = (z) => Math.max(2, z - ZOOM_OUT_LEVELS);
 
 // ---------- hints ----------
-const CONTINENT_ZOOM = { EU: 4, AS: 3, AF: 3, NA: 3, SA: 3, OC: 3, AN: 2 };
+export const CONTINENT_NAMES = { AF: 'Africa', AN: 'Antarctica', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America' };
 
-/** Map zoom for the next view given how many guesses have been missed so far (0..4). */
-export function zoomForMisses(a, misses) {
-  const z0 = a.z;
-  if (misses <= 0) return z0;
-  if (misses === 1) return z0 - 1;
-  if (misses === 2) return z0 - 2;
-  const cont = CONTINENT_ZOOM[a.continent] ?? 3;
-  if (misses === 3) return cont;
-  return Math.max(a.cz, cont + 1);
-}
+export const HINTS = [
+  { key: 'continent', label: 'Continent', value: (a) => CONTINENT_NAMES[a.continent] || a.continent },
+  { key: 'country', label: 'Country', value: (a) => a.country },
+  { key: 'letter', label: 'First letter of name', value: (a) => a.name.trim().charAt(0).toUpperCase() },
+  { key: 'runways', label: 'Number of runways', value: (a) => String(a.rw), available: (a) => a.rw > 0 },
+];
+export const hintAvailable = (h, a) => (h.available ? h.available(a) : true);
 
-export const HINT_LABELS = ['Airfield', 'Wider view', 'Regional view', 'Continent view', 'Country view'];
+/** Attempts left. Every guess, hint and zoom-out spends one. */
+export const attemptsLeft = (spent) => MAX_GUESSES - spent;
+/** Hints and zoom-out are only offered while at least 2 attempts remain (spending the last one would just end the game). */
+export const canSpend = (spent) => attemptsLeft(spent) >= 2;
 
 // ---------- share ----------
 export function bandSquare(r) {
@@ -201,10 +249,17 @@ export function bandSquare(r) {
 const ARROWS = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'];
 export const arrowEmoji = (bearing) => ARROWS[compassIndex(bearing)];
 
-/** Never includes anything identifying the answer. `results` = evaluateGuess outputs. */
-export function buildShareText({ results, won, title, url }) {
-  const score = won ? `${results.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
-  const lines = results.map((r) => (r.correct ? `${bandSquare(r)} \u{1F3AF}` : `${bandSquare(r)} ${arrowEmoji(r.bearing)}`));
+/**
+ * Never includes anything identifying the answer (or which hint was used).
+ * `entries`: in play order, each a guess result (evaluateGuess output), {hint:true} or {zoom:true}.
+ */
+export function buildShareText({ entries, won, title, url }) {
+  const score = won ? `${entries.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
+  const lines = entries.map((e) => {
+    if (e.hint) return '💡'; // light bulb
+    if (e.zoom) return '🔭'; // telescope
+    return e.correct ? `${bandSquare(e)} 🎯` : `${bandSquare(e)} ${arrowEmoji(e.bearing)}`;
+  });
   return [`Airport Guesser — ${title}`, score, '', ...lines, ...(url ? ['', url] : [])].join('\n');
 }
 
