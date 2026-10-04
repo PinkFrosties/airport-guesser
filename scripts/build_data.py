@@ -18,12 +18,14 @@ Tier (difficulty):
   2 = remaining large airports (tier 1 + 2 together = Medium)
   3 = medium airports with scheduled service -> Hard
 
-Per-airport zoom hints:
-  z  = Leaflet zoom at which the whole airfield (farthest runway end from the
-       reference point, plus margin) fits in ~300 px. Clamped 12..15; falls back
-       to 13 (large) / 14 (medium) when runway coordinates are missing.
-  cz = zoom at which the country (spread of its other kept airports around this
-       one) roughly fits in ~320 px. Clamped 4..8.
+Per-airport view box: "view": [centre lat, centre lon, width m, height m] is the bounding box of the
+runway endpoints (falls back to runway length around the reference point, then to a size by type).
+The client picks the zoom that fits it to ~75% of the viewport. "rw" is the number of open runways.
+
+Two files are written:
+  data/airports.json       Daily pool: the airports above (tiers 1-3).
+  data/airports-hard.json  Hard pool: every other open large/medium/small airport that has runway data and
+                           an IATA code, ICAO code or Wikipedia page (tier 4). Also searchable in Hard mode.
 
 Usage:  python scripts/build_data.py [--refresh]
 """
@@ -39,6 +41,7 @@ from collections import Counter, defaultdict
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "scripts", ".cache")
 OUT = os.path.join(ROOT, "data", "airports.json")
+OUT_HARD = os.path.join(ROOT, "data", "airports-hard.json")
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 ROUTES_URL = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat"
 TOP_N = 100
@@ -128,47 +131,104 @@ def main():
     for a in kept:
         a["tier"] = 1 if a["id"] in top_ids else (2 if a["type"] == "large" else 3)
 
-    # ---- airfield zoom from runway end coordinates
-    points = defaultdict(list)
+    # ---- runway data: count, and the airfield's bounding box
+    runways = defaultdict(list)
     for r in csv.DictReader(io.StringIO(runways_csv)):
         if r["closed"] == "1":
             continue
-        for la, lo in (("le_latitude_deg", "le_longitude_deg"), ("he_latitude_deg", "he_longitude_deg")):
-            try:
-                points[int(r["airport_ref"])].append((float(r[la]), float(r[lo])))
-            except ValueError:
-                pass
+        runways[int(r["airport_ref"])].append(r)
+
+    def airfield(a):
+        """(runway_count, [clat, clon, width_m, height_m]) or None when there is no usable runway data."""
+        rws = runways.get(a["id"])
+        if not rws:
+            return None
+        pts = []
+        for r in rws:
+            ends = []
+            for la, lo in (("le_latitude_deg", "le_longitude_deg"), ("he_latitude_deg", "he_longitude_deg")):
+                try:
+                    ends.append((float(r[la]), float(r[lo])))
+                except ValueError:
+                    pass
+            pts.extend(ends)
+            if not ends:  # no coordinates: assume the runway is centred on the reference point
+                try:
+                    half = float(r["length_ft"]) * 0.3048 / 2
+                except ValueError:
+                    continue
+                dlat = half / 110574
+                dlon = half / (111320 * max(0.2, math.cos(math.radians(a["lat"]))))
+                pts.extend([(a["lat"] + dlat, a["lon"]), (a["lat"] - dlat, a["lon"]),
+                            (a["lat"], a["lon"] + dlon), (a["lat"], a["lon"] - dlon)])
+        # drop obviously wrong coordinates (swapped, 0/0, ...): nothing real is >12 km from the reference point
+        pts = [p for p in pts if haversine_m(a["lat"], a["lon"], p[0], p[1]) <= 12000]
+        if not pts:
+            return None
+        pts.append((a["lat"], a["lon"]))
+        lat_min, lat_max = min(p[0] for p in pts), max(p[0] for p in pts)
+        lon_min, lon_max = min(p[1] for p in pts), max(p[1] for p in pts)
+        clat, clon = (lat_min + lat_max) / 2, (lon_min + lon_max) / 2
+        w = (lon_max - lon_min) * 111320 * math.cos(math.radians(clat))
+        h = (lat_max - lat_min) * 110574
+        return len(rws), [round(clat, 5), round(clon, 5), int(round(w)), int(round(h))]
+
+    FALLBACK_M = {"large": 4000, "medium": 2000, "small": 1000}
     for a in kept:
-        pts = points.get(a["id"])
-        if pts:
-            radius = max(haversine_m(a["lat"], a["lon"], p[0], p[1]) for p in pts)
-            z = fit_zoom(2 * radius * 1.3, a["lat"], 300)
-            a["z"] = max(12, min(15, z))
+        info = airfield(a)
+        if info:
+            a["rw"], a["view"] = info
         else:
-            a["z"] = 13 if a["type"] == "large" else 14
+            a["rw"] = 0
+            m = FALLBACK_M[a["type"]]
+            a["view"] = [a["lat"], a["lon"], m, m]
 
-    # ---- country zoom from spread of the country's other airports (ignore overseas outliers)
-    by_cc = defaultdict(list)
-    for a in kept:
-        by_cc[a["countryCode"]].append(a)
-    for a in kept:
-        radius = 0
-        for b in by_cc[a["countryCode"]]:
-            d = haversine_m(a["lat"], a["lon"], b["lat"], b["lon"])
-            if d <= 2_500_000:
-                radius = max(radius, d)
-        z = fit_zoom(max(2 * radius * 1.15, 60_000), a["lat"], 320)
-        a["cz"] = max(4, min(8, z))
+    # ---- hard pool: everything else that is a real airfield with runway data and is identifiable
+    kept_ids = {a["id"] for a in kept}
+    hard = []
+    for r in csv.DictReader(io.StringIO(airports_csv)):
+        if r["type"] not in ("large_airport", "medium_airport", "small_airport"):
+            continue
+        aid = int(r["id"])
+        if aid in kept_ids:
+            continue
+        if not (r["iata_code"].strip() or r["icao_code"].strip() or r["wikipedia_link"].strip()):
+            continue
+        try:
+            lat, lon = float(r["latitude_deg"]), float(r["longitude_deg"])
+        except ValueError:
+            continue
+        a = {
+            "id": aid,
+            "name": r["name"].strip(),
+            "iata": r["iata_code"].strip().upper(),
+            "icao": (r["icao_code"] or r["ident"]).strip().upper(),
+            "lat": round(lat, 5),
+            "lon": round(lon, 5),
+            "country": countries.get(r["iso_country"], r["iso_country"]),
+            "countryCode": r["iso_country"],
+            "continent": r["continent"],
+            "city": (r["municipality"] or "").strip(),
+            "type": r["type"].replace("_airport", ""),
+            "tier": 4,
+        }
+        info = airfield(a)
+        if not info:
+            continue
+        a["rw"], a["view"] = info
+        hard.append(a)
+    hard.sort(key=lambda a: a["id"])
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
-        json.dump({
-            "source": "OurAirports (public domain); tier proxy: OpenFlights route counts",
-            "airports": kept,
-        }, f, ensure_ascii=False, separators=(",", ":"))
+    def dump(path, items, source):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump({"source": source, "airports": items}, f, ensure_ascii=False, separators=(",", ":"))
+        print("wrote %s: %d airports, %d bytes" % (path, len(items), os.path.getsize(path)))
+
+    dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts")
+    dump(OUT_HARD, hard, "OurAirports (public domain)")
     n = Counter(a["tier"] for a in kept)
-    print("wrote %s: %d airports (tier1=%d tier2=%d tier3=%d), %d bytes" % (
-        OUT, len(kept), n[1], n[2], n[3], os.path.getsize(OUT)))
+    print("daily tiers: tier1=%d tier2=%d tier3=%d" % (n[1], n[2], n[3]))
     print("top 10 by routes:", [a["iata"] for a in ranked[:10]])
 
 
