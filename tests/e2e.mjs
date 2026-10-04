@@ -104,7 +104,7 @@ const measure = (page) => page.evaluate(() => {
   return {
     W: size.x, H: size.y, zoom: m.getZoom(),
     fillW: pw / size.x, fillH: ph / size.y, fill: Math.max(pw / size.x, ph / size.y),
-    offX: Math.abs(c.x - size.x / 2), offY: Math.abs(c.y - size.y / 2),
+    offX: Math.abs(c.x - size.x / 2), offY: Math.abs(c.y - size.y / 2), lift: g.lift,
   };
 });
 
@@ -168,7 +168,7 @@ await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp
     const s = await auditSharp(page);
     results[name] = { m, s };
     assert.ok(m.fill >= 0.45 && m.fill <= 0.92, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
-    assert.ok(m.offX < 3 && m.offY < 3, `${name}: centred (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
+    assert.ok(m.offX < 3 && Math.abs(m.offY - m.lift) < 3, `${name}: centred, lifted ${m.lift}px for the attribution pill (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
     assert.equal(s.n, 1, 'extra tile levels capped at +1 even at dpr 3');
     assert.equal(s.tileCss, 128, 'tiles drawn at 128 CSS px (256 bitmap px)');
     await assertTilesReal(page);

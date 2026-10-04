@@ -30,6 +30,7 @@ Two files are written:
 Usage:  python scripts/build_data.py [--refresh]
 """
 import csv
+import datetime
 import io
 import json
 import math
@@ -357,10 +358,17 @@ def main():
         hard.append(a)
     hard.sort(key=lambda a: a["id"])
 
+    def source_date(name):
+        """UTC date the cached source file was downloaded (shown in About & credits)."""
+        ts = os.path.getmtime(os.path.join(CACHE, name))
+        return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    meta = {"ourairports_retrieved": source_date("airports.csv"), "built": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")}
+
     def dump(path, items, source):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump({"source": source, "airports": items}, f, ensure_ascii=False, separators=(",", ":"))
+            json.dump({"source": source, "meta": meta, "airports": items}, f, ensure_ascii=False, separators=(",", ":"))
         print("wrote %s: %d airports, %d bytes" % (path, len(items), os.path.getsize(path)))
 
     # ---- imagery quality: native max level per airport, then filter both pools

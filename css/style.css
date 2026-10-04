@@ -215,6 +215,12 @@ dialog[open]{animation:rise .3s var(--ease)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 .foot{margin-top:28px;color:var(--muted);font-size:13px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
 .foot .seg-sm button{min-height:34px;font-size:14px;padding:0 14px}
+.foot-line{margin:0}
+.link-inline{background:none;border:0;padding:12px 6px;margin:-12px 0;color:var(--accent-text);font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.prose a{color:var(--accent-text);text-underline-offset:2px}
+.prose i{color:var(--text)}
+.prose .muted{color:var(--muted)}
+#about-body li{margin-bottom:6px}
 
 /* phones/tablets: the suggestion list is in-flow so it pushes content down instead of hiding behind the keyboard */
 @media (max-width:899px){

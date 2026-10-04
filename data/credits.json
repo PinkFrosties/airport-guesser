@@ -1,0 +1,12 @@
+{
+  "generated": "2026-10-04",
+  "software": [
+    {
+      "name": "Leaflet",
+      "version": "1.9.4",
+      "license": "BSD-2-Clause",
+      "url": "https://leafletjs.com/",
+      "purpose": "Map engine for the locked satellite view (vendored in vendor/leaflet)."
+    }
+  ]
+}

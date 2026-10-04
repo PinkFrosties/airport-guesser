@@ -1,6 +1,6 @@
 import * as C from './core.js';
 import * as S from './store.js';
-import { IMAGERY, GAME } from './config.js';
+import { IMAGERY, GAME, APP_VERSION } from './config.js';
 import { createSatView } from './satview.js';
 import { initTheme, setPref } from './theme.js';
 
@@ -112,13 +112,22 @@ function syncRetina() {
   for (const v of Object.values(views)) v.setRetina(n);
 }
 
+/** Half the height of the attribution pill: the airfield is lifted by this much so the pill never covers it. */
+function attributionLift(H) {
+  const el = views.main.container.querySelector('.leaflet-control-attribution');
+  const h = el ? el.getBoundingClientRect().height : 0;
+  return Math.round(Math.min(h / 2 + 2, 0.05 * H));
+}
+
 /** Centre + zooms for an airport at the current frame size: fitted to the airfield, never deeper than real imagery. */
 function viewParams(a) {
   syncRetina();
   const n = views.main.retinaLevels;
   const { W, H } = views.main.size();
   const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n });
-  return { center: [a.view[0], a.view[1]], zMain: z, zWide: C.zoomedOut(z), W, H };
+  const lift = attributionLift(H);
+  game.lift = lift;
+  return { center: views.main.shifted([a.view[0], a.view[1]], z, lift), zMain: z, zWide: C.zoomedOut(z), W, H, lift };
 }
 
 let presentToken = 0;
@@ -673,6 +682,25 @@ el.input.addEventListener('blur', () => setTimeout(onViewport, 50));
 el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();
 
+// ---------- about & credits ----------
+const versionLabel = 'v' + APP_VERSION.replace(/\.0$/, '');
+$('#app-version').textContent = versionLabel;
+let aboutFilled = false;
+async function fillAbout() {
+  $('#about-version').textContent = APP_VERSION;
+  const date = game.meta && game.meta.ourairports_retrieved;
+  $('#about-data-date').textContent = date || 'unknown';
+  if (aboutFilled) return;
+  try {
+    const res = await fetch('data/credits.json');
+    const c = await res.json();
+    $('#oss-list').innerHTML = c.software.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${esc(p.version)}, ${esc(p.license)} licence. ${esc(p.purpose)}</li>`).join('');
+    aboutFilled = true;
+  } catch { $('#oss-list').innerHTML = '<li>Open-source software list unavailable offline. See THIRD_PARTY_NOTICES.md in the repository.</li>'; }
+}
+$('#btn-about').addEventListener('click', () => { fillAbout(); $('#dlg-about').showModal(); $('#dlg-about .dlg-body').scrollTop = 0; });
+$('#dlg-about').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
 // ---------- theme ----------
 const themeSeg = $('#theme-seg');
 function markTheme({ pref }) {
@@ -689,7 +717,9 @@ async function boot() {
   try {
     const res = await fetch('data/airports.json');
     if (!res.ok) throw new Error(res.status);
-    game.main = (await res.json()).airports;
+    const data = await res.json();
+    game.main = data.airports;
+    game.meta = data.meta || null;
   } catch {
     showVeil('Could not load the airport data.', true);
     el.veilRetry.onclick = () => location.reload();

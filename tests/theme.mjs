@@ -73,7 +73,7 @@ const AUDIT = () => {
   const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && !el.closest('[hidden]') && !el.closest('.sat:not(.front)'); };
   const ownText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) || el.matches('input');
 
-  const SELECTORS = ['.brand', '.link', '#mode-seg button', '#diff-seg button', '.switch-label', '#theme-seg button', '.foot span', '.left', '.left b',
+  const SELECTORS = ['.brand', '.link', '#mode-seg button', '#diff-seg button', '.switch-label', '#theme-seg button', '.foot span', '.foot .link-inline', 'dialog[open] .prose a', 'dialog[open] .prose i', 'dialog[open] .prose ul li', '.left', '.left b',
     '#guess-input', '#guess-btn', '.btn.ghost', '.cost', '#suggestions .s-name', '#suggestions .s-meta', '#suggestions .s-meta b', '#suggestions mark', '.noresults',
     '.sheet h4', '.sheet p', '.sheet .opt', '.sheet .opt small', '.sheet .cancel', '.sheet .btn', '.sheet .btn.primary',
     '.hints-used h3', '.hints-used li span', '.hints-used li b', '.row .n', '.row .nm', '.row .code', '.row .nums b', '.row .nums > span:not(.bar)', '.row .dir span',
@@ -128,6 +128,14 @@ async function walkthrough(theme) {
   await page.waitForSelector('dialog[open]');
   await audit(page, 'help dialog (about & credits)', theme);
   await shot(page, `${theme}-help`);
+  await page.keyboard.press('Escape');
+  await page.locator('#btn-about').scrollIntoViewIfNeeded();
+  await page.locator('#btn-about').click();
+  await page.waitForSelector('#dlg-about[open]');
+  await page.waitForFunction(() => document.querySelectorAll('#oss-list li a').length > 0);
+  await page.waitForTimeout(300);
+  await audit(page, 'about & credits', theme);
+  await shot(page, `${theme}-about`);
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.__ag.debugStart(21)); await settled(page);        // loads the Hard dataset
   await page.evaluate((id) => window.__ag.debugStart(id), HUB); await settled(page);
@@ -196,7 +204,7 @@ for (const theme of ['light', 'dark']) {
   await test(`${theme}: every component readable (WCAG AA 4.5:1) across all states`, () => walkthrough(theme));
 }
 await test('contrast audit covered the key components in both themes', async () => {
-  for (const s of ['.brand', '.link', '#mode-seg button', '#theme-seg button', '#guess-input::placeholder', '.btn.ghost', '#suggestions .s-name', '#suggestions mark', '.sheet h4', '.sheet .opt', '.sheet .btn.primary', '.hints-used li b', '.row .nm', '.row .nums b', '.row .dir span', '.result h2', '.result .btn', '#toast.show', '.veil p', '#veil-retry', '.chip', '.leaflet-control-attribution', 'dialog[open] .prose p', '.tile b', '.drow .fill', '.foot span']) {
+  for (const s of ['.brand', '.link', '#mode-seg button', '#theme-seg button', '#guess-input::placeholder', '.btn.ghost', '#suggestions .s-name', '#suggestions mark', '.sheet h4', '.sheet .opt', '.sheet .btn.primary', '.hints-used li b', '.row .nm', '.row .nums b', '.row .dir span', '.result h2', '.result .btn', '#toast.show', '.veil p', '#veil-retry', '.chip', '.leaflet-control-attribution', 'dialog[open] .prose p', '.tile b', '.drow .fill', '.foot span', '.foot .link-inline', 'dialog[open] .prose a']) {
     assert.ok(seenAll.has(s), 'audit never saw ' + s);
   }
 });

@@ -29,11 +29,12 @@ export function createSatView({ container, imagery, onProgress }) {
       minZoom: imagery.minZoom, maxZoom: imagery.maxZoom, worldCopyJump: false,
     });
     map.attributionControl.setPrefix(false);
+    map.attributionControl.addAttribution(imagery.attribution); // always on the image, even while tiles load
   }
 
   function makeLayer() {
     const l = new SharpTiles(imagery.url, {
-      attribution: imagery.attribution, subdomains: subs.length ? subs : 'abc', crossOrigin: true,
+      subdomains: subs.length ? subs : 'abc', crossOrigin: true,
       tileSize: 256 / 2 ** n, zoomOffset: n, minZoom: imagery.minZoom, maxZoom: imagery.maxZoom - n,
       keepBuffer: 0, updateWhenIdle: true, updateWhenZooming: false, detectRetina: false,
     });
@@ -84,6 +85,13 @@ export function createSatView({ container, imagery, onProgress }) {
     get stats() { return { ...state.stats, total: state.total }; },
     size() { ensureMap(); map.invalidateSize(); const s = map.getSize(); return { W: Math.max(s.x, 200), H: Math.max(s.y, 150) }; },
     tilesFor,
+
+    /** The centre of the view moved so the airfield appears `dy` CSS px higher in the frame (room for the attribution pill). */
+    shifted(center, z, dy) {
+      ensureMap();
+      const ll = map.unproject(map.project(L.latLng(center), z).add([0, dy]), z);
+      return [ll.lat, ll.lng];
+    },
 
     /** Change tile density (devicePixelRatio changed). Forces the next load() to rebuild. */
     setRetina(level) {
