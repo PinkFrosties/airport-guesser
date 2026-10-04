@@ -35,8 +35,10 @@ import json
 import math
 import os
 import sys
+import time
 import urllib.request
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "scripts", ".cache")
@@ -45,6 +47,17 @@ OUT_HARD = os.path.join(ROOT, "data", "airports-hard.json")
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 ROUTES_URL = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat"
 TOP_N = 100
+
+# ---- image-quality model (keep in sync with js/core.js: fitZoom / fillAt / MIN_FILL / MAX_FILL)
+TILEMAP_URL = "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tilemap/{z}/{y}/{x}/{w}/{h}?f=json"
+TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+PLACEHOLDER_BYTES = 2521        # size of Esri's grey "Map data not yet available" tile
+MPP0 = 156543.03392             # metres per pixel at zoom 0 on the equator
+MIN_BOX_M = 150
+FILL_TARGET, MAX_FILL, MIN_FILL = 0.75, 0.9, 0.45
+REF_W, REF_H = 358, 371         # reference phone frame (CSS px)
+REF_RETINA_LEVELS = 2           # worst case: devicePixelRatio 3-4 renders tiles two levels deeper than the map zoom
+BLOCK = 7                       # tiles (7x7 around the view centre) that must all be real imagery at a level
 
 
 def fetch(url, name, refresh):
@@ -73,6 +86,131 @@ def fit_zoom(extent_m, lat, px):
         return 99
     mpp0 = 156543.03392 * math.cos(math.radians(lat))
     return math.floor(math.log2(px * mpp0 / extent_m))
+
+
+def fill_at(a, w_px, h_px, z):
+    clat, _, w, h = a["view"]
+    k = 2 ** z / (MPP0 * math.cos(math.radians(clat)))
+    return max(max(w, MIN_BOX_M) * k / w_px, max(h, MIN_BOX_M) * k / h_px)
+
+
+def fit_zoom(a, w_px, h_px, min_zoom=8, max_zoom=19):
+    """Integer zoom whose airfield box fills ~75% of the frame (rounded up when that stays <= 90%)."""
+    clat, _, w, h = a["view"]
+    ppm = min(FILL_TARGET * w_px / max(w, MIN_BOX_M), FILL_TARGET * h_px / max(h, MIN_BOX_M))
+    zl = math.floor(math.log2(ppm * MPP0 * math.cos(math.radians(clat))))
+    z = zl + 1 if fill_at(a, w_px, h_px, zl + 1) <= MAX_FILL else zl
+    return max(min_zoom, min(max_zoom, z))
+
+
+def tile_xy(lat, lon, z):
+    n = 2 ** z
+    x = int((lon + 180) / 360 * n)
+    r = math.radians(lat)
+    y = int((1 - math.log(math.tan(r) + 1 / math.cos(r)) / math.pi) / 2 * n)
+    return min(n - 1, max(0, x)), min(n - 1, max(0, y))
+
+
+def http_get(url, binary=False, retries=4):
+    for i in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "airport-guesser-build"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = r.read()
+            return data if binary else json.loads(data)
+        except Exception:
+            if i == retries - 1:
+                raise
+            time.sleep(0.5 * (i + 1))
+
+
+def block_available(a, level):
+    """True when every tile in a BLOCK x BLOCK window around the view centre exists at this level (not a placeholder)."""
+    n = 2 ** level
+    x, y = tile_xy(a["view"][0], a["view"][1], level)
+    half = BLOCK // 2
+    x0, x1, y0, y1 = max(0, x - half), min(n - 1, x + half), max(0, y - half), min(n - 1, y + half)
+    url = TILEMAP_URL.format(z=level, y=y0, x=x0, w=x1 - x0 + 1, h=y1 - y0 + 1)
+    return all(v == 1 for v in http_get(url)["data"])
+
+
+def native_max_level(a):
+    """Deepest tile level (<= 19) with real imagery around the airfield. Availability is monotonic in level."""
+    lo, hi = 10, 19
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if block_available(a, mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def compute_native_levels(items, refresh):
+    """id -> native max level, cached in scripts/.cache/native_zoom.json (keyed by id + view centre)."""
+    path = os.path.join(CACHE, "native_zoom.json")
+    cache = {}
+    if os.path.exists(path) and not refresh:
+        with open(path, encoding="utf-8") as f:
+            cache = json.load(f)
+    key = lambda a: "%d:%.4f,%.4f" % (a["id"], a["view"][0], a["view"][1])
+    todo = [a for a in items if key(a) not in cache]
+    if todo:
+        print("probing Esri imagery for %d airports (cached: %d)..." % (len(todo), len(items) - len(todo)))
+        t0 = time.time()
+        with ThreadPoolExecutor(24) as ex:
+            for a, nz in zip(todo, ex.map(native_max_level, todo)):
+                cache[key(a)] = nz
+        os.makedirs(CACHE, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+        print("  done in %.0fs" % (time.time() - t0))
+    return {a["id"]: cache[key(a)] for a in items}
+
+
+def block_tiles(a, level):
+    n = 2 ** level
+    x, y = tile_xy(a["view"][0], a["view"][1], level)
+    half = BLOCK // 2
+    return [(xx, yy) for yy in range(max(0, y - half), min(n - 1, y + half) + 1) for xx in range(max(0, x - half), min(n - 1, x + half) + 1)]
+
+
+def verify_tilemap(items, n=40):
+    """Spot check against real tiles: at the native level every tile in the block is real imagery (not the 2521-byte
+    grey placeholder); one level deeper (when tilemap says 'not available') at least one tile is the placeholder."""
+    import random
+    rnd = random.Random(1)
+    sample = rnd.sample(items, min(n, len(items)))
+    is_placeholder = lambda lvl, xy: len(http_get(TILE_URL.format(z=lvl, y=xy[1], x=xy[0]), binary=True)) == PLACEHOLDER_BYTES
+    bad_native = bad_next = checked_next = 0
+    for a in sample:
+        if any(is_placeholder(a["nz"], xy) for xy in block_tiles(a, a["nz"])):
+            bad_native += 1
+        if a["nz"] < 19:
+            checked_next += 1
+            if not any(is_placeholder(a["nz"] + 1, xy) for xy in block_tiles(a, a["nz"] + 1)):
+                bad_next += 1
+    print("tilemap vs real tiles (%d airports): %d with a placeholder inside the 'available' block; %d of %d 'unavailable' blocks had no placeholder"
+          % (len(sample), bad_native, bad_next, checked_next))
+
+
+def quality_filter(items, label):
+    """Drop airports whose real imagery cannot reach a frame fill of MIN_FILL on a reference phone at devicePixelRatio 3."""
+    kept_items, dropped = [], Counter()
+    for a in items:
+        z_max = a["nz"] - REF_RETINA_LEVELS
+        if z_max < 8:
+            dropped["no usable imagery (tiles missing / placeholder)"] += 1
+            continue
+        z = min(fit_zoom(a, REF_W, REF_H), z_max)
+        if fill_at(a, REF_W, REF_H, z) < MIN_FILL:
+            dropped["imagery too coarse: airfield would fill < %d%% of the frame" % int(MIN_FILL * 100)] += 1
+            continue
+        kept_items.append(a)
+    print("%s pool: %d -> %d airports (dropped %d)" % (label, len(items), len(kept_items), len(items) - len(kept_items)))
+    for why, c in dropped.most_common():
+        print("    %5d  %s" % (c, why))
+    return kept_items, len(items), dict(dropped)
 
 
 def main():
@@ -225,8 +363,19 @@ def main():
             json.dump({"source": source, "airports": items}, f, ensure_ascii=False, separators=(",", ":"))
         print("wrote %s: %d airports, %d bytes" % (path, len(items), os.path.getsize(path)))
 
-    dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts")
-    dump(OUT_HARD, hard, "OurAirports (public domain)")
+    # ---- imagery quality: native max level per airport, then filter both pools
+    refresh_zoom = "--refresh-zoom" in sys.argv
+    nzs = compute_native_levels(kept + hard, refresh_zoom)
+    for a in kept + hard:
+        a["nz"] = nzs[a["id"]]
+    if "--verify" in sys.argv:
+        verify_tilemap(kept + hard)
+    kept, n_daily_before, daily_dropped = quality_filter(kept, "Daily")
+    hard, n_hard_before, hard_dropped = quality_filter(hard, "Hard")
+    top_ids &= {a["id"] for a in kept}
+
+    dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts; nz = native Esri imagery level")
+    dump(OUT_HARD, hard, "OurAirports (public domain); nz = native Esri imagery level")
     n = Counter(a["tier"] for a in kept)
     print("daily tiers: tier1=%d tier2=%d tier3=%d" % (n[1], n[2], n[3]))
     print("top 10 by routes:", [a["iata"] for a in ranked[:10]])

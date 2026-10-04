@@ -172,10 +172,13 @@ export function practiceOrder(pool, difficulty, rnd = Math.random) {
   return list;
 }
 
-// ---------- locked view: zoom that fits the airfield ----------
-export const FILL = 0.75;
-export const MIN_BOX_M = 150; // never zoom in tighter than a 150 m airfield
-const MPP_Z0 = 156543.03392; // metres per pixel at zoom 0 on the equator
+// ---------- locked view: zoom that fits the airfield, sharp on any screen ----------
+export const FILL = 0.75;       // target: airfield box fills ~75% of the limiting frame dimension
+export const MAX_FILL = 0.9;    // rounding up to the next whole zoom is allowed while the box stays within 90%
+export const MIN_FILL = 0.45;   // pool quality filter: below this the airfield is too small in the frame ("about 50%")
+export const MIN_BOX_M = 150;   // never zoom in tighter than a 150 m airfield
+const MPP_Z0 = 156543.03392;    // metres per pixel at zoom 0 on the equator
+export const REF_FRAME = { W: 358, H: 371, retinaLevels: 2 }; // reference phone frame used by the build-time pool filter
 
 /** Pixels per metre at zoom z, latitude lat. */
 export const pxPerMetre = (z, lat) => 2 ** z / (MPP_Z0 * Math.cos(rad(lat)));
@@ -188,34 +191,46 @@ export function fillAt(a, W, H, z) {
 }
 
 /**
- * Zoom at which the airfield box fills ~75% of the viewport. Quantised DOWN to half-levels: Leaflet picks tiles
- * at round(zoom), so x.5 uses the next level's tiles scaled down (sharp) and integers use native tiles; the
- * result therefore never upscales tiles, and fills 53-75%.
+ * Whole zoom at which the airfield box fills ~75% of the viewport (rounded up when that still fits within 90%).
+ * Integer zoom only: Leaflet then never rescales a tile layer with a CSS transform.
  */
-export function fitZoom(a, W, H, { fill = FILL, minZoom = 8, maxZoom = 19 } = {}) {
+export function fitZoom(a, W, H, { minZoom = 8, maxZoom = 19 } = {}) {
   const [clat, , w, h] = a.view;
-  const ppm = Math.min((fill * W) / Math.max(w, MIN_BOX_M), (fill * H) / Math.max(h, MIN_BOX_M));
-  const z = Math.log2(ppm * MPP_Z0 * Math.cos(rad(clat)));
-  return Math.max(minZoom, Math.min(maxZoom, Math.floor(z * 2) / 2));
+  const ppm = Math.min((FILL * W) / Math.max(w, MIN_BOX_M), (FILL * H) / Math.max(h, MIN_BOX_M));
+  const zl = Math.floor(Math.log2(ppm * MPP_Z0 * Math.cos(rad(clat))));
+  const z = fillAt(a, W, H, zl + 1) <= MAX_FILL ? zl + 1 : zl;
+  return Math.max(minZoom, Math.min(maxZoom, z));
 }
 
-/** The map tile level used to render zoom z (what Leaflet will request). */
-export const tileLevel = (z) => Math.round(z);
+/**
+ * Extra tile levels to request so every CSS pixel is backed by >= devicePixelRatio real pixels:
+ * level = zoom + n with tiles drawn at 256/2^n CSS px. dpr 1 -> 0, 1.5-2 -> 1, 2.01-4 -> 2.
+ */
+export const retinaLevels = (dpr) => Math.min(2, Math.max(0, Math.ceil(Math.log2(Math.max(1, dpr)) - 1e-9)));
 
-/** Tile block (at level L) covering the viewport when the view is at zoom z, plus a one-tile margin. */
-export function tileBlock(a, W, H, z, L = tileLevel(z)) {
+/** Highest map zoom whose tiles (level zoom+n) are still real, native-resolution imagery at this airport. */
+export const maxSharpZoom = (a, n) => a.nz - n;
+
+/** Zoom actually used: the fitted zoom, but never deeper than real imagery allows (smaller airport beats a blurry one). */
+export function finalZoom(a, W, H, n, opts) {
+  return Math.min(fitZoom(a, W, H, opts), maxSharpZoom(a, n));
+}
+
+/** Tile block (at level zoom+n) covering the viewport, plus a one-tile margin. */
+export function tileBlock(a, W, H, z, n) {
   const [clat, clon] = a.view;
-  const n = 2 ** L;
+  const L = z + n;
+  const tiles = 2 ** L;
   const latR = rad(clat);
-  const fx = ((clon + 180) / 360) * n;
-  const fy = ((1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2) * n;
-  const scale = 2 ** (z - L);
-  const hx = W / 2 / (256 * scale) + 1;
-  const hy = H / 2 / (256 * scale) + 1;
+  const fx = ((clon + 180) / 360) * tiles;
+  const fy = ((1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2) * tiles;
+  const css = 256 / 2 ** n; // CSS px per tile
+  const hx = W / 2 / css + 1;
+  const hy = H / 2 / css + 1;
   const x0 = Math.max(0, Math.floor(fx - hx));
-  const x1 = Math.min(n - 1, Math.floor(fx + hx));
+  const x1 = Math.min(tiles - 1, Math.floor(fx + hx));
   const y0 = Math.max(0, Math.floor(fy - hy));
-  const y1 = Math.min(n - 1, Math.floor(fy + hy));
+  const y1 = Math.min(tiles - 1, Math.floor(fy + hy));
   return { z: L, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 

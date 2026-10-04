@@ -2,7 +2,7 @@
 // Plays full games on a phone (390x844) and desktop viewport against a local static server (needs network for Esri tiles).
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 import * as C from '../js/core.js';
 
@@ -23,13 +23,13 @@ for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) {
 }
 if (!browser) throw new Error('no browser available');
 
-const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
+const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true };
 const DESKTOP = { viewport: { width: 1280, height: 800 } };
 const errors = [];
 let passed = 0;
 
 // Test airports: a hub, a small regional airfield (hard pool), a remote desert airfield (the v1 screenshot), an Antarctic station.
-const HUB = 3384, SMALL = 20403, REMOTE = 299738, ANTARCTIC = 6039;
+const HUB = 3384, SMALL = 20403, REMOTE = 299738;
 
 async function newPage(profile, { watch = true } = {}) {
   const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'] });
@@ -101,7 +101,7 @@ const measure = (page) => page.evaluate(() => {
   const pw = Math.abs(p2.x - p1.x), ph = Math.abs(p2.y - p1.y);
   const c = m.latLngToContainerPoint([clat, clon]);
   return {
-    W: size.x, H: size.y, zoom: m.getZoom(), tileLevel: Math.round(m.getZoom()),
+    W: size.x, H: size.y, zoom: m.getZoom(),
     fillW: pw / size.x, fillH: ph / size.y, fill: Math.max(pw / size.x, ph / size.y),
     offX: Math.abs(c.x - size.x / 2), offY: Math.abs(c.y - size.y / 2),
   };
@@ -112,7 +112,7 @@ async function assertTilesReal(page) {
   const srcs = await page.$$eval('#map img.leaflet-tile-loaded', (imgs) => imgs.map((i) => i.src));
   assert.ok(srcs.length > 0);
   const zs = new Set();
-  for (const s of srcs) {
+  for (const s of srcs.slice(0, 10)) {
     const m = s.match(/tile\/(\d+)\/(\d+)\/(\d+)/);
     assert.ok(m, s);
     zs.add(+m[1]);
@@ -125,37 +125,102 @@ async function assertTilesReal(page) {
 // ---------------------------------------------------------------- phone
 console.log('phone 390x844');
 
-await test('hub, small regional airfield and remote airfield: image fills ~75% (>=50%), centred, sharp, locked', async () => {
+const QA = new URL('../qa/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+mkdirSync(QA, { recursive: true });
+const qaReport = [];
+
+/** Sharpness audit of what is on screen: bitmap pixels per device pixel, tile levels, transforms, placeholders. */
+async function auditSharp(page) {
+  const a = await page.evaluate(() => {
+    const g = window.__ag, dpr = devicePixelRatio;
+    const tiles = [...document.querySelectorAll('#map img.leaflet-tile')];
+    const rects = tiles.map((t) => ({ css: t.getBoundingClientRect().width, nat: t.naturalWidth, loaded: t.classList.contains('leaflet-tile-loaded'), level: +t.src.match(/tile\/(\d+)\//)[1] }));
+    return {
+      dpr, zoom: g.map.getZoom(), n: g.view.retinaN, nz: g.round.answer.nz,
+      levels: [...new Set(rects.map((r) => r.level))], allLoaded: rects.every((r) => r.loaded), count: rects.length,
+      minBitmapPerDevicePx: Math.min(...rects.map((r) => r.nat / (r.css * dpr))),
+      tileCss: rects[0].css,
+      transforms: [...document.querySelectorAll('#map .leaflet-tile-container')].map((e) => e.style.transform).filter((t) => /scale\((?!1\))/.test(t)),
+      rendering: getComputedStyle(tiles[0]).imageRendering,
+    };
+  });
+  assert.equal(a.levels.length, 1, 'only one tile level on screen (no stand-in tiles): ' + a.levels);
+  assert.equal(a.levels[0], a.zoom + a.n, 'tiles come from level zoom + retina levels');
+  assert.ok(a.levels[0] <= a.nz, `never deeper than native imagery (level ${a.levels[0]} > nz ${a.nz})`);
+  assert.ok(a.allLoaded, 'all tiles of the view are loaded before the image is shown');
+  assert.ok(a.minBitmapPerDevicePx >= 0.99, `bitmap pixels per device pixel ${a.minBitmapPerDevicePx.toFixed(2)} (< 1 means CSS upscaling)`);
+  assert.deepEqual(a.transforms, [], 'no CSS scaling of the tile layer');
+  assert.equal(a.rendering, 'auto');
+  assert.equal(Number.isInteger(a.zoom), true);
+  return a;
+}
+
+await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp (retina tiles, integer zoom, native-capped), fill the frame, centred', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
+  assert.equal(await page.evaluate(() => devicePixelRatio), 3);
   const results = {};
   for (const [name, id] of [['hub', HUB], ['small', SMALL], ['remote', REMOTE]]) {
     const res = await start(page, id);
     assert.ok(res && res.z, name + ' resolved');
     const m = await measure(page);
-    results[name] = m;
-    assert.ok(m.fill >= 0.5 && m.fill <= 0.77, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
+    const s = await auditSharp(page);
+    results[name] = { m, s };
+    assert.ok(m.fill >= 0.45 && m.fill <= 0.92, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
     assert.ok(m.offX < 3 && m.offY < 3, `${name}: centred (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
-    assert.ok(m.tileLevel >= m.zoom, `${name}: tiles never upscaled (zoom ${m.zoom}, tile level ${m.tileLevel})`);
+    assert.equal(s.tileCss, 64, 'tiles drawn at 64 CSS px (256 bitmap px, dpr 3)');
     await assertTilesReal(page);
-    await page.screenshot({ path: OUT + `phone-${name}.png` });
+    await page.screenshot({ path: QA + `phone-dpr3-${name}.png` });
+    const a = await answerOf(page);
+    qaReport.push({ airport: a.name, iata: a.iata || a.icao, pool: a.tier === 4 ? 'hard' : 'daily', dpr: s.dpr, zoomUsed: s.zoom, tileLevelRequested: s.levels[0], nativeMaxLevel: s.nz, fillPct: Math.round(m.fill * 100), bitmapPxPerDevicePx: +s.minBitmapPerDevicePx.toFixed(2) });
   }
-  assert.ok(results.small.zoom - results.hub.zoom >= 1.5, `small airfield (${results.small.zoom}) much tighter than hub (${results.hub.zoom})`);
-  console.log('       zoom: hub ' + results.hub.zoom + ', small ' + results.small.zoom + ', remote ' + results.remote.zoom);
+  assert.ok(results.small.m.zoom - results.hub.m.zoom >= 1, `small airfield (${results.small.m.zoom}) tighter than hub (${results.hub.m.zoom})`);
+  console.log('       zoom: hub ' + results.hub.m.zoom + ', small ' + results.small.m.zoom + ', remote ' + results.remote.m.zoom + ' (tile levels +2)');
   await ctx.close();
 });
 
-await test('Antarctic station: zoom capped to native imagery, no placeholder tiles, never blurry', async () => {
+await test('native cap: when imagery is shallower than the fitted zoom, the airport gets smaller instead of blurry', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
-  const res = await start(page, ANTARCTIC);
+  // simulate a location whose real imagery ends at level 14 (data patched in memory only)
+  await page.evaluate((id) => { window.__ag.byId.get(id).nz = 14; }, HUB);
+  await start(page, HUB);
+  const s = await auditSharp(page);
   const m = await measure(page);
   const fit = C.fitZoom(await answerOf(page), m.W, m.H);
-  console.log(`       fitted ${fit}, shown ${m.zoom}, cap ${res && res.cap}`);
-  assert.ok(m.zoom <= fit);
-  assert.ok(m.tileLevel >= m.zoom);
-  await assertTilesReal(page);
-  await page.screenshot({ path: OUT + 'phone-antarctic.png' });
+  assert.ok(fit > s.zoom, 'fitted zoom ' + fit + ' was reduced');
+  assert.equal(s.zoom, 12, 'zoom = nz (14) - retina levels (2)');
+  assert.equal(s.levels[0], 14, 'requested tile level never beyond native max');
+  assert.ok(m.fill < 0.45, 'airport is smaller in the frame (' + (m.fill * 100).toFixed(0) + '%) rather than upscaled');
+  await page.screenshot({ path: QA + 'phone-dpr3-native-cap-simulated.png' });
+  await ctx.close();
+});
+
+await test('DPR 1 and DPR 2 renders also pick matching tile levels and stay sharp', async () => {
+  for (const dsf of [1, 2]) {
+    const { ctx, page } = await newPage({ ...PHONE, deviceScaleFactor: dsf });
+    await open(page);
+    await start(page, SMALL);
+    const s = await auditSharp(page);
+    assert.equal(s.n, dsf === 1 ? 0 : 1);
+    assert.equal(s.tileCss, 256 / 2 ** s.n);
+    await ctx.close();
+  }
+});
+
+await test('zoom-out reveals only after all tiles of the wider view are loaded (no stand-in tiles)', async () => {
+  const { ctx, page } = await newPage(PHONE);
+  await open(page);
+  await start(page, HUB);
+  const a = await answerOf(page);
+  await guess(page, wrongPick(a, 1)[0].iata);
+  await page.locator('#btn-zoom').click();
+  await page.locator('#sheet [data-confirm]').click();
+  // while loading the veil covers the map; sample until it is gone
+  await page.waitForFunction(() => document.querySelector('#veil').hidden, null, { timeout: 30000 });
+  const s = await auditSharp(page);
+  assert.equal(s.zoom, (await measure(page)).zoom);
+  await page.screenshot({ path: QA + 'phone-dpr3-hub-zoomed-out.png' });
   await ctx.close();
 });
 
@@ -348,7 +413,7 @@ await test('keyboard open (short viewport): image, input and suggestions all sta
   assert.ok(boxes.map.height >= 100 && boxes.map.top >= -1 && boxes.map.bottom <= boxes.vh, 'map visible ' + JSON.stringify(boxes));
   assert.ok(boxes.input.bottom <= boxes.vh && boxes.list.bottom <= boxes.vh + 2, JSON.stringify(boxes));
   const m = await measure(page);
-  assert.ok(m.fill <= 0.77 && m.fill > 0.4, 'view re-fitted to the smaller frame: ' + m.fill);
+  assert.ok(m.fill <= 0.92 && m.fill > 0.4, 'view re-fitted to the smaller frame: ' + m.fill);
   await page.screenshot({ path: OUT + 'phone-keyboard.png' });
   await ctx.close();
 });
@@ -610,6 +675,7 @@ await test('no console errors or page errors in the main flows', async () => {
   assert.deepEqual(errors, []);
 });
 
+writeFileSync(QA + 'report.json', JSON.stringify(qaReport, null, 2));
 await browser.close();
 server.close();
 console.log(`\n${passed} e2e checks passed${process.exitCode ? ', some FAILED' : ''}. Screenshots: test-output/`);

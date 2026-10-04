@@ -1,0 +1,35 @@
+[
+  {
+    "airport": "Hartsfield Jackson Atlanta International Airport",
+    "iata": "ATL",
+    "pool": "daily",
+    "dpr": 3,
+    "zoomUsed": 13,
+    "tileLevelRequested": 15,
+    "nativeMaxLevel": 19,
+    "fillPct": 69,
+    "bitmapPxPerDevicePx": 1.33
+  },
+  {
+    "airport": "General Dewitt Spain Airport",
+    "iata": "KM01",
+    "pool": "hard",
+    "dpr": 3,
+    "zoomUsed": 15,
+    "tileLevelRequested": 17,
+    "nativeMaxLevel": 19,
+    "fillPct": 78,
+    "bitmapPxPerDevicePx": 1.33
+  },
+  {
+    "airport": "Duqm International Airport",
+    "iata": "DQM",
+    "pool": "daily",
+    "dpr": 3,
+    "zoomUsed": 14,
+    "tileLevelRequested": 16,
+    "nativeMaxLevel": 18,
+    "fillPct": 88,
+    "bitmapPxPerDevicePx": 1.33
+  }
+]

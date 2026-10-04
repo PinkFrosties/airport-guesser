@@ -1,6 +1,6 @@
 // Caches the app shell and airport data. Map tiles (cross-origin) always go to the network.
 // Bump VERSION when shipping changes so old caches are dropped.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `airport-guesser-${VERSION}`;
 const SHELL = [
   './',

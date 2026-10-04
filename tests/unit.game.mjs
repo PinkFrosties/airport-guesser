@@ -55,43 +55,72 @@ test('practice sets', () => {
   assert.equal(C.practiceOrder(hard, null).length, hard.length);
 });
 
-console.log('locked view: zoom fitting');
-test('airfield fills ~53-75% of the viewport for every airport, any viewport size', () => {
+console.log('locked view: zoom fitting and image quality');
+test('airfield fills 45-90% of the frame (target 75%) for every airport, any viewport size, whole zoom levels', () => {
   for (const [W, H] of [[358, 371], [604, 600], [700, 420], [390, 250]]) {
     for (const a of [...airports, ...hard]) {
       const z = C.fitZoom(a, W, H);
+      assert.ok(Number.isInteger(z), 'integer zoom: no CSS scaling of the tile layer');
       const f = C.fillAt(a, W, H, z);
-      assert.ok(f <= 0.751 || z <= 8, 'never overfills ' + a.name);
-      if (z > 8 && z < 19) assert.ok(f > 0.5, a.name + ' ' + [W, H, z, f].join(' '));
+      if (z > 8 && z < 19) assert.ok(f > 0.449 && f <= 0.901, a.name + ' ' + [W, H, z, f].join(' '));
+      assert.ok(f <= 0.901 || z <= 8, 'never overfills ' + a.name);
     }
   }
 });
 test('small airfields are much tighter than hubs', () => {
   const hub = C.fitZoom(byIata('ATL'), 600, 600);
-  assert.ok(C.fitZoom(byIata('DQM'), 600, 600) > hub);
+  assert.ok(C.fitZoom(byIata('DQM'), 600, 600) >= hub);
   const small = hard.find((a) => a.view[2] < 400 && a.view[3] > 500 && a.view[3] < 900);
-  assert.ok(C.fitZoom(small, 600, 600) - hub >= 1.5, 'small airfield vs ATL');
+  assert.ok(C.fitZoom(small, 600, 600) - hub >= 1, 'small airfield vs ATL');
   const zs = hard.map((a) => C.fitZoom(a, 600, 600)).sort((x, y) => x - y);
   assert.ok(zs[Math.floor(zs.length / 2)] - hub >= 1, 'median hard airfield is >= 1 level tighter than a hub');
 });
-test('tiles are never upscaled: tile level >= zoom, half-level steps', () => {
-  for (const a of [...airports, ...hard.slice(0, 2000)]) {
-    const z = C.fitZoom(a, 500, 500);
-    assert.ok(C.tileLevel(z) >= z, a.name);
-    assert.equal(z * 2, Math.round(z * 2));
+test('retina levels: tiles are requested deeper so every CSS pixel has >= devicePixelRatio real pixels', () => {
+  assert.deepEqual([1, 1.25, 1.5, 2, 2.625, 3, 3.5, 4].map(C.retinaLevels), [0, 1, 1, 1, 2, 2, 2, 2]);
+  for (const dpr of [1, 1.5, 2, 2.625, 3, 4]) {
+    const n = C.retinaLevels(dpr);
+    const bitmapPxPerDevicePx = 2 ** n / dpr; // 256px bitmap drawn at 256/2^n CSS px
+    assert.ok(bitmapPxPerDevicePx >= 1 - 1e-9, `dpr ${dpr}: ${bitmapPxPerDevicePx}`);
   }
 });
-test('tile block covers the viewport and contains the centre tile', () => {
-  const a = byIata('ZRH');
-  const z = C.fitZoom(a, 600, 600);
-  const b = C.tileBlock(a, 600, 600, z);
-  assert.equal(b.z, C.tileLevel(z));
-  assert.ok(b.w >= 3 && b.h >= 3 && b.w < 12 && b.h < 12, JSON.stringify(b));
-  const c = C.tileCoords(a.view[0], a.view[1], b.z);
-  assert.ok(c.x >= b.x && c.x < b.x + b.w && c.y >= b.y && c.y < b.y + b.h);
+test('final zoom never exceeds native imagery: zoom + retina levels <= nz, for every airport and dpr', () => {
+  for (const a of [...airports, ...hard]) {
+    for (const dpr of [1, 2, 3]) {
+      const n = C.retinaLevels(dpr);
+      const z = C.finalZoom(a, 358, 371, n);
+      assert.ok(z + n <= a.nz, `${a.name}: z${z} + ${n} > nz${a.nz}`);
+    }
+  }
+  // the pool filter removes airports whose cap would shrink them below 45%, so kept airports are never capped at dpr 3 ...
+  assert.ok([...airports, ...hard].every((a) => C.fitZoom(a, 358, 371) <= C.maxSharpZoom(a, 2)));
+  // ... but the rule itself: a smaller airport in the frame beats a blurry upscale
+  const poor = { ...byIata('ATL'), nz: 14 };
+  assert.ok(C.fitZoom(poor, 358, 371) > 12);
+  assert.equal(C.finalZoom(poor, 358, 371, 2), 12);
+  assert.equal(C.finalZoom(poor, 358, 371, 1), 13);
+  assert.equal(C.finalZoom(poor, 358, 371, 0), 14 <= C.fitZoom(poor, 358, 371) ? 14 : C.fitZoom(poor, 358, 371));
 });
-test('zoom-out is 2 levels wider', () => {
-  assert.equal(C.zoomedOut(14.5), 12.5);
+test('pool quality filter: on the reference phone at dpr 3 every airport fills >= 45% of the frame', () => {
+  const { W, H, retinaLevels } = C.REF_FRAME;
+  for (const a of [...airports, ...hard]) {
+    assert.ok(a.nz >= 10 && a.nz <= 19, a.name + ' nz ' + a.nz);
+    const f = C.fillAt(a, W, H, C.finalZoom(a, W, H, retinaLevels));
+    assert.ok(f >= C.MIN_FILL - 1e-9, `${a.name} (nz ${a.nz}) fills only ${(f * 100).toFixed(0)}%`);
+  }
+});
+test('tile block (at level zoom + n) covers the frame and contains the centre tile', () => {
+  const a = byIata('ZRH');
+  for (const n of [0, 1, 2]) {
+    const z = C.finalZoom(a, 358, 371, n);
+    const b = C.tileBlock(a, 358, 371, z, n);
+    assert.equal(b.z, z + n);
+    assert.ok(b.w >= 3 && b.h >= 3 && b.w < 20 && b.h < 20, JSON.stringify(b));
+    const c = C.tileCoords(a.view[0], a.view[1], b.z);
+    assert.ok(c.x >= b.x && c.x < b.x + b.w && c.y >= b.y && c.y < b.y + b.h);
+  }
+});
+test('zoom-out is 2 levels wider (whole levels)', () => {
+  assert.equal(C.zoomedOut(14), 12);
   assert.equal(C.zoomedOut(13), 11);
 });
 

@@ -28,12 +28,19 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 - Light, Apple-inspired design, responsive on phone and desktop
 - Zoom fitted per airport to its runway extent, capped at native tile resolution so images stay sharp
+- Retina-sharp imagery: tiles are requested at the screen's pixel density, never upscaled
 - Desktop layout: image left, guess panel right
 - Distance and direction feedback on every wrong guess
 - Optional hints and one-time zoom-out, each costing a guess
 - Installable PWA that works offline (map tiles need a network)
 
 ## Changelog
+
+### v1.1.1 (image quality)
+- Fixed blurry images on phones: tiles are now requested 1-2 levels deeper (by devicePixelRatio) and drawn at 256/2^n CSS px, so every device pixel is backed by a real pixel
+- Whole-number zooms only (no CSS scaling of the tile layer); no stand-in tiles from other zoom levels; the image is revealed only after every tile of the view has loaded
+- Per-airport native imagery level (`nz`) precomputed at build time; zoom never exceeds it
+- Airports whose real imagery cannot show the airfield at 45% or more of the frame (on a reference phone at 3x) are removed from both pools
 
 ### v1.1
 - Light theme and Apple-style UI
@@ -84,10 +91,12 @@ Both data files are generated and committed; the app never fetches OurAirports a
 python scripts/build_data.py     # add --refresh to re-download sources
 ```
 
-- `data/airports.json`, the **Daily pool** (3,244 airports): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
-- `data/airports-hard.json`, the **Hard pool** (9,765 airports): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
+- `data/airports.json`, the **Daily pool** (3,230 airports): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
+- `data/airports-hard.json`, the **Hard pool** (9,548 airports): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
 - **Per-airport view box.** `view` is `[lat, lon, width m, height m]`: the bounding box of the runway endpoints (falling back to runway length around the reference point). The client picks the zoom at which that box fills about 75% of the actual image area, in half-level steps so tiles are never upscaled, and `rw` is the number of open runways (for the hint).
-- **Native resolution cap.** Before a round starts, the Esri `tilemap` service is asked which tiles exist for the view. If tiles are missing at the fitted level (remote areas with lower-resolution imagery) the view steps down one tile level at a time, so the "map data not yet available" placeholder and blurry upscales never appear. A candidate whose sharp view would show the airfield under 20% of the frame is skipped; for the Daily this uses a deterministic fallback order.
+- **Native resolution (`nz`).** At build time the Esri `tilemap` service is probed for each airport: `nz` is the deepest tile level at which a 7x7 block of tiles around the airfield is real imagery (not the grey "map data not yet available" placeholder). Results are cached in `scripts/.cache/native_zoom.json`; `--refresh-zoom` re-probes and `--verify` spot-checks the tilemap against real tile downloads.
+- **Sharp rendering.** Tiles are requested `n` levels deeper than the map zoom (n = 0, 1 or 2 for devicePixelRatio 1, up to 2, up to 4) and drawn at 256/2^n CSS px, so each CSS pixel has at least devicePixelRatio real pixels. The map zoom is a whole number, and the zoom used is `min(fit-to-airfield zoom, nz - n)`: a smaller airport in the frame beats a blurry upscale.
+- **Quality filter.** Both pools drop airports where, on a reference 358x371 phone at devicePixelRatio 3, real imagery cannot show the airfield at 45% or more of the frame (Daily 3,244 to 3,230, Hard 9,765 to 9,548). The filter is device-independent so everyone gets the same Daily.
 - **Practice sets.** OurAirports has no passenger numbers, so "Top 100" is ranked by a connectivity proxy: route counts in [OpenFlights](https://github.com/jpatokal/openflights) `routes.dat` (ODbL). "Large" is all large airports, "Mid-size" is medium airports.
 
 ## Imagery provider
