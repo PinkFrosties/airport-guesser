@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Airport Guesser</title>
+<meta name="description" content="Name the airport from a satellite image. Five guesses, with distance and direction clues.">
+<meta name="theme-color" content="#0c0e11">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Airport Guesser">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" class="wrap">
+  <header class="top">
+    <h1 class="brand">Airport <em>Guesser</em></h1>
+    <nav class="actions" aria-label="Menu">
+      <button type="button" class="link" id="btn-stats">Stats</button>
+      <button type="button" class="link" id="btn-help">Help</button>
+    </nav>
+  </header>
+
+  <div class="modebar">
+    <div class="seg" id="mode-seg" role="group" aria-label="Game mode">
+      <button type="button" data-mode="daily" aria-pressed="true">Daily</button>
+      <button type="button" data-mode="practice" aria-pressed="false">Practice</button>
+    </div>
+    <div class="seg seg-sm" id="diff-seg" role="group" aria-label="Difficulty" hidden>
+      <button type="button" data-diff="easy" aria-pressed="false">Easy</button>
+      <button type="button" data-diff="medium" aria-pressed="true">Medium</button>
+      <button type="button" data-diff="hard" aria-pressed="false">Hard</button>
+    </div>
+  </div>
+
+  <main>
+    <section class="stage" id="stage">
+      <div id="map" role="img" aria-label="Satellite image of the mystery airport"></div>
+      <div class="hud" aria-live="polite">
+        <span class="chip" id="hint-label">Airfield</span>
+        <span class="chip pips" id="pips" aria-label="Guesses used"></span>
+      </div>
+      <div class="veil" id="veil" hidden>
+        <p id="veil-msg">Loading imagery</p>
+        <button type="button" class="btn small" id="veil-retry" hidden>Retry</button>
+      </div>
+    </section>
+
+    <section id="play">
+      <form id="guess-form" autocomplete="off" novalidate>
+        <div class="field">
+          <input id="guess-input" name="airport-search" type="text" role="combobox" aria-autocomplete="list"
+                 aria-expanded="false" aria-controls="suggestions" aria-label="Guess an airport"
+                 placeholder="Search airport, city or code" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" enterkeyhint="go">
+          <ul id="suggestions" role="listbox" hidden></ul>
+        </div>
+        <button type="submit" class="btn primary" id="guess-btn" disabled>Guess</button>
+      </form>
+    </section>
+
+    <section id="result" class="result" hidden aria-live="polite"></section>
+
+    <ol id="guesses" class="guesses" aria-label="Your guesses"></ol>
+  </main>
+
+  <footer class="foot">
+    <span>Airport data: OurAirports. Imagery: Esri.</span>
+  </footer>
+</div>
+
+<dialog id="dlg-help" aria-labelledby="help-title">
+  <form method="dialog" class="dlg-head">
+    <h2 id="help-title">How to play</h2>
+    <button class="link" value="close">Close</button>
+  </form>
+  <div class="dlg-body prose">
+    <p>Identify the airport from the satellite image. You have <b>five guesses</b>. Pick an airport from the suggestions, then press Guess.</p>
+    <p>Every miss shows the <b>distance</b> from your guess to the answer, the <b>compass direction</b> toward it, and how close you were as a percentage of half the Earth's circumference.</p>
+    <h3>Free hints</h3>
+    <ul>
+      <li>Start: a tight view of the airfield.</li>
+      <li>Miss 1 and 2: the view zooms out.</li>
+      <li>Miss 3: the continent. Miss 4: the country.</li>
+    </ul>
+    <h3>Modes</h3>
+    <p><b>Daily</b> is the same airport for everyone, one attempt per UTC day. <b>Practice</b> is endless: Easy is roughly the 100 best-connected hubs, Medium all large airports, Hard medium airports with scheduled service.</p>
+    <h3>Sharing</h3>
+    <p>Shared results use colour squares by distance: green correct, yellow under 500 km, orange under 2,000 km, red under 5,000 km, black further. Arrows show the direction toward the answer.</p>
+  </div>
+</dialog>
+
+<dialog id="dlg-stats" aria-labelledby="stats-title">
+  <form method="dialog" class="dlg-head">
+    <h2 id="stats-title">Statistics</h2>
+    <button class="link" value="close">Close</button>
+  </form>
+  <div class="dlg-body">
+    <div class="seg seg-sm" id="stats-seg" role="group" aria-label="Statistics for">
+      <button type="button" data-stats="daily" aria-pressed="true">Daily</button>
+      <button type="button" data-stats="practice" aria-pressed="false">Practice</button>
+    </div>
+    <div id="stats-body"></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
