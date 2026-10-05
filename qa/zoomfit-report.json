@@ -1,0 +1,222 @@
+[
+  {
+    "device": "phone",
+    "airport": "SZX Shenzhen (southern China, diagonal runways)",
+    "frame": "358x371",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 68,
+    "minEdgePct": 15.9,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "KMG Kunming (southern China, diagonal runways)",
+    "frame": "358x371",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 71,
+    "minEdgePct": 12.8,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "ATL Atlanta",
+    "frame": "358x371",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 69,
+    "minEdgePct": 15.4,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "DQM Duqm (remote desert)",
+    "frame": "358x371",
+    "zoom": 13,
+    "nz": 18,
+    "fillPct": 44,
+    "minEdgePct": 27,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "Small regional airfield (General Dewitt Spain)",
+    "frame": "358x371",
+    "zoom": 15,
+    "nz": 19,
+    "fillPct": 78,
+    "minEdgePct": 9,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#5 PVG Shanghai Pudong International Airport",
+    "frame": "358x371",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 74,
+    "minEdgePct": 13.1,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#6 ORD Chicago O'Hare International Airport",
+    "frame": "358x371",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 52,
+    "minEdgePct": 22.2,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#43 CKG Chongqing Jiangbei International Airport",
+    "frame": "358x371",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 41,
+    "minEdgePct": 27.6,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#3 HND Tokyo Haneda International Airport",
+    "frame": "358x371",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 49,
+    "minEdgePct": 25.1,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#20 KUL Kuala Lumpur International Airport",
+    "frame": "358x371",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 55,
+    "minEdgePct": 20.8,
+    "flags": []
+  },
+  {
+    "device": "phone",
+    "airport": "#11 DEL Indira Gandhi International Airport",
+    "frame": "358x371",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 46,
+    "minEdgePct": 26.8,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "SZX Shenzhen (southern China, diagonal runways)",
+    "frame": "604x585",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 40,
+    "minEdgePct": 29.8,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "KMG Kunming (southern China, diagonal runways)",
+    "frame": "604x585",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 45,
+    "minEdgePct": 26.5,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "ATL Atlanta",
+    "frame": "604x585",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 41,
+    "minEdgePct": 29.5,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "DQM Duqm (remote desert)",
+    "frame": "604x585",
+    "zoom": 13,
+    "nz": 18,
+    "fillPct": 27,
+    "minEdgePct": 35.6,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "Small regional airfield (General Dewitt Spain)",
+    "frame": "604x585",
+    "zoom": 15,
+    "nz": 19,
+    "fillPct": 50,
+    "minEdgePct": 24.1,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#5 PVG Shanghai Pudong International Airport",
+    "frame": "604x585",
+    "zoom": 13,
+    "nz": 19,
+    "fillPct": 44,
+    "minEdgePct": 28.1,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#6 ORD Chicago O'Hare International Airport",
+    "frame": "604x585",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 33,
+    "minEdgePct": 32.5,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#43 CKG Chongqing Jiangbei International Airport",
+    "frame": "604x585",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 26,
+    "minEdgePct": 35.9,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#3 HND Tokyo Haneda International Airport",
+    "frame": "604x585",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 29,
+    "minEdgePct": 35.3,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#20 KUL Kuala Lumpur International Airport",
+    "frame": "604x585",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 35,
+    "minEdgePct": 31.6,
+    "flags": []
+  },
+  {
+    "device": "desktop",
+    "airport": "#11 DEL Indira Gandhi International Airport",
+    "frame": "604x585",
+    "zoom": 12,
+    "nz": 19,
+    "fillPct": 27,
+    "minEdgePct": 36.2,
+    "flags": []
+  }
+]

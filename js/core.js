@@ -230,17 +230,23 @@ export function practiceOrder(pool, difficulty, rnd = Math.random) {
 }
 
 // ---------- locked view: zoom that fits the airfield, sharp on any screen ----------
-export const FILL = 0.75;       // target: airfield box fills ~75% of the limiting frame dimension
-export const MAX_FILL = 0.9;    // rounding up to the next whole zoom is allowed while the box stays within 90%
-export const MIN_FILL = 0.45;   // pool quality filter: below this the airfield is too small in the frame ("about 50%")
+// Keep in sync with scripts/build_data.py (the build writes each airport's zoom `z`; unit tests check parity).
+export const MARGIN = 0.06;     // no runway endpoint closer than 6% of the frame to an edge
+export const MAX_FILL = 0.78;   // hard maximum: the airfield box fills at most 78% of the frame, per dimension
+export const MIN_FILL = 0.45;   // pool filter: when imagery caps the zoom, the airfield must still fill this much
 export const MIN_BOX_M = 150;   // never zoom in tighter than a 150 m airfield
+export const CHIPS_BOTTOM = 41; // px: the top corner chips (Airfield view, dots) end here
+export const GAP = 6;           // px clearance kept around the chips and the attribution pill
 const MPP_Z0 = 156543.03392;    // metres per pixel at zoom 0 on the equator
-export const REF_FRAME = { W: 358, H: 371, retinaLevels: 2 }; // reference phone frame used by the build-time pool filter
+/** Reference frames (CSS px) and attribution pill height: phone (390 px wide) and desktop (1280x800). */
+export const REF_PHONE = { W: 358, H: 371, pill: 27 };
+export const REF_DESKTOP = { W: 604, H: 585, pill: 18 };
+export const REF_FRAME = { W: REF_PHONE.W, H: REF_PHONE.H, retinaLevels: 2 }; // pool filter: reference phone, worst-case retina levels
 
 /** Pixels per metre at zoom z, latitude lat. */
 export const pxPerMetre = (z, lat) => 2 ** z / (MPP_Z0 * Math.cos(rad(lat)));
 
-/** Fraction (0..1+) of the viewport's limiting dimension that the airfield box occupies at zoom z. */
+/** Fraction (0..1+) of the frame's limiting dimension that the airfield box (all runway endpoints) occupies at zoom z. */
 export function fillAt(a, W, H, z) {
   const [clat, , w, h] = a.view;
   const k = pxPerMetre(z, clat);
@@ -248,15 +254,34 @@ export function fillAt(a, W, H, z) {
 }
 
 /**
- * Whole zoom at which the airfield box fills ~75% of the viewport (rounded up when that still fits within 90%).
- * Integer zoom only: Leaflet then never rescales a tile layer with a CSS transform.
+ * The part of the frame the airfield must stay inside: edge margin all round, below the top corner chips and above the
+ * attribution pill (both counted as occupied, full width, to be safe).
  */
-export function fitZoom(a, W, H, { minZoom = 8, maxZoom = 19 } = {}) {
+export function safeRect(W, H, pill = REF_PHONE.pill, chipsBottom = CHIPS_BOTTOM) {
+  return { l: MARGIN * W, r: W - MARGIN * W, t: Math.max(MARGIN * H, chipsBottom + GAP), b: H - Math.max(MARGIN * H, pill + GAP) };
+}
+
+/**
+ * Largest WHOLE zoom at which every runway endpoint lies inside the safe rect and the airfield box fills at most MAX_FILL
+ * of the frame in each dimension. Always rounds down (wider). The extents are those of the endpoints themselves, so this
+ * is the exact condition for "all endpoints inside", whatever the runway angle.
+ */
+export function fitZoom(a, W, H, { pill = REF_PHONE.pill, chipsBottom = CHIPS_BOTTOM, minZoom = 8, maxZoom = 19 } = {}) {
+  const r = safeRect(W, H, pill, chipsBottom);
   const [clat, , w, h] = a.view;
-  const ppm = Math.min((FILL * W) / Math.max(w, MIN_BOX_M), (FILL * H) / Math.max(h, MIN_BOX_M));
-  const zl = Math.floor(Math.log2(ppm * MPP_Z0 * Math.cos(rad(clat))));
-  const z = fillAt(a, W, H, zl + 1) <= MAX_FILL ? zl + 1 : zl;
+  const ex = Math.max(w, MIN_BOX_M), ey = Math.max(h, MIN_BOX_M);
+  const ppm = Math.min(Math.min(MAX_FILL * W, r.r - r.l) / ex, Math.min(MAX_FILL * H, r.b - r.t) / ey);
+  const z = Math.floor(Math.log2(ppm * MPP_Z0 * Math.cos(rad(clat))));
   return Math.max(minZoom, Math.min(maxZoom, z));
+}
+
+/** The airport's zoom for everyone: the smaller (wider) of the phone and desktop fits, written by the build as `a.z`. */
+export const baseZoom = (a) => Math.min(fitZoom(a, REF_PHONE.W, REF_PHONE.H, { pill: REF_PHONE.pill }), fitZoom(a, REF_DESKTOP.W, REF_DESKTOP.H, { pill: REF_DESKTOP.pill }));
+
+/** Pixels the airfield must be moved up (+) so its box is centred in the safe rect instead of the whole frame. */
+export function airfieldLift(W, H, pill = REF_PHONE.pill, chipsBottom = CHIPS_BOTTOM) {
+  const r = safeRect(W, H, pill, chipsBottom);
+  return Math.round(H / 2 - (r.t + r.b) / 2);
 }
 
 /**
@@ -269,9 +294,12 @@ export const retinaLevels = (dpr) => (dpr > 1.0001 ? 1 : 0);
 /** Highest map zoom whose tiles (level zoom+n) are still real, native-resolution imagery at this airport. */
 export const maxSharpZoom = (a, n) => a.nz - n;
 
-/** Zoom actually used: the fitted zoom, but never deeper than real imagery allows (smaller airport beats a blurry one). */
+/**
+ * Zoom actually used: the airport's zoom `a.z` (the same for everyone), never deeper than real imagery allows, and wider
+ * still if this frame is smaller than the reference frames (so the airfield never leaves the frame, e.g. while typing).
+ */
 export function finalZoom(a, W, H, n, opts) {
-  return Math.min(fitZoom(a, W, H, opts), maxSharpZoom(a, n));
+  return Math.min(a.z ?? fitZoom(a, W, H, opts), maxSharpZoom(a, n), fitZoom(a, W, H, opts));
 }
 
 /** Tile block (at level zoom+n) covering the viewport, plus a one-tile margin. */

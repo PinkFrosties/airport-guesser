@@ -112,20 +112,30 @@ function syncRetina() {
   for (const v of Object.values(views)) v.setRetina(n);
 }
 
-/** Half the height of the attribution pill: the airfield is lifted by this much so the pill never covers it. */
-function attributionLift(H) {
-  const el = views.main.container.querySelector('.leaflet-control-attribution');
-  const h = el ? el.getBoundingClientRect().height : 0;
-  return Math.round(Math.min(h / 2 + 2, 0.05 * H));
+/** What occupies the frame: the attribution pill (bottom) and the corner chips (top), measured from the page. */
+function frameChrome() {
+  const stage = el.stage.getBoundingClientRect();
+  const att = views.main.container.querySelector('.leaflet-control-attribution');
+  const chips = [...document.querySelectorAll('.hud .chip')];
+  return {
+    pill: att ? att.getBoundingClientRect().height : C.REF_PHONE.pill,
+    chipsBottom: chips.length ? Math.max(...chips.map((c) => c.getBoundingClientRect().bottom - stage.top)) : C.CHIPS_BOTTOM,
+  };
 }
 
-/** Centre + zooms for an airport at the current frame size: fitted to the airfield, never deeper than real imagery. */
+/**
+ * Centre + zooms for an airport at the current frame size. The zoom is the airport's own `a.z` (identical on every
+ * device), never deeper than real imagery allows, and only wider than that when this frame is smaller than the reference
+ * frames. The airfield is centred in the part of the frame not covered by the chips and the attribution pill.
+ */
 function viewParams(a) {
   syncRetina();
   const n = views.main.retinaLevels;
   const { W, H } = views.main.size();
-  const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n });
-  const lift = attributionLift(H);
+  const ref = W < 520 ? C.REF_PHONE.pill : C.REF_DESKTOP.pill; // fixed pill height for the fit, so the zoom does not depend on measuring
+  const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n, pill: ref });
+  const { pill, chipsBottom } = frameChrome();
+  const lift = C.airfieldLift(W, H, pill, chipsBottom);
   game.lift = lift;
   return { center: views.main.shifted([a.view[0], a.view[1]], z, lift), zMain: z, zWide: C.zoomedOut(z), W, H, lift };
 }
@@ -268,8 +278,7 @@ async function startMode() {
   let answer = null;
   game.round = null;
   for (const cand of order.slice(0, GAME.maxProbeAttempts)) {
-    const { center, zMain, W, H } = viewParams(cand);
-    if (C.fillAt(cand, W, H, zMain) < C.MIN_FILL * 0.8) continue; // frame far narrower than the reference phone
+    const { center, zMain } = viewParams(cand); // no per-device skipping: every device must pick the same Daily airport
     awaiting = views.main;
     setFront();
     setProgress(0, views.main.tilesFor(center, zMain).length);

@@ -169,8 +169,8 @@ await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp
     const m = await measure(page);
     const s = await auditSharp(page);
     results[name] = { m, s };
-    assert.ok(m.fill >= 0.45 && m.fill <= 0.92, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
-    assert.ok(m.offX < 3 && Math.abs(m.offY - m.lift) < 3, `${name}: centred, lifted ${m.lift}px for the attribution pill (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
+    assert.ok(m.fill >= 0.38 && m.fill <= 0.785, `${name}: airfield fills ${(m.fill * 100).toFixed(0)}% of the frame`);
+    assert.ok(m.offX < 3 && Math.abs(m.offY - Math.abs(m.lift)) < 3, `${name}: centred in the space free of chips and pill (offset ${m.lift}px) (${m.offX.toFixed(1)}, ${m.offY.toFixed(1)})`);
     assert.equal(s.n, 1, 'extra tile levels capped at +1 even at dpr 3');
     assert.equal(s.tileCss, 128, 'tiles drawn at 128 CSS px (256 bitmap px)');
     await assertTilesReal(page);
@@ -536,7 +536,7 @@ await test('keyboard open (short viewport): image, input and suggestions all sta
   assert.ok(boxes.map.height >= 100 && boxes.map.top >= -1 && boxes.map.bottom <= boxes.vh, 'map visible ' + JSON.stringify(boxes));
   assert.ok(boxes.input.bottom <= boxes.vh && boxes.list.bottom <= boxes.vh + 2, JSON.stringify(boxes));
   const m = await measure(page);
-  assert.ok(m.fill <= 0.92 && m.fill > 0.4, 'view re-fitted to the smaller frame: ' + m.fill);
+  assert.ok(m.fill <= 0.785 && m.fill > 0.2, 'view re-fitted to the smaller frame: ' + m.fill);
   await page.screenshot({ path: OUT + 'phone-keyboard.png' });
   await ctx.close();
 });
@@ -607,6 +607,20 @@ await test('daily (default): one of the busiest airports, seeded cycle order, re
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('airportGuesser.stats.v1')));
   assert.deepEqual([st.daily.played, st.streaks.daily.current, st.hard.played], [1, 1, 0]);
   await ctx.close();
+});
+
+await test('the Daily airport and its zoom are identical on a phone and on desktop (one zoom per airport for everyone)', async () => {
+  const got = [];
+  for (const profile of [PHONE, DESKTOP, { viewport: { width: 768, height: 1024 } }]) {
+    const { ctx, page } = await newPage(profile);
+    await open(page);
+    await ready(page);
+    got.push(await page.evaluate(() => ({ id: window.__ag.round.answer.id, zoom: window.__ag.map.getZoom(), z: window.__ag.round.answer.z })));
+    await ctx.close();
+  }
+  assert.equal(new Set(got.map((g) => g.id)).size, 1, 'same airport: ' + JSON.stringify(got));
+  assert.equal(new Set(got.map((g) => g.zoom)).size, 1, 'same zoom: ' + JSON.stringify(got));
+  assert.equal(got[0].zoom, got[0].z);
 });
 
 await test('Hard mode: separate toggle, own daily from every airport outside the top list, full-database search, own state/streak/results', async () => {

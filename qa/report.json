@@ -26,10 +26,10 @@
     "iata": "DQM",
     "pool": "hard",
     "dpr": 3,
-    "zoomUsed": 14,
-    "tileLevelRequested": 15,
+    "zoomUsed": 13,
+    "tileLevelRequested": 14,
     "nativeMaxLevel": 18,
-    "fillPct": 88,
+    "fillPct": 44,
     "bitmapPxPerDevicePx": 0.67
   }
 ]

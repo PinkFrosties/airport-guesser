@@ -55,8 +55,11 @@ TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/M
 PLACEHOLDER_BYTES = 2521        # size of Esri's grey "Map data not yet available" tile
 MPP0 = 156543.03392             # metres per pixel at zoom 0 on the equator
 MIN_BOX_M = 150
-FILL_TARGET, MAX_FILL, MIN_FILL = 0.75, 0.9, 0.45
-REF_W, REF_H = 358, 371         # reference phone frame (CSS px)
+MARGIN, MAX_FILL, MIN_FILL = 0.06, 0.78, 0.45   # edge margin (share of the frame), hard max fill, pool-filter minimum fill
+CHIPS_BOTTOM, GAP = 41, 6       # px: the top corner chips end 41 px below the frame top; clearance kept around chips and pill
+REF_PHONE = (358, 371, 27)      # reference frames (CSS px) + attribution pill height: phone (390 px wide) ...
+REF_DESKTOP = (604, 585, 18)    # ... and desktop (1280x800). One zoom per airport = the smaller (wider) of the two fits.
+REF_W, REF_H = REF_PHONE[0], REF_PHONE[1]
 REF_RETINA_LEVELS = 2           # worst case: devicePixelRatio 3-4 renders tiles two levels deeper than the map zoom
 BLOCK = 7                       # tiles (7x7 around the view centre) that must all be real imagery at a level
 
@@ -81,27 +84,31 @@ def haversine_m(lat1, lon1, lat2, lon2):
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def fit_zoom(extent_m, lat, px):
-    """Largest integer zoom at which extent_m spans <= px pixels."""
-    if extent_m <= 0:
-        return 99
-    mpp0 = 156543.03392 * math.cos(math.radians(lat))
-    return math.floor(math.log2(px * mpp0 / extent_m))
-
-
 def fill_at(a, w_px, h_px, z):
     clat, _, w, h = a["view"]
     k = 2 ** z / (MPP0 * math.cos(math.radians(clat)))
     return max(max(w, MIN_BOX_M) * k / w_px, max(h, MIN_BOX_M) * k / h_px)
 
 
-def fit_zoom(a, w_px, h_px, min_zoom=8, max_zoom=19):
-    """Integer zoom whose airfield box fills ~75% of the frame (rounded up when that stays <= 90%)."""
+def safe_rect(w_px, h_px, pill):
+    """Part of the frame the airfield must stay inside: edge margin, below the top corner chips, above the pill."""
+    return (MARGIN * w_px, max(MARGIN * h_px, CHIPS_BOTTOM + GAP), w_px - MARGIN * w_px, h_px - max(MARGIN * h_px, pill + GAP))
+
+
+def fit_zoom(a, w_px, h_px, pill, min_zoom=8, max_zoom=19):
+    """Largest WHOLE zoom at which every runway endpoint (the airfield box) lies inside the safe rect and the box fills at most
+    MAX_FILL of the frame in each dimension. Always rounds down (wider)."""
+    l, t, r, b = safe_rect(w_px, h_px, pill)
     clat, _, w, h = a["view"]
-    ppm = min(FILL_TARGET * w_px / max(w, MIN_BOX_M), FILL_TARGET * h_px / max(h, MIN_BOX_M))
-    zl = math.floor(math.log2(ppm * MPP0 * math.cos(math.radians(clat))))
-    z = zl + 1 if fill_at(a, w_px, h_px, zl + 1) <= MAX_FILL else zl
+    ex, ey = max(w, MIN_BOX_M), max(h, MIN_BOX_M)
+    ppm = min(min(MAX_FILL * w_px, r - l) / ex, min(MAX_FILL * h_px, b - t) / ey)
+    z = math.floor(math.log2(ppm * MPP0 * math.cos(math.radians(clat))))
     return max(min_zoom, min(max_zoom, z))
+
+
+def base_zoom(a):
+    """The airport's zoom for everyone: the smaller of the phone and desktop fits (so the Daily looks the same on every device)."""
+    return min(fit_zoom(a, *REF_PHONE), fit_zoom(a, *REF_DESKTOP))
 
 
 def tile_xy(lat, lon, z):
@@ -196,12 +203,16 @@ def verify_tilemap(items, n=40):
 
 
 def passes_quality(a):
-    z_max = a["nz"] - REF_RETINA_LEVELS
-    if z_max < 8:
+    """Imagery must be able to show the airfield. The airport's zoom z is chosen by fit (rounded down, max 78% fill). Only when the
+    native-resolution cap (nz minus the worst-case retina levels) forces a WIDER view than z does the airfield have to still
+    fill MIN_FILL of the reference phone frame; otherwise the airport passes."""
+    cap = a["nz"] - REF_RETINA_LEVELS
+    if cap < 8:
         return False, "no usable imagery (nz %d)" % a["nz"]
-    z = min(fit_zoom(a, REF_W, REF_H), z_max)
-    fill = fill_at(a, REF_W, REF_H, z)
-    return (fill >= MIN_FILL), "airfield would fill %d%% of the frame (nz %d)" % (round(fill * 100), a["nz"])
+    if a["z"] <= cap:
+        return True, "fits at its zoom (%d <= %d)" % (a["z"], cap)
+    fill = fill_at(a, REF_PHONE[0], REF_PHONE[1], cap)
+    return (fill >= MIN_FILL), "capped by imagery (nz %d): airfield would fill %d%% of the frame" % (a["nz"], round(fill * 100))
 
 
 def mark_top_airports(kept):
@@ -234,18 +245,14 @@ def mark_top_airports(kept):
 
 
 def quality_filter(items, label):
-    """Drop airports whose real imagery cannot reach a frame fill of MIN_FILL on a reference phone at devicePixelRatio 3."""
+    """Drop airports whose real imagery cannot show the airfield (see passes_quality)."""
     kept_items, dropped = [], Counter()
     for a in items:
-        z_max = a["nz"] - REF_RETINA_LEVELS
-        if z_max < 8:
-            dropped["no usable imagery (tiles missing / placeholder)"] += 1
-            continue
-        z = min(fit_zoom(a, REF_W, REF_H), z_max)
-        if fill_at(a, REF_W, REF_H, z) < MIN_FILL:
-            dropped["imagery too coarse: airfield would fill < %d%% of the frame" % int(MIN_FILL * 100)] += 1
-            continue
-        kept_items.append(a)
+        ok, why = passes_quality(a)
+        if ok:
+            kept_items.append(a)
+        else:
+            dropped["no usable imagery" if a["nz"] - REF_RETINA_LEVELS < 8 else "imagery too coarse: capped airfield would fill < %d%% of the frame" % int(MIN_FILL * 100)] += 1
     print("%s pool: %d -> %d airports (dropped %d)" % (label, len(items), len(kept_items), len(items) - len(kept_items)))
     for why, c in dropped.most_common():
         print("    %5d  %s" % (c, why))
@@ -342,7 +349,6 @@ def main():
         pts = [p for p in pts if haversine_m(a["lat"], a["lon"], p[0], p[1]) <= 12000]
         if not pts:
             return None
-        pts.append((a["lat"], a["lon"]))
         lat_min, lat_max = min(p[0] for p in pts), max(p[0] for p in pts)
         lon_min, lon_max = min(p[1] for p in pts), max(p[1] for p in pts)
         clat, clon = (lat_min + lat_max) / 2, (lon_min + lon_max) / 2
@@ -414,6 +420,7 @@ def main():
     nzs = compute_native_levels(kept + hard, refresh_zoom)
     for a in kept + hard:
         a["nz"] = nzs[a["id"]]
+        a["z"] = base_zoom(a)
     if "--verify" in sys.argv:
         verify_tilemap(kept + hard)
     mark_top_airports(kept)

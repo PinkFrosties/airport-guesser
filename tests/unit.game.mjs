@@ -107,54 +107,90 @@ test('practice sets', () => {
 });
 
 console.log('locked view: zoom fitting and image quality');
-test('airfield fills 45-90% of the frame (target 75%) for every airport, any viewport size, whole zoom levels', () => {
-  for (const [W, H] of [[358, 371], [604, 600], [700, 420], [390, 250]]) {
-    for (const a of [...airports, ...hard]) {
-      const z = C.fitZoom(a, W, H);
-      assert.ok(Number.isInteger(z), 'integer zoom: no CSS scaling of the tile layer');
-      const f = C.fillAt(a, W, H, z);
-      if (z > 8 && z < 19) assert.ok(f > 0.449 && f <= 0.901, a.name + ' ' + [W, H, z, f].join(' '));
-      assert.ok(f <= 0.901 || z <= 8, 'never overfills ' + a.name);
+const everyone = [...airports, ...hard];
+const FRAMES = [[358, 371, 27], [604, 585, 18], [328, 326, 27], [736, 451, 18], [390, 250, 27]]; // phone, desktop, small phone, tablet, short
+test('fit: whole zoom, rounded down; every runway endpoint inside the safe rect (>= 6% margin, clear of chips and pill); fill <= 78%', () => {
+  for (const [W, H, pill] of FRAMES) {
+    const r = C.safeRect(W, H, pill);
+    assert.ok(r.l >= 0.06 * W - 1e-9 && W - r.r >= 0.06 * W - 1e-9 && r.t >= 0.06 * H - 1e-9 && H - r.b >= 0.06 * H - 1e-9, 'margin');
+    assert.ok(r.t >= C.CHIPS_BOTTOM + C.GAP - 1e-9 && H - r.b >= pill + C.GAP - 1e-9, 'chips and pill are occupied space');
+    for (const a of everyone) {
+      const z = C.fitZoom(a, W, H, { pill });
+      assert.ok(Number.isInteger(z), 'whole zoom');
+      if (z <= 8 || z >= 19) continue;
+      const k = C.pxPerMetre(z, a.view[0]);
+      const ex = Math.max(a.view[2], C.MIN_BOX_M) * k, ey = Math.max(a.view[3], C.MIN_BOX_M) * k;
+      assert.ok(C.fillAt(a, W, H, z) <= C.MAX_FILL + 1e-9, a.name + ' fill ' + C.fillAt(a, W, H, z));
+      assert.ok(ex <= r.r - r.l + 1e-6 && ey <= r.b - r.t + 1e-6, a.name + ' endpoints inside the safe rect');
+      // rounding down: one level tighter would break a rule
+      const k1 = C.pxPerMetre(z + 1, a.view[0]);
+      const ex1 = Math.max(a.view[2], C.MIN_BOX_M) * k1, ey1 = Math.max(a.view[3], C.MIN_BOX_M) * k1;
+      assert.ok(C.fillAt(a, W, H, z + 1) > C.MAX_FILL || ex1 > r.r - r.l || ey1 > r.b - r.t, a.name + ' is the largest zoom that fits');
     }
   }
+});
+test('airfield centred in the safe rect: no endpoint within 6% of an edge, none under the chips or the pill', () => {
+  for (const [W, H, pill] of FRAMES.slice(0, 2)) {
+    const r = C.safeRect(W, H, pill);
+    const lift = C.airfieldLift(W, H, pill);
+    for (const a of everyone) {
+      const z = C.finalZoom(a, W, H, 1, { pill });
+      const k = C.pxPerMetre(z, a.view[0]);
+      const ex = Math.max(a.view[2], C.MIN_BOX_M) * k, ey = Math.max(a.view[3], C.MIN_BOX_M) * k;
+      const left = W / 2 - ex / 2, right = W / 2 + ex / 2, top = H / 2 - lift - ey / 2, bottom = H / 2 - lift + ey / 2;
+      const small = a.nz - 1 < a.z;
+      if (small || a.z <= 8 || a.z >= 19) continue; // imagery-capped (smaller than the fit by design) or at the zoom limits
+      assert.ok(left >= 0.06 * W - 1 && right <= W - 0.06 * W + 1 && top >= 0.06 * H - 1 && bottom <= H - 0.06 * H + 1, a.name + ' 6% margin');
+      assert.ok(top >= C.CHIPS_BOTTOM + C.GAP - 1 && bottom <= H - pill - C.GAP + 1, a.name + ' clear of chips and pill');
+    }
+  }
+});
+test('one zoom per airport: a.z = the smaller of the phone and desktop fits (build and app agree); same on every normal frame', () => {
+  for (const a of everyone) {
+    assert.equal(a.z, C.baseZoom(a), a.name);
+    const phone = C.fitZoom(a, 358, 371, { pill: 27 }), desktop = C.fitZoom(a, 604, 585, { pill: 18 });
+    assert.equal(a.z, Math.min(phone, desktop));
+    for (const [W, H, pill] of [[358, 371, 27], [604, 585, 18], [736, 451, 18], [900, 700, 18]]) assert.equal(C.finalZoom(a, W, H, 1, { pill }), Math.min(a.z, a.nz - 1), a.name + ' ' + W);
+  }
+});
+test('a frame smaller than the reference frames only ever zooms OUT further (the airfield never leaves the frame)', () => {
+  let wider = 0;
+  for (const a of everyone) {
+    const z = C.finalZoom(a, 328, 150, 1, { pill: 27 });
+    assert.ok(z <= Math.min(a.z, a.nz - 1));
+    if (z < a.z) wider++;
+  }
+  assert.ok(wider > 0, 'a very short frame (keyboard open) does zoom out');
 });
 test('small airfields are much tighter than hubs', () => {
-  const hub = C.fitZoom(byIata('ATL'), 600, 600);
-  assert.ok(C.fitZoom(byIata('DQM'), 600, 600) >= hub);
+  const hub = byIata('ATL').z;
+  assert.ok(byIata('DQM').z >= hub - 1);
   const small = hard.find((a) => a.view[2] < 400 && a.view[3] > 500 && a.view[3] < 900);
-  assert.ok(C.fitZoom(small, 600, 600) - hub >= 1, 'small airfield vs ATL');
-  const zs = hard.map((a) => C.fitZoom(a, 600, 600)).sort((x, y) => x - y);
+  assert.ok(small.z - hub >= 1, 'small airfield vs ATL: ' + small.z + ' vs ' + hub);
+  const zs = hard.map((a) => a.z).sort((x, y) => x - y);
   assert.ok(zs[Math.floor(zs.length / 2)] - hub >= 1, 'median hard airfield is >= 1 level tighter than a hub');
 });
-test('retina levels: tiles are requested deeper so every CSS pixel has >= devicePixelRatio real pixels', () => {
+test('retina levels: tiles are requested deeper so every CSS pixel has real pixels (capped at +1)', () => {
   assert.deepEqual([1, 1.25, 1.5, 2, 2.625, 3, 3.5, 4].map(C.retinaLevels), [0, 1, 1, 1, 1, 1, 1, 1], 'extra levels capped at +1');
-  for (const dpr of [1, 1.5, 2]) assert.ok(2 ** C.retinaLevels(dpr) / dpr >= 1 - 1e-9, `dpr ${dpr}: native 1:1 or better`);
-  assert.ok(2 / 3 > 0.66, 'dpr 3 gets 2 bitmap px per CSS px (0.67 per device px)');
+  for (const dpr of [1, 1.5, 2]) assert.ok(2 ** C.retinaLevels(dpr) / dpr >= 1 - 1e-9, 'dpr ' + dpr + ': native 1:1 or better');
 });
-test('final zoom never exceeds native imagery: zoom + retina levels <= nz, for every airport and dpr', () => {
-  for (const a of [...airports, ...hard]) {
-    for (const dpr of [1, 2, 3]) {
-      const n = C.retinaLevels(dpr);
-      const z = C.finalZoom(a, 358, 371, n);
-      assert.ok(z + n <= a.nz, `${a.name}: z${z} + ${n} > nz${a.nz}`);
-    }
+test('native cap: zoom + retina levels <= nz for every airport, and a smaller airport beats a blurry one', () => {
+  for (const a of everyone) for (const dpr of [1, 2, 3]) {
+    const n = C.retinaLevels(dpr);
+    assert.ok(C.finalZoom(a, 358, 371, n) + n <= a.nz, a.name);
   }
-  // the pool filter removes airports whose cap would shrink them below 45%, so kept airports are never capped at dpr 3 ...
-  assert.ok([...airports, ...hard].every((a) => C.fitZoom(a, 358, 371) <= C.maxSharpZoom(a, 2)));
-  // ... but the rule itself: a smaller airport in the frame beats a blurry upscale
-  const poor = { ...byIata('ATL'), nz: 14 };
-  assert.ok(C.fitZoom(poor, 358, 371) > 12);
-  assert.equal(C.finalZoom(poor, 358, 371, 2), 12);
-  assert.equal(C.finalZoom(poor, 358, 371, 1), 13);
-  assert.equal(C.finalZoom(poor, 358, 371, 0), 14 <= C.fitZoom(poor, 358, 371) ? 14 : C.fitZoom(poor, 358, 371));
+  const poor = { ...byIata('ATL'), nz: 13 };
+  assert.equal(C.finalZoom(poor, 358, 371, 1), 12);
+  assert.equal(C.finalZoom(poor, 358, 371, 0), Math.min(poor.z, 13));
 });
-test('pool quality filter: on the reference phone at dpr 3 every airport fills >= 45% of the frame', () => {
+test('pool filter: an airport is kept unless the imagery cap forces a view where the airfield fills < 45% of the reference phone (worst-case retina)', () => {
   const { W, H, retinaLevels } = C.REF_FRAME;
-  for (const a of [...airports, ...hard]) {
+  for (const a of everyone) {
     assert.ok(a.nz >= 10 && a.nz <= 19, a.name + ' nz ' + a.nz);
-    const f = C.fillAt(a, W, H, C.finalZoom(a, W, H, retinaLevels));
-    assert.ok(f >= C.MIN_FILL - 1e-9, `${a.name} (nz ${a.nz}) fills only ${(f * 100).toFixed(0)}%`);
+    const cap = a.nz - retinaLevels;
+    assert.ok(a.z <= cap || C.fillAt(a, W, H, cap) >= C.MIN_FILL - 1e-9, a.name + ' z' + a.z + ' cap ' + cap);
   }
+  for (const a of airports.filter((x) => x.top)) assert.ok(a.z <= a.nz - retinaLevels, 'top airport ' + a.iata + ' is never capped');
 });
 test('tile block (at level zoom + n) covers the frame and contains the centre tile', () => {
   const a = byIata('ZRH');

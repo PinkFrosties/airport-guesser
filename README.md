@@ -20,9 +20,9 @@ You get a locked satellite view of an airport. Name it in 5 guesses or fewer.
 | Mode | Airport pool | Notes |
 |---|---|---|
 | Daily | The 50 busiest airports worldwide by total passengers (ACI World, 2025) | Same airport for everyone each day; every airport once per cycle, then reshuffled; never the same airport twice within 30 days |
-| Hard | All other airports: the rest of the international airports plus regional, small and remote airfields (12,728) | Own daily airport and own results |
+| Hard | All other airports: the rest of the international airports plus regional, small and remote airfields (12,770) | Own daily airport and own results |
 
-Hard is a toggle next to the mode switch. Its daily is drawn from a different pool and it keeps its own saved game, streak and statistics. Autocomplete searches the full database (12,778 airports) in every mode. Practice (endless random airports) is also available; with Hard mode on it draws from the Hard pool.
+Hard is a toggle next to the mode switch. Its daily is drawn from a different pool and it keeps its own saved game, streak and statistics. Autocomplete searches the full database (12,820 airports) in every mode. Practice (endless random airports) is also available; with Hard mode on it draws from the Hard pool.
 
 ## Features
 
@@ -39,6 +39,12 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 ## Changelog
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
+
+### v1.2.3 (zoom fit) - 2026-10-05
+- The airfield is now fitted on its runway endpoints with a 6% margin on every edge, never under the corner chips or the attribution pill, and a hard maximum fill of 78%; the zoom always rounds down (wider), so long diagonal runways no longer touch or leave the frame
+- One zoom per airport for everyone (`z` in the data: the smaller of the phone and desktop fits), so the Daily looks the same on every device; a frame smaller than the reference frames (for example with the keyboard open) only zooms out further
+- The airfield is centred in the part of the frame the chips and the pill do not cover
+- Pool filter keeps its 45% minimum but now applies only where the imagery cap forces a wider view than the fit (Daily 3,230 to 3,228, Hard file 9,548 to 9,592)
 
 ### v1.2.2 (top 50 Daily) - 2026-10-05
 - Daily now draws only from the busiest airports worldwide by total passengers (ACI World 2025 ranking, `data/top50.json`); every airport comes up once per cycle, the order is reshuffled each cycle, and no airport repeats within 30 days
@@ -123,12 +129,12 @@ python scripts/build_data.py     # add --refresh to re-download sources
 ```
 
 - `data/top50.json`: the Daily ranking. `python scripts/fetch_top_airports.py` fetches the latest "<year> statistics" table of Wikipedia's [List of busiest airports by passenger traffic](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic) (ACI World annual figures; the top 50 only) with rank, IATA, ICAO, name, city, country, passengers, year and source URL. `build_data.py` matches every entry to the dataset by IATA and ICAO, requires it to pass the image-quality filter (the build stops instead of dropping anything), and flags it with `top` (the rank).
-- `data/airports.json` (3,230 international airports, 50 of them flagged `top` = the **Daily pool**; the other 3,180 join the Hard pool): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
-- `data/airports-hard.json` (9,548 airports, the rest of the **Hard pool** with the 3,180 above): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
-- **Per-airport view box.** `view` is `[lat, lon, width m, height m]`: the bounding box of the runway endpoints (falling back to runway length around the reference point). The client picks the zoom at which that box fills about 75% of the actual image area, in half-level steps so tiles are never upscaled, and `rw` is the number of open runways (for the hint).
+- `data/airports.json` (3,228 international airports, 50 of them flagged `top` = the **Daily pool**; the other 3,178 join the Hard pool): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
+- `data/airports-hard.json` (9,592 airports, the rest of the **Hard pool** with the 3,178 above): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
+- **Per-airport view box and zoom.** `view` is `[lat, lon, width m, height m]`: the bounding box of the runway endpoints, which is exactly the condition for "every endpoint inside the frame" whatever the runway angle. `z` is the airport's whole-number zoom for everyone: the largest zoom at which that box stays inside the frame minus a 6% margin, below the top corner chips and above the attribution pill, and fills at most 78% of the frame, rounded down; it is the smaller of the phone (358x371) and desktop (604x585) fits. `rw` is the number of open runways (for the hint).
 - **Native resolution (`nz`).** At build time the Esri `tilemap` service is probed for each airport: `nz` is the deepest tile level at which a 7x7 block of tiles around the airfield is real imagery (not the grey "map data not yet available" placeholder). Results are cached in `scripts/.cache/native_zoom.json`; `--refresh-zoom` re-probes and `--verify` spot-checks the tilemap against real tile downloads.
 - **Sharp rendering.** Tiles are requested `n` levels deeper than the map zoom (n = 0 for devicePixelRatio 1, otherwise 1; +2 was dropped in v1.1.2 for load speed) and drawn at 256/2^n CSS px. The map zoom is a whole number, and the zoom used is `min(fit-to-airfield zoom, nz - n)`: a smaller airport in the frame beats a blurry upscale.
-- **Quality filter.** Both pools drop airports where, on a reference 358x371 phone at devicePixelRatio 3, real imagery cannot show the airfield at 45% or more of the frame (Daily 3,244 to 3,230, Hard 9,765 to 9,548). The filter is device-independent so everyone gets the same Daily.
+- **Quality filter.** Both pools drop airports where the imagery cap (native resolution minus the worst-case retina levels) forces a view wider than the airport's fitted zoom and the airfield would then fill less than 45% of the reference 358x371 phone frame (Daily 3,244 to 3,228, Hard 9,765 to 9,592). Airports whose fitted zoom is not capped are never dropped for being small in the frame. The filter is device-independent so everyone gets the same Daily.
 - **Practice sets.** OurAirports has no passenger numbers, so "Top 100" is ranked by a connectivity proxy: route counts in [OpenFlights](https://github.com/jpatokal/openflights) `routes.dat` (ODbL). "Large" is all large airports, "Mid-size" is medium airports.
 
 ## Performance
