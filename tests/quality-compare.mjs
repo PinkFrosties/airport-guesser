@@ -1,6 +1,6 @@
 // Compare +1 and +2 extra tile levels at devicePixelRatio 3: tiles requested, KB, and a sharpness score of the frame.
 // Run: node tests/quality-compare.mjs   (writes qa/quality-<airport>-n1.png / -n2.png and prints a table)
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 
@@ -11,7 +11,7 @@ const server = createServer();
 await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
 await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
 const page = await ctx.newPage();

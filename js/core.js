@@ -241,7 +241,7 @@ export function dailyTopOrder(top, dateStr) {
 }
 
 export const DIFFICULTIES = {
-  easy: { label: 'Top 100', filter: (a) => a.tier === 1 },
+  easy: { label: 'Major hubs', filter: (a) => a.tier === 1 },
   medium: { label: 'Large', filter: (a) => a.type === 'large' },
   hard: { label: 'Mid-size', filter: (a) => a.type === 'medium' },
 };

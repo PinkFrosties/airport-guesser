@@ -1,11 +1,11 @@
 // Touch targets: every visible control must have a 44x44 hit area (the visible shape may be smaller: .seg buttons extend theirs with ::after).
 // Run: node tests/targets.mjs
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from '../scripts/serve.mjs';
 const server = createServer(); await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
-let browser; for (const o of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(o); break; } catch { /* */ } }
+let browser; for (const o of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(o); break; } catch { /* */ } }
 let failed = 0;
 for (const [name, vp] of [['phone', { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }], ['desktop', { width: 1280, height: 800 }]]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, ...(vp.isMobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), serviceWorkers: 'block' });

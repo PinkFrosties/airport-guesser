@@ -35,11 +35,15 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import time
 import urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
+
+# Records that the source itself marks as closed, disused, duplicated or superseded: never offered as an answer.
+JUNK_NAME = re.compile(r"\[(in-?active|closed|duplicate)\]|\((old|disused|former[^)]*)\)|^\(\*\)", re.I)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "scripts", ".cache")
@@ -244,11 +248,27 @@ def mark_top_airports(kept):
     print("top airports: %d matched by IATA+ICAO, all pass the quality filter" % len(top))
 
 
+# Image visibility: scripts/image_contrast.mjs scores how visible the runway is in the imagery (median brightness difference
+# between the runway line and its sides, 0..255; cache in scripts/.cache/contrast.json). Airports below CONTRAST_MIN show
+# nothing a player could identify (bare fields, blank ice, haze) and are dropped. The Daily top 50 are never dropped.
+CONTRAST_MIN = 3.0
+try:
+    with open(os.path.join(CACHE, "contrast.json"), encoding="utf-8") as _f:
+        CONTRAST = {int(k): v for k, v in json.load(_f).items()}
+except OSError:
+    CONTRAST = {}
+    print("WARNING: scripts/.cache/contrast.json missing (run node scripts/image_contrast.mjs); no visibility filter applied")
+
+
 def quality_filter(items, label):
     """Drop airports whose real imagery cannot show the airfield (see passes_quality)."""
     kept_items, dropped = [], Counter()
     for a in items:
         ok, why = passes_quality(a)
+        c = CONTRAST.get(a["id"])
+        if ok and not a.get("top") and c is not None and 0 <= c < CONTRAST_MIN:
+            dropped["runway not visible in the imagery (contrast < %g)" % CONTRAST_MIN] += 1
+            continue
         if ok:
             kept_items.append(a)
         else:
@@ -275,6 +295,8 @@ def main():
     kept = []
     for r in csv.DictReader(io.StringIO(airports_csv)):
         if r["type"] not in ("large_airport", "medium_airport"):
+            continue
+        if JUNK_NAME.search(r["name"]):
             continue
         if r["scheduled_service"] != "yes" or not r["iata_code"].strip():
             continue
@@ -374,6 +396,8 @@ def main():
             continue
         aid = int(r["id"])
         if aid in kept_ids:
+            continue
+        if JUNK_NAME.search(r["name"]):
             continue
         if not (r["iata_code"].strip() or r["icao_code"].strip() or r["wikipedia_link"].strip()):
             continue

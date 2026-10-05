@@ -1,6 +1,6 @@
 // End-to-end checks with headless Playwright. Run: node tests/e2e.mjs
 // Plays full games on a phone (390x844) and desktop viewport against a local static server (needs network for Esri tiles).
-import { chromium } from 'playwright';
+import { launchBrowser, browserName } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
@@ -23,7 +23,7 @@ const BASE = `http://localhost:${server.address().port}/`;
 
 let browser;
 for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) {
-  try { browser = await chromium.launch(opts); break; } catch { /* next */ }
+  try { browser = await launchBrowser(opts); break; } catch { /* next */ }
 }
 if (!browser) throw new Error('no browser available');
 
@@ -37,7 +37,7 @@ const HUB = 3384, SMALL = 20403, REMOTE = 299738;
 
 // `sw: false` blocks service workers so page.route() sees every tile request (SW-initiated fetches bypass page.route)
 async function newPage(profile, { watch = true, sw = true } = {}) {
-  const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'], serviceWorkers: sw ? 'allow' : 'block' });
+  const ctx = await browser.newContext({ ...profile, ...(browserName === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}), serviceWorkers: sw ? 'allow' : 'block' });
   await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   if (watch) {
@@ -89,7 +89,11 @@ async function guess(page, query, { viaKeyboard = false, expect = query } = {}) 
 }
 const wrongPick = (answer, n) => ['JFK', 'LHR', 'SIN', 'GRU', 'SYD', 'DXB'].map(by).filter((a) => a.id !== answer.id).slice(0, n);
 
+// Playwright's WebKit/Firefox have no CDP, no Touch constructor, no clipboard-read and an unstable service worker on Windows:
+// these tests exercise the test harness, not the app, so they run on Chromium only (AG_BROWSER=chromium, the default).
+const CHROMIUM_ONLY = /stalled tiles|built site only|locked view: no pan|win after a hint|Hard mode: separate toggle|PWA: manifest|service worker caches tiles/;
 async function test(name, fn) {
+  if (browserName !== 'chromium' && CHROMIUM_ONLY.test(name)) { console.log(`  skip ${name} (needs Chromium test tooling)`); return; }
   const t0 = Date.now();
   try { await fn(); passed++; console.log(`  ok   ${name} (${((Date.now() - t0) / 1000).toFixed(1)}s)`); }
   catch (e) { console.log(`  FAIL ${name}\n       ${e.stack.split('\n').slice(0, 4).join('\n       ')}`); process.exitCode = 1; }

@@ -21,7 +21,8 @@ const game = {
   round: null, // { kind, date, answer, log, results, hints, zoomed, done, won, cap }
   selected: null, token: 0, lastPracticeId: null,
 };
-window.__ag = game; // convenience for tests/debugging; the dataset is client-side anyway
+// Test hook: only on a local development host, so the answer is not one console command away on the live site.
+if (/^(localhost|127\.0\.0\.1|\[::1\]|[^.]+\.localhost)$/.test(location.hostname)) window.__ag = game;
 game.config = IMAGERY; // tests may shorten the tile timeout
 game.retinaOverride = null; // tests may force the extra tile levels
 Object.defineProperty(game, 'zoom', { get: () => (frontView().map ? frontView().map.getZoom() : null) });

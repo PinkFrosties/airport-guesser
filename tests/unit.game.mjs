@@ -110,11 +110,11 @@ console.log('daily schedule (build) and local dates');
 const { buildDaily, inlineSubset } = await import('../scripts/daily_build.mjs');
 const { execFileSync } = await import('node:child_process');
 const schedule = buildDaily({ root: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), now: new Date('2026-10-05T12:00:00Z') });
-test('schedule: dates cover yesterday..+14 days, 3 candidates per kind, entries are complete records equal to the full data', () => {
+test('schedule: dates cover yesterday..tomorrow, 3 candidates per kind, entries are complete records equal to the full data', () => {
   const dates = Object.keys(schedule.days);
   assert.equal(schedule.from, '2026-10-04');
-  assert.equal(schedule.to, '2026-10-19');
-  assert.equal(dates.length, 16);
+  assert.equal(schedule.to, "2026-10-06");
+  assert.equal(dates.length, 3);
   assert.ok(schedule.meta && /^\d{4}-\d{2}-\d{2}$/.test(schedule.meta.ourairports_retrieved), 'data date travels with the schedule');
   const byId = new Map([...airports, ...hard].map((a) => [a.id, a]));
   for (const d of dates) {
@@ -348,6 +348,15 @@ test('search tolerates hostile and odd input (regex characters, HTML, huge strin
   const idx = C.prepareIndex(airports);
   for (const q of ['', '   ', '.*', '(', '\\', '<img src=x onerror=alert(1)>', '✈️', 'a'.repeat(5000), '__proto__', 'constructor', '北京']) assert.ok(Array.isArray(C.search(idx, q)), q);
   assert.equal(C.search(idx, 'zürich')[0].iata, 'ZRH');
+});
+
+console.log('pool clean-up (v1.3)');
+test('no airport the source marks closed / disused / duplicated / superseded is in any pool', () => {
+  const junk = /\[(in-?active|closed|duplicate)\]|\((old|disused|former[^)]*)\)|^\(\*\)/i;
+  assert.deepEqual([...airports, ...hard].filter((a) => junk.test(a.name)).map((a) => a.name), []);
+});
+test('Practice set is called "Major hubs" and still holds 100 airports', () => {
+  assert.equal(C.DIFFICULTIES.easy.label, 'Major hubs');
 });
 
 console.log('hints and attempts');

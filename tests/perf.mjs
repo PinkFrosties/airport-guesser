@@ -1,7 +1,7 @@
 // Load-speed measurements: tile requests, KB and time-to-reveal on a throttled phone.
 // Run: node tests/perf.mjs [label]      (needs network; writes qa/perf-<label>.json)
 // Profile: 390px wide, devicePixelRatio 3, "Fast 4G" = 9 Mbit/s down, 1.5 Mbit/s up, 170 ms RTT, fresh browser profile each run.
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 
@@ -17,7 +17,7 @@ const server = createServer();
 await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 
 // service workers are blocked for the throttled first-visit measurements (SW fetches are not throttled by page-level emulation)
 async function freshPage({ throttleFromStart = false, sw = false } = {}) {

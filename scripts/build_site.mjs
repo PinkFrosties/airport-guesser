@@ -1,7 +1,7 @@
 // Builds the deployable site into dist/ (GitHub Pages serves that folder).  Usage: node scripts/build_site.mjs
 //  - bundles and minifies the JS (one critical bundle + a lazy "extras" chunk), content-hashed file names
 //  - inlines the minified CSS, the theme/Daily scripts and an inline preloader that starts the first tile requests
-//  - writes data/daily.json (the next two weeks of Daily airports) and inlines yesterday/today/tomorrow into the HTML
+//  - writes data/daily.json (yesterday, today and tomorrow) and inlines yesterday/today/tomorrow into the HTML
 //  - writes sw.js with the real file list
 // The source tree keeps working without this step (it just loads more files); tests run against both.
 import { build, transform } from 'esbuild';
@@ -59,8 +59,8 @@ sub(/<link rel="modulepreload" href="js\/app\.js">\s*/, () => `<link rel="module
 html = html.replace(/<link rel="modulepreload" href="js\/[^"]*">\s*/g, ''); // the other modules are inside the bundle
 sub(/<script src="vendor\/leaflet\/leaflet\.js"><\/script>\s*<script type="module" src="js\/app\.js"><\/script>/, `<script>${preloadJs}</script>\n<script defer src="${leafletFile}"></script>\n<script type="module" src="${appFile}"></script>`, 'scripts');
 html = html.replace(/<!--(?!\[)[\s\S]*?-->/g, '').replace(/\n\s+/g, '\n').replace(/\n{2,}/g, '\n').trim() + '\n';
-// Opt-in Content-Security-Policy (proposal, tested; not enabled): AG_CSP=1 node scripts/build_site.mjs. Inline scripts are allowed by hash only.
-if (process.env.AG_CSP) {
+// Content-Security-Policy, on by default (AG_CSP=0 turns it off). Inline scripts are allowed by hash only.
+if (process.env.AG_CSP !== '0') {
   const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => "'sha256-" + createHash('sha256').update(m[1]).digest('base64') + "'");
   const csp = [
     "default-src 'none'",

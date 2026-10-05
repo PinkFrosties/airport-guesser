@@ -11,6 +11,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write   # keepalive step below
 
 concurrency:
   group: pages
@@ -23,6 +24,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Keep the scheduled rebuild alive (GitHub disables scheduled workflows after 60 days without repository activity)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable" || true
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

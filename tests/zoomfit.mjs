@@ -1,6 +1,6 @@
 // Zoom-fit verification on real renders: fill %, runway endpoints vs the frame edges (>= 6% margin), chips and attribution pill.
 // Run: node tests/zoomfit.mjs      (needs network for Esri tiles; writes qa/zoomfit-*.png and qa/zoomfit-report.json)
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
@@ -30,7 +30,7 @@ const server = createServer();
 await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 
 const PROFILES = [['phone', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true }], ['desktop', { viewport: { width: 1280, height: 800 } }]];
 const report = [];

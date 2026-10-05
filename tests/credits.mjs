@@ -1,6 +1,6 @@
 // Credits checks: footer, always-visible attribution that never covers the airfield, About & credits screen.
 // Run: node tests/credits.mjs     (needs network for Esri tiles; writes qa/credits-*.png)
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
@@ -16,7 +16,7 @@ const server = createServer();
 await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
 const DESKTOP = { viewport: { width: 1280, height: 800 } };

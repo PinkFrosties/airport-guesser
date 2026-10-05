@@ -1,7 +1,7 @@
 // Version and changelog consistency. Run: node tests/changelog.mjs
 // One source of truth (js/version.js); the README changelog is newest-first with strictly descending versions, the
 // top entry equals the constant, and the footer, About screen, package.json and service worker all show it.
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
@@ -44,7 +44,7 @@ console.log('shown in the app');
 const server = createServer();
 await new Promise((r) => server.listen(0, r));
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 await test('footer and About & credits show the version', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
   await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it

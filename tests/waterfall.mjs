@@ -3,7 +3,7 @@
 //   Slow 4G = 1.6 Mbit/s down, 0.75 up, 150 ms RTT. (CDP page-level throttling does not slow service-worker fetches,
 //   so cold runs block the service worker; warm runs allow it and only show what comes from its caches.)
 // Writes qa/perf/waterfall-<label>.json and prints the tables. With a baseUrl it measures that site instead of the local one.
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 
@@ -20,7 +20,7 @@ let server = null;
 let BASE = remote;
 if (!BASE) { server = createServer(); await new Promise((r) => server.listen(0, r)); BASE = `http://localhost:${server.address().port}/`; }
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 
 const short = (u) => u.replace(BASE, '/').replace(/^https:\/\/([a-z.]+arcgisonline\.com)\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\//, '$1 tile ');
 const kb = (n) => (n == null ? '-' : (n / 1024).toFixed(1));

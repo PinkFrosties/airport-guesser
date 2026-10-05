@@ -1,6 +1,6 @@
 // Theme checks: system/light/dark, manual override, live OS switching, no flash on load, WCAG AA contrast, QA screenshots.
 // Run: node tests/theme.mjs      (needs network for Esri tiles; writes qa/theme-*.png and test-output/theme/*)
-import { chromium } from 'playwright';
+import { launchBrowser, browserName } from './browser.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, copyFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
@@ -15,20 +15,21 @@ const server = createServer();
 await new Promise((r) => server.listen(0, r));
 const BASE = `http://localhost:${server.address().port}/`;
 let browser;
-for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
+for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await launchBrowser(opts); break; } catch { /* next */ } }
 
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
 const DESKTOP = { viewport: { width: 1280, height: 800 } };
 const HUB = 3384;
 let passed = 0;
 const test = async (name, fn) => {
+  if (browserName !== 'chromium' && /no white flash|no flash when/.test(name)) { console.log(`  skip ${name} (needs Chromium CDP)`); return; }
   const t0 = Date.now();
   try { await fn(); passed++; console.log(`  ok   ${name} (${((Date.now() - t0) / 1000).toFixed(1)}s)`); }
   catch (e) { console.log(`  FAIL ${name}\n       ${e.stack.split('\n').slice(0, 5).join('\n       ')}`); process.exitCode = 1; }
 };
 
 async function newPage(profile, { colorScheme, pref, sw = false } = {}) {
-  const ctx = await browser.newContext({ ...profile, colorScheme, serviceWorkers: sw ? 'allow' : 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await browser.newContext({ ...profile, colorScheme, serviceWorkers: sw ? 'allow' : 'block', ...(browserName === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
   await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   const errors = [];

@@ -23,7 +23,7 @@ export function loadPools(root) {
  * @param {object} o  root: project root; now: Date; pastDays/futureDays: calendar days around the UTC date of `now`;
  *                    fallbacks: how many candidates per kind and date (first = airport of the day, rest = imagery fallbacks).
  */
-export function buildDaily({ root, now = new Date(), pastDays = 1, futureDays = 14, fallbacks = 3 }) {
+export function buildDaily({ root, now = new Date(), pastDays = 1, futureDays = 1, fallbacks = 3 }) {
   const { top, hardPool, meta } = loadPools(root);
   const base = C.utcDateString(now);
   const days = {};

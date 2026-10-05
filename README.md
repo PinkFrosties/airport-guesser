@@ -20,7 +20,7 @@ You get a locked satellite view of an airport. Name it in 5 guesses or fewer.
 | Mode | Airport pool | Notes |
 |---|---|---|
 | Daily | The 50 busiest airports worldwide by total passengers (ACI World, 2025) | Same airport for everyone each day; every airport once per cycle, then reshuffled; never the same airport twice within 30 days |
-| Hard | All other airports: the rest of the international airports plus regional, small and remote airfields (12,770) | Own daily airport and own results |
+| Hard | All other airports: the rest of the international airports plus regional, small and remote airfields (12,675) | Own daily airport and own results |
 
 Hard is a toggle next to the mode switch. Its daily is drawn from a different pool and it keeps its own saved game, streak and statistics. Autocomplete searches the full database (12,820 airports) in every mode. Practice (endless random airports) is also available; with Hard mode on it draws from the Hard pool.
 
@@ -39,6 +39,15 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 ## Changelog
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
+
+### v1.3.0 (text size, cleaner pools, hardening) - 2026-10-05
+- Text follows the browser's text size: all type is in `rem`, so a larger default font size or zoom scales the whole app. The header, mode bar, dialogs and statistics reflow instead of overflowing (tested at 100/150/200% on 390 and 320 px wide screens). The chips and attribution on the satellite image keep fixed sizes because the airfield fit is measured against them
+- Hard pool cleaned: records the source marks closed, disused, duplicated or superseded are never offered, and so are airports whose runway cannot be seen in the imagery (visibility filter, `scripts/image_contrast.mjs`; the Daily top 50 are never filtered). Pools: Daily 3,222, Hard 12,675. The Hard Daily is drawn from the new pool, so today's and tomorrow's Hard airport may differ from what the previous version showed; a game already started keeps its airport
+- Practice "Top 100" is now called "Major hubs" (it is ranked by route counts, not passengers)
+- Content-Security-Policy is on in the built site (inline scripts allowed by hash only, images and tiles only from Esri); `AG_CSP=0` builds without it
+- The `window.__ag` test hook exists on localhost only, and `data/daily.json` now holds yesterday, today and tomorrow (it listed two weeks)
+- The deploy workflow re-enables itself on every run so GitHub does not pause the daily rebuild after 60 days without repository activity
+- Tests run on WebKit too (`AG_BROWSER=webkit`); new tests for text scaling and hardening
 
 ### v1.2.6 (audit fixes) - 2026-10-05
 - Full audit: game logic, schedule, data, layout, failures, performance, accessibility, security
@@ -119,7 +128,9 @@ node scripts/build_site.mjs      # writes dist/: bundled + minified JS, inlined 
 AG_ROOT=dist node scripts/serve.mjs 8080   # serve the built site (the tests accept AG_ROOT=dist too)
 ```
 
-`.github/workflows/deploy.yml` runs the build on every push to `main` **and every day at 00:07 UTC** and publishes `dist/`. The daily rebuild keeps `data/daily.json` (the next 14 days of Daily and Hard airports) and the entry inlined in `index.html` current. If scheduled runs stop (GitHub pauses them after 60 days without repository activity) the app still works: for a date missing from the schedule it computes the airport from the full lists, just more slowly.
+`.github/workflows/deploy.yml` runs the build on every push to `main` **and every day at 00:07 UTC** and publishes `dist/`. A first step re-enables the workflow through the API so GitHub's 60-day inactivity pause cannot stop the schedule. The daily rebuild keeps `data/daily.json` (yesterday, today and tomorrow) and the entry inlined in `index.html` current. If scheduled runs stop (GitHub pauses them after 60 days without repository activity) the app still works: for a date missing from the schedule it computes the airport from the full lists, just more slowly.
+
+The built site carries a Content-Security-Policy `<meta>` (scripts by hash, `img-src`/`connect-src` limited to the app and Esri's two tile hosts; `AG_CSP=0 node scripts/build_site.mjs` leaves it out). If the imagery provider changes, update the hosts in `scripts/build_site.mjs`.
 
 ## Run locally
 
@@ -137,6 +148,8 @@ npm install                      # dev-only: Playwright + the vendored Leaflet s
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
+node tests/textscale.mjs         # text follows the browser font size, no overflow at 150/200% on narrow screens
+node tests/hardening.mjs         # debug hook only on localhost; CSP blocks injected scripts (AG_ROOT=dist for the CSP checks)
 node tests/targets.mjs           # every control has a 44 px touch target
 node tests/wikipedia.mjs         # Wikipedia link: never before the game ends, correct and safe after it
 node tests/credits.mjs           # footer, attribution never covering the airfield, About & credits
@@ -144,7 +157,7 @@ node tests/theme.mjs             # light/dark, live OS switching, no-flash, WCAG
 node tests/e2e.mjs               # headless Playwright: phone 390x844 and desktop 1280x800 (needs network for Esri tiles)
 ```
 
-The e2e script uses an installed Edge or Chrome if present, otherwise Playwright's Chromium (`npx playwright install chromium`). Screenshots land in `test-output/`.
+The tests use an installed Edge or Chrome if present, otherwise Playwright's Chromium (`npx playwright install chromium`). `AG_BROWSER=webkit` runs them on Playwright's WebKit (`npx playwright install webkit`; the few checks that need Chromium-only tooling are skipped and say so). Playwright's WebKit is not Safari: check iOS on a real device. Screenshots land in `test-output/`.
 
 ## Deploy to GitHub Pages
 
@@ -164,14 +177,16 @@ python scripts/build_data.py     # add --refresh to re-download sources
 ```
 
 - `data/top50.json`: the Daily ranking. `python scripts/fetch_top_airports.py` fetches the latest "<year> statistics" table of Wikipedia's [List of busiest airports by passenger traffic](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic) (ACI World annual figures; the top 50 only) with rank, IATA, ICAO, name, city, country, passengers, year and source URL. `build_data.py` matches every entry to the dataset by IATA and ICAO, requires it to pass the image-quality filter (the build stops instead of dropping anything), and flags it with `top` (the rank).
-- `data/airports.json` (3,228 international airports, 50 of them flagged `top` = the **Daily pool**; the other 3,178 join the Hard pool): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
-- `data/airports-hard.json` (9,592 airports, the rest of the **Hard pool** with the 3,178 above): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
+- `data/airports.json` (3,222 international airports, 50 of them flagged `top` = the **Daily pool**; the other 3,172 join the Hard pool): [OurAirports](https://davidmegginson.github.io/ourairports-data/) large and medium airports with an IATA code and scheduled service, not closed.
+- `data/airports-hard.json` (9,503 airports, the rest of the **Hard pool** with the 3,172 above): every other open large, medium or small airport that has runway data and an IATA code, ICAO code or Wikipedia page. In Hard mode autocomplete searches both files.
 - **Per-airport view box and zoom.** `view` is `[lat, lon, width m, height m]`: the bounding box of the runway endpoints, which is exactly the condition for "every endpoint inside the frame" whatever the runway angle. `z` is the airport's whole-number zoom for everyone: the largest zoom at which that box stays inside the frame minus a 6% margin, below the top corner chips and above the attribution pill, and fills at most 78% of the frame, rounded down; it is the smaller of the phone (358x371) and desktop (604x585) fits. `rw` is the number of open runways (for the hint).
 - **Native resolution (`nz`).** At build time the Esri `tilemap` service is probed for each airport: `nz` is the deepest tile level at which a 7x7 block of tiles around the airfield is real imagery (not the grey "map data not yet available" placeholder). Results are cached in `scripts/.cache/native_zoom.json`; `--refresh-zoom` re-probes and `--verify` spot-checks the tilemap against real tile downloads.
 - **Sharp rendering.** Tiles are requested `n` levels deeper than the map zoom (n = 0 for devicePixelRatio 1, otherwise 1; +2 was dropped in v1.1.2 for load speed) and drawn at 256/2^n CSS px. The map zoom is a whole number, and the zoom used is `min(fit-to-airfield zoom, nz - n)`: a smaller airport in the frame beats a blurry upscale.
 - **Quality filter.** Both pools drop airports where the imagery cap (native resolution minus the worst-case retina levels) forces a view wider than the airport's fitted zoom and the airfield would then fill less than 45% of the reference 358x371 phone frame (Daily 3,244 to 3,228, Hard 9,765 to 9,592). Airports whose fitted zoom is not capped are never dropped for being small in the frame. The filter is device-independent so everyone gets the same Daily.
+- **Source clean-up.** Records the source itself marks as closed, disused, duplicated or superseded ("[CLOSED]", "[Duplicate]", "(Old)", "(former ...)", "(*)") are never offered (8 airports; `JUNK_NAME` in `scripts/build_data.py`).
+- **Visibility filter.** `node scripts/image_contrast.mjs` downloads the few Esri tiles covering each airport's runways (at its display zoom, 8 at a time), samples the pixels along every open runway and beside it, and stores a score in `scripts/.cache/contrast.json` (median brightness difference, 0 to 255; runways without coordinates are searched around the reference point at their known heading). `build_data.py` drops airports scoring under `CONTRAST_MIN = 3.0` (87: bare fields, haze, blank ice) and never the Daily top 50. The score is a crude single measure: a few visible-but-low-contrast strips are dropped with the invisible ones.
 - **Wikipedia link (`wp`).** `python scripts/wikipedia_links.py` validates each airport's OurAirports `wikipedia_link` (HTTPS upgrade, host wikipedia.org, redirects followed through the MediaWiki API, must not be missing or a disambiguation page, must be an airport/airbase/heliport on Wikidata), falls back to a Wikidata lookup by ICAO/FAA/IATA code, and writes `qa/wikipedia-report.json`. `build_data.py` stores only the article title (`Title`, or `lang|Title` for other-language wikis) as `wp`; the app builds the URL in code (`wikipediaLink` in `js/core.js`) and uses a Wikipedia search link when there is no verified article; it never guesses. Result for 12,820 airports: 10,933 verified direct links, 346 via Wikidata, 1,541 search links (1,009 OurAirports links rejected: 875 not an airport article, 85 missing page, 34 disambiguation, 14 not wikipedia.org, 1 no Wikidata item). All top 50 have a verified article.
-- **Practice sets.** OurAirports has no passenger numbers, so "Top 100" is ranked by a connectivity proxy: route counts in [OpenFlights](https://github.com/jpatokal/openflights) `routes.dat` (ODbL). "Large" is all large airports, "Mid-size" is medium airports.
+- **Practice sets.** OurAirports has no passenger numbers, so "Major hubs" is ranked by a connectivity proxy: route counts in [OpenFlights](https://github.com/jpatokal/openflights) `routes.dat` (ODbL). "Large" is all large airports, "Mid-size" is medium airports.
 
 ## Performance
 
@@ -195,7 +210,7 @@ Mirrors **About & credits** in the app (footer link). Only what the code actuall
 - **Airport data:** [OurAirports](https://ourairports.com/data/), public domain, no warranty. Fields used: name, IATA and ICAO codes, latitude and longitude, country, municipality, continent, airport type, runway count and end coordinates. The retrieval date is stored in `data/*.json` (`meta.ourairports_retrieved`) and shown in the app.
 - **Ranking:** the Daily list is the world's 50 busiest airports by total passengers, ACI World annual figures for 2025 as compiled on [Wikipedia](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic) (retrieved 2026-10-05; see `data/top50.json`). [ACI World](https://aci.aero/resources/busiest-airports-in-the-world/) publishes the original figures. The source lists the top 50 only.
 - **Wikipedia / Wikidata:** Wikipedia is a link target only (result card, after the round ends); the link leaves the app. Article titles are resolved at build time from the OurAirports `wikipedia_link` field, falling back to [Wikidata](https://www.wikidata.org/) (CC0); no Wikipedia text is copied and the app makes no runtime request to Wikipedia or Wikidata.
-- **Other data:** country names (OurAirports countries table) and continent codes (OurAirports airport records). The Practice "Top 100" set is ordered by route counts from [OpenFlights](https://github.com/jpatokal/openflights) (ODbL), used only at build time.
+- **Other data:** country names (OurAirports countries table) and continent codes (OurAirports airport records). The Practice "Major hubs" set is ordered by route counts from [OpenFlights](https://github.com/jpatokal/openflights) (ODbL), used only at build time.
 - **Open-source software:** [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause), vendored in `vendor/leaflet`. No framework, no build step. Full list and licence text: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), generated by `node scripts/gen_notices.mjs`.
 - **Fonts and icons:** no fonts are bundled (system font stack); the app icon is original artwork generated by `scripts/make_icons.mjs`.
 - **Disclaimer:** not affiliated with or endorsed by any airport, airline, or data and imagery provider. Imagery may be outdated.
