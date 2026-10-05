@@ -12,11 +12,10 @@ const el = {
   tools: $('#tools'), btnHint: $('#btn-hint'), btnZoom: $('#btn-zoom'), sheet: $('#sheet'),
   hintsUsed: $('#hints-used'), hintsList: $('#hints-list'),
   modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), hardToggle: $('#hard-toggle'), toast: $('#toast'),
-  dlgHelp: $('#dlg-help'), dlgStats: $('#dlg-stats'), statsBody: $('#stats-body'), statsSeg: $('#stats-seg'),
 };
 
 const game = {
-  main: [], top: [], hardList: [], hardPool: [], hardLoaded: false,
+  main: [], top: [], hardList: [], hardPool: [], fullLoaded: false, hardLoaded: false, meta: null,
   byId: new Map(), mainIndex: [], fullIndex: [],
   mode: 'daily', hard: false, diff: 'medium',
   round: null, // { kind, date, answer, log, results, hints, zoomed, done, won, cap }
@@ -92,8 +91,11 @@ function showVeil(msg, retry = false, loading = false) {
   el.veilRetry.hidden = !retry;
   el.veil.hidden = false;
 }
+const mark = (name) => { try { if (!performance.getEntriesByName(name).length) performance.mark(name); } catch { /* old browsers */ } };
 function hideVeil() {
   if (el.veil.hidden) return;
+  mark('ag:revealed');
+  scheduleBackground();
   el.veil.classList.add('out');
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => { el.veil.hidden = true; el.veil.classList.remove('out'); }, 240);
@@ -112,17 +114,6 @@ function syncRetina() {
   for (const v of Object.values(views)) v.setRetina(n);
 }
 
-/** What occupies the frame: the attribution pill (bottom) and the corner chips (top), measured from the page. */
-function frameChrome() {
-  const stage = el.stage.getBoundingClientRect();
-  const att = views.main.container.querySelector('.leaflet-control-attribution');
-  const chips = [...document.querySelectorAll('.hud .chip')];
-  return {
-    pill: att ? att.getBoundingClientRect().height : C.REF_PHONE.pill,
-    chipsBottom: chips.length ? Math.max(...chips.map((c) => c.getBoundingClientRect().bottom - stage.top)) : C.CHIPS_BOTTOM,
-  };
-}
-
 /**
  * Centre + zooms for an airport at the current frame size. The zoom is the airport's own `a.z` (identical on every
  * device), never deeper than real imagery allows, and only wider than that when this frame is smaller than the reference
@@ -134,8 +125,7 @@ function viewParams(a) {
   const { W, H } = views.main.size();
   const ref = W < 520 ? C.REF_PHONE.pill : C.REF_DESKTOP.pill; // fixed pill height for the fit, so the zoom does not depend on measuring
   const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n, pill: ref });
-  const { pill, chipsBottom } = frameChrome();
-  const lift = C.airfieldLift(W, H, pill, chipsBottom);
+  const lift = C.airfieldLift(W, H, ref, C.CHIPS_BOTTOM); // constants, not measurements: the inline preloader computes exactly the same view
   game.lift = lift;
   return { center: views.main.shifted([a.view[0], a.view[1]], z, lift), zMain: z, zWide: C.zoomedOut(z), W, H, lift };
 }
@@ -178,44 +168,91 @@ function preloadWider() {
 }
 
 // ---------- rounds ----------
-const todayKey = () => C.utcDateString();
+// The player's LOCAL calendar date picks the Daily: everyone with the same date on their clock gets the same airport.
+const todayKey = () => C.localDateString();
 
-// The other airports (regional, small, remote). Needed for Hard mode, and for autocomplete in every mode
-// ("search the full database"), so it is also fetched quietly in the background after the first image is up.
-let hardPromise = null;
+// ---- data. The Daily needs only today's entry (inlined in the HTML by the deploy build, or data/daily.json); the full
+// airport lists (autocomplete, Practice, old saved games) load later and never compete with the first image's tiles.
+const fetchJson = (url, low = false) => fetch(url, low ? { priority: 'low' } : undefined).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+let dailyJsonPromise = null;
+if (window.__DAILY && window.__DAILY.meta) game.meta = window.__DAILY.meta;
+
+/** Today's candidates: { daily: [airport of the day, fallback, ...], hard: [...] }, or null when no schedule is available. */
+async function dailyEntries(date) {
+  const inline = window.__DAILY;
+  if (inline && inline.days && inline.days[date]) return inline.days[date];
+  const load = (opts) => fetch('data/daily.json', opts).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  dailyJsonPromise ||= load();
+  let dj = await dailyJsonPromise;
+  if (!(dj && dj.days[date])) { dj = await load({ cache: 'reload' }); if (dj) dailyJsonPromise = Promise.resolve(dj); } // a stale cached copy: ask the network once
+  if (dj && dj.meta && !game.meta) game.meta = dj.meta;
+  return dj && dj.days[date] ? dj.days[date] : null;
+}
+
+let fullPromise = null, hardPromise = null;
+/** airports.json: autocomplete index, Practice pools, answers of old saved games. */
+async function ensureFull(loud = true) {
+  if (game.fullLoaded) return true;
+  if (loud) showVeil('Loading airports', false, true);
+  fullPromise ||= (async () => {
+    try {
+      const data = await fetchJson('data/airports.json', !loud);
+      game.main = data.airports;
+      game.meta = data.meta || game.meta;
+    } catch { return false; }
+    for (const a of game.main) game.byId.set(a.id, a);
+    game.mainIndex = C.prepareIndex(game.main);
+    game.top = game.main.filter((a) => a.top).sort((a, b) => a.top - b.top);
+    game.fullLoaded = true;
+    indexUpdated();
+    return true;
+  })();
+  const ok = await fullPromise;
+  if (!ok) fullPromise = null;
+  return ok;
+}
+
+/** airports-hard.json (the other airports): Hard/Practice pools and the complete autocomplete index. */
 async function ensureHard(loud = true) {
   if (game.hardLoaded) return true;
+  if (!(await ensureFull(loud))) return false;
   if (loud) showVeil('Loading airports', false, true);
   hardPromise ||= (async () => {
-    try {
-      const res = await fetch('data/airports-hard.json');
-      if (!res.ok) throw new Error(res.status);
-      game.hardList = (await res.json()).airports;
-    } catch {
-      return false;
-    }
+    try { game.hardList = (await fetchJson('data/airports-hard.json', !loud)).airports; } catch { return false; }
     for (const a of game.hardList) game.byId.set(a.id, a);
     game.fullIndex = C.prepareIndex([...game.main, ...game.hardList]);
-    game.hardPool = [...game.main.filter((a) => !a.top), ...game.hardList]; // Hard pool = every airport not in the Daily top list
+    game.hardPool = [...game.main.filter((a) => !a.top), ...game.hardList]; // Hard pool = every airport outside the Daily top list
     game.hardLoaded = true;
+    indexUpdated();
     return true;
   })();
   const ok = await hardPromise;
   if (!ok) hardPromise = null;
   return ok;
 }
+const warmData = () => ensureFull(false).then((ok) => ok && ensureHard(false)).then((ok) => { if (ok) tellServiceWorker({ type: 'cache-data', urls: ['data/airports.json', 'data/airports-hard.json'] }); return ok; });
 
 function newRound(kind, date, answer) {
-  return { kind, date, answer, log: [], results: [], hints: [], zoomed: false, done: false, won: false };
+  return { kind, date, answer, log: [], results: [], hints: [], zoomed: false, done: false, won: false, guessed: new Map() };
 }
 
-function restoreRound(kind, saved) {
-  const answer = game.byId.get(saved.id);
+/** Rebuild a saved Daily. Guesses are saved with a small snapshot of the airport, so no big list is needed (older saves are looked up). */
+async function restoreRound(kind, saved, candidates) {
+  let answer = candidates.find((c) => c.id === saved.id) || game.byId.get(saved.id);
+  const needsLists = !answer || saved.log.some((e) => e.t === 'g' && !e.a && !game.byId.has(e.id));
+  if (needsLists) {
+    if (!(await ensureHard())) throw new Error('lists unavailable');
+    answer = answer || game.byId.get(saved.id);
+  }
   if (!answer) return null;
   const r = newRound(kind, saved.date, answer);
   for (const e of saved.log) {
-    if (e.t === 'g' && game.byId.has(e.id)) r.results.push(C.evaluateGuess(game.byId.get(e.id), answer));
-    else if (e.t === 'h' && C.HINTS.some((h) => h.key === e.k)) r.hints.push(e.k);
+    if (e.t === 'g') {
+      const g = e.a ? { id: e.id, ...e.a } : game.byId.get(e.id);
+      if (!g) continue;
+      r.guessed.set(e.id, g);
+      r.results.push(C.evaluateGuess(g, answer));
+    } else if (e.t === 'h' && C.HINTS.some((h) => h.key === e.k)) r.hints.push(e.k);
     else if (e.t === 'z') r.zoomed = true;
     else continue;
     r.log.push(e);
@@ -236,48 +273,52 @@ async function startMode() {
   awaiting = views.main;
   showVeil('Loading imagery', false, true);
 
-  if (game.hard && !(await ensureHard())) {
-    if (token !== game.token) return;
-    showVeil('Could not load the Hard mode airports. Check your connection and retry.', true);
-    return;
-  }
-  if (token !== game.token) return;
-
   const kind = kindOf();
+  const date = kind === 'practice' ? null : todayKey();
+  let candidates = null;
+  if (kind === 'practice') {
+    if (!(await (game.hard ? ensureHard() : ensureFull()))) {
+      if (token === game.token) showVeil('Could not load the airport data. Check your connection and retry.', true);
+      return;
+    }
+    if (token !== game.token) return;
+    candidates = C.practiceOrder(game.hard ? game.hardPool : game.main, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId);
+  } else {
+    const entries = await dailyEntries(date);
+    if (token !== game.token) return;
+    if (entries) candidates = entries[kind];
+    else { // no schedule (plain static server, very stale cache): work it out from the full lists
+      if (!(await ensureHard())) { showVeil('Could not load the airport data. Check your connection and retry.', true); return; }
+      if (token !== game.token) return;
+      candidates = kind === 'daily' ? C.dailyTopOrder(game.top, date).slice(0, 3) : C.dailyOrder(game.hardPool, date, 'hard:').slice(0, 3);
+    }
+  }
 
   // Resume today's daily from storage: the airport was fixed when first played.
   if (kind !== 'practice') {
     const saved = S.loadDaily(kind);
-    if (saved && saved.date === todayKey()) {
-      // a saved guess may be an airport from the other file
-      if (saved.log.some((e) => e.t === 'g' && !game.byId.has(e.id)) && !(await ensureHard())) {
-        if (token !== game.token) return;
-        showVeil('Could not load the airport data. Check your connection and retry.', true);
+    if (saved && saved.date === date) {
+      let r = null;
+      try { r = await restoreRound(kind, saved, candidates); } catch {
+        if (token === game.token) showVeil('Could not load the airport data. Check your connection and retry.', true);
         return;
       }
       if (token !== game.token) return;
-      const r = restoreRound(kind, saved);
       if (r) {
         game.round = r;
         renderAll();
+        mark('ag:airport-known');
         await presentRound();
         return;
       }
     }
   }
 
-  const date = kind === 'practice' ? null : todayKey();
-  const order = kind === 'practice'
-    ? C.practiceOrder(game.hard ? game.hardPool : game.main, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId)
-    : kind === 'daily'
-      ? C.dailyTopOrder(game.top, date) // the busiest airports, each once per cycle
-      : C.dailyOrder(game.hardPool, date, 'hard:');
-
   // Start loading the first candidate's tiles right away. A candidate whose tiles still fail after one retry is skipped
   // (deterministic fallback order for the Daily); a stalled network stops here with a tap-to-retry state.
   let answer = null;
-  game.round = null;
-  for (const cand of order.slice(0, GAME.maxProbeAttempts)) {
+  mark('ag:airport-known');
+  for (const cand of candidates.slice(0, GAME.maxProbeAttempts)) {
     const { center, zMain } = viewParams(cand); // no per-device skipping: every device must pick the same Daily airport
     awaiting = views.main;
     setFront();
@@ -301,10 +342,11 @@ async function startMode() {
 }
 
 /** Test hook: start a practice round on a specific airport (the data is client-side anyway). */
+game.viewParams = (a) => viewParams(a); // test hook
 game.debugStart = async (id) => {
   const token = ++game.token;
   closeSheet(); clearSelection(); closeList();
-  if (!game.hardLoaded) await ensureHard();
+  await ensureHard();
   const a = game.byId.get(id);
   game.round = null;
   const { center, zMain } = viewParams(a);
@@ -345,7 +387,8 @@ function submitGuess() {
   const r = game.round, g = game.selected;
   if (!r || r.done || !g) return;
   r.results.push(C.evaluateGuess(g, r.answer));
-  r.log.push({ t: 'g', id: g.id });
+  r.guessed.set(g.id, g);
+  r.log.push({ t: 'g', id: g.id, a: { name: g.name, iata: g.iata, icao: g.icao, lat: g.lat, lon: g.lon } }); // enough to restore the row without the big list
   clearSelection();
   closeList();
   afterSpend();
@@ -463,7 +506,7 @@ function renderAll(animateLast = false) {
   // guess rows (newest on top)
   el.guesses.innerHTML = '';
   r.results.forEach((res, i) => {
-    const g = game.byId.get(res.id);
+    const g = r.guessed.get(res.id) || game.byId.get(res.id);
     const li = document.createElement('li');
     li.className = 'row' + (res.correct ? ' ok' : '');
     if (!(animateLast && i === r.results.length - 1)) li.style.animation = 'none';
@@ -513,12 +556,12 @@ let cdTimer = null;
 function stopCountdown() { clearInterval(cdTimer); cdTimer = null; }
 function startCountdown() {
   const tick = () => {
-    const ms = C.msUntilNextUtcDay();
+    const ms = C.msUntilNextLocalDay();
     const node = $('#countdown');
     if (!node) return stopCountdown();
     const s = Math.max(0, Math.floor(ms / 1000));
     node.textContent = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => String(n).padStart(2, '0')).join(':');
-    if (game.round && game.round.date !== C.utcDateString()) { stopCountdown(); if (game.mode === 'daily') startMode(); }
+    if (game.round && game.round.date && game.round.date !== todayKey()) { stopCountdown(); if (game.mode === 'daily') startMode(); }
   };
   tick();
   cdTimer = setInterval(tick, 1000);
@@ -555,7 +598,9 @@ async function share() {
 
 // ---------- autocomplete ----------
 let active = -1, shown = [];
-const searchIndex = () => (game.hardLoaded ? game.fullIndex : game.mainIndex); // full database in every mode once loaded
+// full database in every mode once loaded; null while the lists are still downloading (queries typed meanwhile wait)
+const searchIndex = () => (game.hardLoaded ? game.fullIndex : game.fullLoaded ? game.mainIndex : null);
+function indexUpdated() { if (el.input.value && !game.selected && document.activeElement === el.input) renderList(); }
 const hl = (text, q) => {
   const nq = C.normalize(q).replace(/ /g, '');
   if (!nq) return esc(text);
@@ -575,8 +620,17 @@ const hl = (text, q) => {
 function renderList() {
   const q = el.input.value;
   if (game.selected || !q.trim()) return closeList();
+  const index = searchIndex();
+  if (!index) { // lists not downloaded yet: start now (the player is typing) and show a placeholder; indexUpdated() re-runs this
+    warmData();
+    shown = []; active = -1;
+    el.list.innerHTML = '<li class="noresults" role="presentation">Loading airports&hellip;</li>';
+    el.list.hidden = false;
+    el.input.setAttribute('aria-expanded', 'true');
+    return;
+  }
   const exclude = new Set(game.round ? game.round.results.map((r) => r.id) : []);
-  shown = C.search(searchIndex(), q, { exclude, limit: 6 });
+  shown = C.search(index, q, { exclude, limit: 6 });
   active = shown.length ? 0 : -1;
   el.list.innerHTML = '';
   if (!shown.length) el.list.innerHTML = '<li class="noresults" role="presentation">No matching airport</li>';
@@ -625,7 +679,7 @@ el.input.addEventListener('input', () => {
   el.btn.disabled = true;
   renderList();
 });
-el.input.addEventListener('focus', () => { if (el.input.value && !game.selected) renderList(); });
+el.input.addEventListener('focus', () => { warmData(); if (el.input.value && !game.selected) renderList(); }); // first focus: the player is about to search
 el.input.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown') { e.preventDefault(); if (el.list.hidden) renderList(); else setActive(active + 1); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
@@ -638,32 +692,6 @@ el.input.addEventListener('keydown', (e) => {
 });
 document.addEventListener('pointerdown', (e) => { if (!el.form.contains(e.target)) closeList(); });
 el.form.addEventListener('submit', (e) => { e.preventDefault(); submitGuess(); });
-
-// ---------- stats ----------
-let statsTab = 'daily';
-function renderStats() {
-  for (const b of el.statsSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.stats === statsTab));
-  const st = S.loadStats();
-  const m = st[statsTab];
-  const rate = m.played ? Math.round((100 * m.wins) / m.played) : 0;
-  const max = Math.max(1, ...m.dist);
-  const tiles = [['Played', m.played], ['Win rate', rate + '%']];
-  if (statsTab !== 'practice') {
-    const streak = S.displayStreak(st, statsTab, C.utcDateString());
-    tiles.push(['Streak', streak.current], ['Best', streak.best]);
-  } else tiles.push(['Wins', m.wins], ['Losses', m.dist[5]]);
-  const labels = ['1', '2', '3', '4', '5', 'X'];
-  const top = Math.max(...m.dist);
-  el.statsBody.innerHTML = `
-    <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
-    <div class="dist"><h3>Attempts used</h3>
-      ${m.dist.map((n, i) => `<div class="drow${n && n === top ? ' top' : ''}"><span>${labels[i]}</span><div class="track"><div class="fill" style="width:${Math.max(n ? 8 : 0, (100 * n) / max)}%">${n || ''}</div></div></div>`).join('')}
-    </div>`;
-}
-$('#btn-stats').addEventListener('click', () => { statsTab = kindOf(); renderStats(); el.dlgStats.showModal(); });
-el.statsSeg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { statsTab = b.dataset.stats; renderStats(); } });
-$('#btn-help').addEventListener('click', () => el.dlgHelp.showModal());
-for (const d of [el.dlgHelp, el.dlgStats]) d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
 
 // ---------- mode switching ----------
 el.modeSeg.addEventListener('click', (e) => {
@@ -708,69 +736,73 @@ el.input.addEventListener('blur', () => setTimeout(onViewport, 50));
 el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();
 
-// ---------- about & credits ----------
-const versionLabel = 'v' + APP_VERSION;
-$('#app-version').textContent = versionLabel;
-let aboutFilled = false;
-async function fillAbout() {
-  $('#about-version').textContent = APP_VERSION;
-  const date = game.meta && game.meta.ourairports_retrieved;
-  $('#about-data-date').textContent = date || 'unknown';
-  if (aboutFilled) return;
-  try {
-    const rank = await (await fetch('data/top50.json')).json();
-    $('#about-rank-year').textContent = rank.year;
-    $('#about-rank-date').textContent = rank.retrieved;
-  } catch { /* the static text stays */ }
-  try {
-    const res = await fetch('data/credits.json');
-    const c = await res.json();
-    $('#oss-list').innerHTML = c.software.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${esc(p.version)}, ${esc(p.license)} licence. ${esc(p.purpose)}</li>`).join('');
-    aboutFilled = true;
-  } catch { $('#oss-list').innerHTML = '<li>Open-source software list unavailable offline. See THIRD_PARTY_NOTICES.md in the repository.</li>'; }
+// ---------- extras: statistics, help, About & credits (loaded after the first image, or on first use) ----------
+let extrasPromise = null;
+const loadExtras = () => (extrasPromise ||= import('./extras.js').then((m) => m.init({ game, S, C, $, esc, kindOf, todayKey, APP_VERSION })));
+for (const [sel, method] of [['#btn-stats', 'openStats'], ['#btn-help', 'openHelp'], ['#btn-about', 'openAbout']]) {
+  $(sel).addEventListener('click', () => loadExtras().then((x) => x[method]()));
 }
-$('#btn-about').addEventListener('click', () => { fillAbout(); $('#dlg-about').showModal(); $('#dlg-about .dlg-body').scrollTop = 0; });
-$('#dlg-about').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-
-// ---------- theme ----------
+// theme switch: tiny and instant, so it stays in the main bundle (the first paint is handled by the inline script in <head>)
 const themeSeg = $('#theme-seg');
-function markTheme({ pref }) {
-  for (const b of themeSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.themePref === pref));
-}
+function markTheme({ pref }) { for (const b of themeSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.themePref === pref)); }
 themeSeg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) markTheme(setPref(b.dataset.themePref)); });
 initTheme(markTheme); // also follows the OS setting live while on System
+$('#app-version').textContent = 'v' + APP_VERSION;
+
+// ---------- after the first image: everything that must not compete with its tiles ----------
+const idle = (fn) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 300));
+let backgroundStarted = false;
+/** Called once, when the first image is revealed. The big downloads wait for the zoom-out view's tiles (or 6 s). */
+function scheduleBackground() {
+  if (backgroundStarted) return;
+  backgroundStarted = true;
+  const wideSettled = () => {
+    const r = game.round;
+    const wants = r && !r.done && !r.zoomed && C.canSpend(spent(r));
+    return !wants || ['ready', 'failed', 'timeout'].includes(views.wide.status);
+  };
+  let tries = 0;
+  const poll = setInterval(() => { if (wideSettled() || ++tries > 30) { clearInterval(poll); go(); } }, 200);
+  function go() {
+    mark('ag:background-start');
+    warmData();
+    idle(async () => { const x = await loadExtras(); if (!S.hasSeenHelp()) { S.markHelpSeen(); x.openHelp(); } });
+    idle(registerServiceWorker);
+    cacheTilesInServiceWorker();
+  }
+}
+// the first image's tiles go into the service worker's tile cache (they are already in the HTTP cache, so this costs no download)
+function tellServiceWorker(msg) {
+  if (!('serviceWorker' in navigator) || !/^https?:/.test(location.protocol)) return;
+  navigator.serviceWorker.ready.then((reg) => reg.active && reg.active.postMessage(msg)).catch(() => {});
+}
+function cacheTilesInServiceWorker() {
+  const r = game.round;
+  if (!r) return;
+  const { center, zMain } = viewParams(r.answer);
+  tellServiceWorker({ type: 'cache-tiles', urls: views.main.tilesFor(center, zMain) });
+  if (game.hardLoaded) tellServiceWorker({ type: 'cache-data', urls: ['data/airports.json', 'data/airports-hard.json'] });
+}
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !/^https?:/.test(location.protocol)) return;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(() => cacheTilesInServiceWorker()).catch(() => {});
+}
+
+// ---------- date rollover ----------
+// The Daily follows the local calendar date. If the clock passes midnight while the page stays open (any state of the game),
+// switch to the new day. The schedule is already in memory (inline / daily.json), so this does not trigger a full load.
+function checkRollover() {
+  const r = game.round;
+  if (r && r.date && r.date !== todayKey() && game.mode === 'daily') startMode();
+}
+setInterval(checkRollover, 10000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkRollover(); });
 
 // ---------- boot ----------
 async function boot() {
   loadPrefs();
   renderChrome();
-  showVeil('Loading airports', false, true);
-  try {
-    const res = await fetch('data/airports.json');
-    if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    game.main = data.airports;
-    game.meta = data.meta || null;
-  } catch {
-    showVeil('Could not load the airport data.', true);
-    el.veilRetry.onclick = () => location.reload();
-    return;
-  }
-  for (const a of game.main) game.byId.set(a.id, a);
-  game.mainIndex = C.prepareIndex(game.main);
-  game.top = game.main.filter((a) => a.top).sort((a, b) => a.top - b.top);
-  if (!S.hasSeenHelp()) { el.dlgHelp.showModal(); S.markHelpSeen(); }
+  if (el.input.value) renderList(); // characters typed while the page was loading
   await startMode();
-  ensureHard(false); // background: full-database autocomplete in every mode
-}
-
-if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
-  // When a new service worker takes over an already-controlled page, reload once so users get the new version.
-  const hadController = !!navigator.serviceWorker.controller;
-  let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hadController && !reloaded) { reloaded = true; location.reload(); }
-  });
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
 }
 boot();

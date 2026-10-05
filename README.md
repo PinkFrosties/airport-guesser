@@ -40,6 +40,13 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
 
+### v1.2.4 (daily load) - 2026-10-05
+- The Daily's first image appears much sooner: today's airport comes from `data/daily.json` / an entry inlined in the HTML (built at deploy time), so the 180 KB airport list is no longer on the critical path; the first tile requests start from an inline script before any app JavaScript has downloaded (cold, Fast 4G: image at about 1.0 s, was 1.3 s; Slow 4G: about 2.5 s, was 3.7 s; repeat visit: instant)
+- Airport lists, Statistics, Help and About load after the first image (or on first use); a query typed before the lists arrive waits and then shows results
+- Deploy now builds the site: one minified bundle with hashed names, inlined CSS, minified HTML; rebuilt daily so the schedule stays current
+- Service worker: small install-time precache (the big lists are not precached), stale-while-revalidate for pages and data so an update never causes a blank wait, tile cache fed with the first image's tiles
+- The Daily now follows the player's local calendar date (midnight rollover switches the tab to the new day without a reload); tiles come 3:1 from the faster Esri host
+
 ### v1.2.3 (zoom fit) - 2026-10-05
 - The airfield is now fitted on its runway endpoints with a 6% margin on every edge, never under the corner chips or the attribution pill, and a hard maximum fill of 78%; the zoom always rounds down (wider), so long diagonal runways no longer touch or leave the frame
 - One zoom per airport for everyone (`z` in the data: the smaller of the phone and desktop fits), so the Daily looks the same on every device; a frame smaller than the reference frames (for example with the keyboard open) only zooms out further
@@ -89,6 +96,16 @@ Newest first. The top entry is the current version (`js/version.js`); `tests/cha
 ### v1.0 (initial release) - 2026-10-04
 - Initial release
 
+## Build and deploy
+
+```bash
+npm install
+node scripts/build_site.mjs      # writes dist/: bundled + minified JS, inlined CSS, data/daily.json, sw.js
+AG_ROOT=dist node scripts/serve.mjs 8080   # serve the built site (the tests accept AG_ROOT=dist too)
+```
+
+`.github/workflows/deploy.yml` runs the build on every push to `main` **and every day at 00:07 UTC** and publishes `dist/`. The daily rebuild keeps `data/daily.json` (the next 14 days of Daily and Hard airports) and the entry inlined in `index.html` current. If scheduled runs stop (GitHub pauses them after 60 days without repository activity) the app still works: for a date missing from the schedule it computes the airport from the full lists, just more slowly.
+
 ## Run locally
 
 ```bash
@@ -103,6 +120,7 @@ Any static server works. A service worker only registers on `localhost` or HTTPS
 ```bash
 npm install                      # dev-only: Playwright + the vendored Leaflet source
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
+node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
 node tests/credits.mjs           # footer, attribution never covering the airfield, About & credits
 node tests/theme.mjs             # light/dark, live OS switching, no-flash, WCAG AA contrast, QA screenshots

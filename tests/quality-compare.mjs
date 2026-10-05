@@ -13,6 +13,7 @@ const BASE = `http://localhost:${server.address().port}/`;
 let browser;
 for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
 const page = await ctx.newPage();
 const tiles = [];
 page.on('response', (r) => { if (/World_Imagery\/MapServer\/tile\//.test(r.url())) tiles.push(r); });

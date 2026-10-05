@@ -44,6 +44,7 @@ No framework, no bundler and no fonts are shipped: the app is plain JavaScript, 
 
 ## Development tooling (not distributed with the app)
 
+- esbuild 0.28.2, MIT (git+https://github.com/evanw/esbuild.git)
 - playwright 1.63.0, Apache-2.0 (https://playwright.dev)
 - playwright-core 1.63.0, Apache-2.0 (https://playwright.dev)
 

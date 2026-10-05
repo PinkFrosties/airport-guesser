@@ -47,9 +47,10 @@ let browser;
 for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { browser = await chromium.launch(opts); break; } catch { /* next */ } }
 await test('footer and About & credits show the version', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   await page.goto(`http://localhost:${server.address().port}/`);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await page.waitForFunction(() => window.__ag);
   if (await page.locator('#dlg-help[open]').count()) await page.keyboard.press('Escape');
   assert.equal(await page.locator('#app-version').innerText(), 'v' + VERSION);
   await page.locator('#btn-about').click();

@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 import * as C from '../js/core.js';
+import { IMAGERY } from '../js/config.js';
+import * as TM from '../js/tilemath.js';
 
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8')).airports;
 const airports = read('airports.json');
@@ -36,6 +38,7 @@ const HUB = 3384, SMALL = 20403, REMOTE = 299738;
 // `sw: false` blocks service workers so page.route() sees every tile request (SW-initiated fetches bypass page.route)
 async function newPage(profile, { watch = true, sw = true } = {}) {
   const ctx = await browser.newContext({ ...profile, permissions: ['clipboard-read', 'clipboard-write'], serviceWorkers: sw ? 'allow' : 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   if (watch) {
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -51,7 +54,7 @@ async function ready(page) {
 }
 async function open(page) {
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
   if (await page.locator('#dlg-help[open]').count()) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
 }
 /** Start a practice round on a specific airport (test hook), wait for tiles. */
@@ -187,6 +190,7 @@ await test('native cap: when imagery is shallower than the fitted zoom, the airp
   const { ctx, page } = await newPage(PHONE);
   await open(page);
   // simulate a location whose real imagery ends at level 13 (data patched in memory only)
+  await start(page, 21); // loads the airport lists (they are no longer fetched before the first image)
   await page.evaluate((id) => { window.__ag.byId.get(id).nz = 13; }, HUB);
   await start(page, HUB);
   const s = await auditSharp(page);
@@ -310,7 +314,7 @@ await test('stalled tiles: retried once after the timeout, then a tap-to-retry s
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => { if (stall) { stalled++; return; } return route.continue(); });
   const t0 = Date.now();
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
   if (await page.locator('#dlg-help[open]').count()) await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#veil').hidden && !document.querySelector('#veil-retry').hidden, null, { timeout: 20000 });
   const took = Date.now() - t0;
@@ -344,6 +348,111 @@ await test('service worker caches tiles: a reload is served from the Cache API (
   await page.waitForFunction(() => window.__ag && window.__ag.round && (document.querySelector('#veil').hidden || document.querySelector('#veil').classList.contains('out')), null, { timeout: 20000 });
   const t = await page.evaluate(() => { const t = [...document.querySelectorAll('.sat.front img.leaflet-tile')]; return { n: t.length, ok: t.every((i) => i.classList.contains('leaflet-tile-loaded')) }; });
   assert.ok(t.n > 0 && t.ok, 'all tiles shown from the cache: ' + JSON.stringify(t));
+  await ctx.close();
+});
+
+await test('tile maths (used by the inline preloader) equals what Leaflet requests: same zoom, same shifted centre, same tiles, on phone and desktop', async () => {
+  for (const profile of [PHONE, DESKTOP]) {
+    const { ctx, page } = await newPage(profile);
+    await open(page);
+    await start(page, 21); // loads the lists
+    for (const id of [HUB, SMALL, REMOTE, by('KMG').id, by('SZX').id]) {
+      const a = await page.evaluate((i) => window.__ag.byId.get(i), id);
+      const pv = await page.evaluate((i) => { const g = window.__ag, p = g.viewParams(g.byId.get(i)); return { ...p, tiles: g.views.main.tilesFor(p.center, p.zMain), n: g.views.main.retinaLevels }; }, id);
+      const pill = pv.W < 520 ? C.REF_PHONE.pill : C.REF_DESKTOP.pill;
+      const z = C.finalZoom(a, pv.W, pv.H, pv.n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - pv.n, pill });
+      const center = TM.shiftedCenter(a.view[0], a.view[1], z, C.airfieldLift(pv.W, pv.H, pill, C.CHIPS_BOTTOM));
+      assert.equal(z, pv.zMain, a.name + ' zoom');
+      assert.ok(Math.abs(center[0] - pv.center[0]) < 1e-7 && Math.abs(center[1] - pv.center[1]) < 1e-7, a.name + ' centre ' + center + ' vs ' + pv.center);
+      assert.deepEqual(TM.tilesForView(IMAGERY, pv.n, center, z, pv.W, pv.H), pv.tiles, a.name + ' tiles');
+    }
+    await ctx.close();
+  }
+});
+
+await test('built site only: the inline preloader fetches exactly the first view\'s tiles before the app code runs, and no tile is downloaded twice', async () => {
+  const { ctx, page } = await newPage(PHONE, { sw: false });
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Network.enable');
+  const reqs = new Map();
+  cdp.on('Network.requestWillBeSent', (e) => { if (/World_Imagery\/MapServer\/tile\//.test(e.request.url)) reqs.set(e.requestId, { url: e.request.url, type: e.type, first: e.type === 'Fetch', wire: 0 }); });
+  cdp.on('Network.loadingFinished', (e) => { const r = reqs.get(e.requestId); if (r) r.wire = e.encodedDataLength; });
+  await open(page);
+  await ready(page);
+  await page.waitForTimeout(800);
+  const info = await page.evaluate(() => { const g = window.__ag, p = g.viewParams(g.round.answer); return { pre: window.__preloadedTiles ? window.__preloadedTiles.length : null, tiles: g.views.main.tilesFor(p.center, p.zMain) }; });
+  if (info.pre === null) { console.log('       (source tree: no inline preloader, nothing to check)'); await ctx.close(); return; }
+  assert.equal(info.pre, info.tiles.length, 'the preloader worked out the same tiles as the map');
+  const transferred = [...reqs.values()].filter((r) => r.wire > 1000); // a request answered from the HTTP cache transfers nothing
+  for (const u of info.tiles) {
+    const n = transferred.filter((r) => r.url === u).length;
+    assert.equal(n, 1, 'downloaded exactly once: ' + u);
+    assert.ok([...reqs.values()].some((r) => r.url === u && r.type === 'Fetch'), 'first requested by the inline preloader (fetch): ' + u);
+  }
+  await ctx.close();
+});
+
+await test('local-midnight rollover (New York clock): the tab switches to the new date\'s airport without reloading and without fetching the airport lists', async () => {
+  const ctx = await browser.newContext({ ...DESKTOP, serviceWorkers: 'block', timezoneId: 'America/New_York' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* */ } });
+  const page = await ctx.newPage();
+  const attempts = [];
+  await page.route('**/data/airports*.json', (route) => { attempts.push(route.request().url()); return route.abort(); });
+  let navs = 0;
+  page.on('framenavigated', () => navs++);
+  // 60 s before the New York midnight that starts today's UTC date (04:00Z in summer, 05:00Z in winter)
+  const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+  const utcMidnight = new Date(C.utcDateString() + 'T00:00:00Z').getTime();
+  const nyMidnight = [4, 5].map((h) => utcMidnight + h * 3600000).find((ms) => nyDate(new Date(ms - 1000)) !== nyDate(new Date(ms)));
+  await page.clock.install({ time: new Date(nyMidnight - 60000) });
+  await page.goto(BASE);
+  await page.waitForFunction(() => window.__ag && window.__ag.round && document.querySelector('#veil').hidden, null, { timeout: 60000 });
+  const before = await page.evaluate(() => ({ date: window.__ag.round.date, id: window.__ag.round.answer.id }));
+  const attemptsBefore = attempts.length;
+  await page.clock.fastForward(90000); // jump past local midnight (due timers fire once; nothing is in flight to time out)
+  await page.waitForFunction((d) => window.__ag.round && window.__ag.round.date && window.__ag.round.date !== d && document.querySelector('#veil').hidden, before.date, { timeout: 60000 });
+  const after = await page.evaluate(() => ({ date: window.__ag.round.date, id: window.__ag.round.answer.id }));
+  assert.equal(C.addDays(before.date, 1), after.date, 'moved to the next local date');
+  assert.equal(before.id, C.dailyTopOrder(topList, before.date)[0].id);
+  assert.equal(after.id, C.dailyTopOrder(topList, after.date)[0].id, 'the new date\'s airport, the same as for everyone on that date');
+  assert.equal(navs, 1, 'no reload (only the initial navigation)');
+  assert.equal(attempts.length, attemptsBefore, 'the rollover did not trigger any airport-list request');
+  await ctx.close();
+});
+
+await test('typing before the airport lists have arrived: the query waits ("Loading airports"), then results appear; the lists are not needed for the first image', async () => {
+  const { ctx, page } = await newPage(PHONE, { sw: false });
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const listRequests = [];
+  await page.route('**/data/airports*.json', async (route) => { listRequests.push({ url: route.request().url(), at: Date.now() }); await gate; await route.continue(); });
+  await page.goto(BASE);
+  await page.waitForFunction(() => window.__ag && window.__ag.round && document.querySelector('#veil').hidden, null, { timeout: 60000 }); // image is up while the lists are held back
+  const input = page.locator('#guess-input');
+  await input.fill('zur');
+  assert.match(await page.locator('#suggestions').innerText(), /Loading airports/i);
+  assert.equal(await page.locator('#suggestions li[role=option]').count(), 0);
+  release();
+  await page.waitForSelector('#suggestions li[role=option]', { timeout: 30000 });
+  assert.ok((await page.locator('#suggestions').innerText()).includes('Zürich'), 'results appear for the queued query');
+  assert.ok(listRequests.length >= 1, 'the lists were requested (on focus / after the image)');
+  await ctx.close();
+});
+
+await test('first paint: header, mode switches and the guess panel are there immediately and the image area shows the loading skeleton while JavaScript is still downloading', async () => {
+  const { ctx, page } = await newPage(PHONE, { sw: false, watch: false });
+  await page.route(/\/(assets|js)\/.*\.js$|leaflet.*\.js$/, async (route) => { await new Promise((r) => setTimeout(r, 4000)); await route.continue(); });
+  await page.goto(BASE, { waitUntil: 'commit' });
+  await page.waitForSelector('.brand', { timeout: 5000 });
+  await page.waitForTimeout(800); // still no app code
+  assert.equal(await page.evaluate(() => !!window.__ag), false, 'the app has not started yet');
+  const s = await page.evaluate(() => {
+    const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+    return { brand: vis('.brand'), modes: vis('#mode-seg'), input: vis('#guess-input'), guessBtn: vis('#guess-btn'), hard: vis('#hard-switch'), veil: vis('#veil'), veilText: document.querySelector('#veil-msg').textContent, spinner: getComputedStyle(document.querySelector('.spinner')).display !== 'none', bg: getComputedStyle(document.body).backgroundColor };
+  });
+  assert.deepEqual([s.brand, s.modes, s.input, s.guessBtn, s.hard, s.veil, s.spinner], [true, true, true, true, true, true, true], JSON.stringify(s));
+  assert.equal(s.veilText, 'Loading imagery');
+  await page.screenshot({ path: OUT + 'first-paint-before-js.png' });
   await ctx.close();
 });
 
@@ -567,7 +676,7 @@ await test('daily (default): one of the busiest airports, seeded cycle order, re
   const { ctx, page } = await newPage(DESKTOP);
   await open(page);
   await ready(page);
-  const today = C.utcDateString();
+  const today = C.localDateString();
   const order = C.dailyTopOrder(topList, today);
   const a = await answerOf(page);
   const idx = order.findIndex((x) => x.id === a.id);
@@ -635,7 +744,7 @@ await test('Hard mode: separate toggle, own daily from every airport outside the
   const a = await answerOf(page);
   assert.ok(!a.top, 'hard answer is not in the Daily top list: ' + a.name);
   assert.ok(hardPool.some((x) => x.id === a.id));
-  const order = C.dailyOrder(hardPool, C.utcDateString(), 'hard:');
+  const order = C.dailyOrder(hardPool, C.localDateString(), 'hard:');
   assert.ok(order.slice(0, 10).some((x) => x.id === a.id), 'seeded hard order');
   assert.notEqual(a.id, dailyAnswer.id);
   assert.equal(await page.locator('#hard-toggle').isChecked(), true);
@@ -665,7 +774,7 @@ await test('Hard mode: separate toggle, own daily from every airport outside the
   // share title names the mode
   await page.locator('#btn-share').click();
   const text = await page.evaluate(() => navigator.clipboard.readText());
-  assert.ok(text.startsWith('Airport Guesser \u2014 Hard Daily ' + C.utcDateString()), text);
+  assert.ok(text.startsWith('Airport Guesser \u2014 Hard Daily ' + C.localDateString()), text);
   // back to Daily: its own untouched game
   await page.locator('#hard-switch').click();
   await page.waitForFunction(() => !window.__ag.hard && window.__ag.round && window.__ag.round.kind === 'daily', null, { timeout: 60000 });
@@ -772,7 +881,7 @@ console.log('imagery failure and PWA');
 
 await test('daily deterministic fallback when imagery for the first candidate is unreachable', async () => {
   const { ctx, page } = await newPage(DESKTOP, { watch: false, sw: false });
-  const order = C.dailyTopOrder(topList, C.utcDateString());
+  const order = C.dailyTopOrder(topList, C.localDateString());
   // Block the centre tile of the first candidate at every level it might use
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => {
     const m = route.request().url().match(/tile\/(\d+)\/(\d+)\/(\d+)/);
@@ -814,7 +923,16 @@ await test('PWA: manifest valid, icons load, service worker registers, shell+bot
     const c = await caches.open(keys[0]);
     return (await c.keys()).map((r) => new URL(r.url).pathname);
   });
-  for (const p of ['/index.html', '/data/airports.json', '/data/airports-hard.json', '/js/app.js', '/vendor/leaflet/leaflet.js', '/css/style.css']) assert.ok(cached.includes(p), 'cached ' + p);
+  for (const p of ['/index.html', '/data/daily.json']) assert.ok(cached.includes(p), 'precached ' + p);
+  assert.ok(cached.some((p) => /\/js\/app\.js$|\/assets\/app-/.test(p)) && cached.some((p) => /leaflet/.test(p)), 'app bundle and Leaflet precached: ' + cached.join(' '));
+  const swSource = await (await page.request.get(BASE + 'sw.js')).text();
+  const shellList = swSource.match(/\/\*SHELL\*\/([\s\S]*?)\/\*END\*\//)[1];
+  assert.ok(!/airports/.test(shellList), 'the big airport lists are NOT in the install-time precache (they would compete with the first image)');
+  // the big lists are cached the first time they are fetched (in the background after the first image)
+  await page.waitForFunction(() => window.__ag.hardLoaded, null, { timeout: 60000 });
+  await page.waitForTimeout(500);
+  const later = await page.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys.filter((k) => /^airport-guesser-v\d/.test(k)).sort().pop()); return (await c.keys()).map((r) => new URL(r.url).pathname); });
+  for (const p of ['/data/airports.json', '/data/airports-hard.json']) assert.ok(later.includes(p), 'runtime-cached ' + p);
   const a = await answerOf(page);
   await guess(page, wrongPick(a, 1)[0].iata);
   await page.reload();

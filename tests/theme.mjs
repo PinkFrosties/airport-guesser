@@ -29,6 +29,7 @@ const test = async (name, fn) => {
 
 async function newPage(profile, { colorScheme, pref, sw = false } = {}) {
   const ctx = await browser.newContext({ ...profile, colorScheme, serviceWorkers: sw ? 'allow' : 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -124,9 +125,12 @@ const shot = async (page, name, { full = false } = {}) => { const p = OUT + name
 async function walkthrough(theme) {
   const { ctx, page, errors } = await newPage(PHONE, { colorScheme: theme });
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
-  await page.waitForSelector('dialog[open]');
-  await audit(page, 'help dialog (about & credits)', theme);
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
+  await settled(page); // the first image is up before we look at dialogs (the skeleton is not under test here)
+  await page.waitForFunction(() => document.querySelector('#veil').hidden); // fade finished
+  await page.locator('#btn-help').click();
+  await page.waitForSelector('#dlg-help[open]');
+  await audit(page, 'help dialog', theme);
   await shot(page, `${theme}-help`);
   await page.keyboard.press('Escape');
   await page.locator('#btn-about').scrollIntoViewIfNeeded();
@@ -212,14 +216,14 @@ await test('contrast audit covered the key components in both themes', async () 
 await test('follows the OS setting; tokens, color-scheme and browser-bar colour change per theme', async () => {
   const { ctx, page } = await newPage(PHONE, { colorScheme: 'light' });
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await page.waitForFunction(() => window.__ag);
   const light = await themeOf(page);
   assert.deepEqual([light.theme, light.pref, light.scheme, light.meta, light.bg], ['light', 'system', 'light', '#f5f5f7', 'rgb(245, 245, 247)']);
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card').trim()), '#ffffff');
   await ctx.close();
   const d = await newPage(PHONE, { colorScheme: 'dark' });
   await d.page.goto(BASE);
-  await d.page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await d.page.waitForFunction(() => window.__ag);
   const dark = await themeOf(d.page);
   assert.deepEqual([dark.theme, dark.pref, dark.scheme, dark.meta, dark.bg], ['dark', 'system', 'dark', '#000000', 'rgb(0, 0, 0)']);
   assert.equal(await d.page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card').trim()), '#1c1c1e');
@@ -229,7 +233,7 @@ await test('follows the OS setting; tokens, color-scheme and browser-bar colour 
 await test('System mode reacts live when the OS setting changes (no reload)', async () => {
   const { ctx, page } = await newPage(PHONE, { colorScheme: 'light' });
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await page.waitForFunction(() => window.__ag);
   await page.evaluate(() => { window.__marker = 'same-document'; });
   assert.equal((await themeOf(page)).theme, 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -246,7 +250,7 @@ await test('System mode reacts live when the OS setting changes (no reload)', as
 await test('manual switch (System / Light / Dark) overrides the OS, persists across reloads, and System follows the OS again', async () => {
   const { ctx, page } = await newPage(PHONE, { colorScheme: 'light' });
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await page.waitForFunction(() => window.__ag);
   if (await page.locator('dialog[open]').count()) await page.keyboard.press('Escape');
   const pressed = () => page.$$eval('#theme-seg button', (b) => b.filter((x) => x.getAttribute('aria-pressed') === 'true').map((x) => x.dataset.themePref));
   assert.deepEqual(await pressed(), ['system']);
@@ -258,7 +262,7 @@ await test('manual switch (System / Light / Dark) overrides the OS, persists acr
   assert.equal((await themeOf(page)).theme, 'dark', 'OS changes are ignored while a manual choice is set');
   await page.screenshot({ path: OUT + 'override-dark-on-light-os.png' });
   await page.reload();
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await page.waitForFunction(() => window.__ag);
   assert.deepEqual([(await themeOf(page)).theme, await pressed()], ['dark', ['dark']], 'persisted');
   await page.locator('#theme-seg [data-theme-pref=light]').click();
   assert.equal((await themeOf(page)).theme, 'light');
@@ -293,7 +297,7 @@ async function frames(profile, opts) {
   cdp.on('Page.screencastFrame', (f) => { shots.push(f.data); cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {}); });
   await page.goto(BASE, { waitUntil: 'commit' }); // frames of the previous blank page are not part of the app's load
   await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
   await page.waitForTimeout(400);
   await cdp.send('Page.stopScreencast');
   const scorer = await ctx.newPage();
@@ -329,7 +333,7 @@ await test('QA screenshots: 390px and desktop, light and dark, plus overrides', 
   for (const [theme, profile, name] of [['light', PHONE, 'phone'], ['dark', PHONE, 'phone'], ['light', DESKTOP, 'desktop'], ['dark', DESKTOP, 'desktop']]) {
     const { ctx, page } = await newPage(profile, { colorScheme: theme });
     await page.goto(BASE);
-    await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+    await page.waitForFunction(() => window.__ag);
     await page.keyboard.press('Escape');
     await page.evaluate((id) => window.__ag.debugStart(id), HUB);
     await settled(page);
@@ -343,7 +347,7 @@ await test('QA screenshots: 390px and desktop, light and dark, plus overrides', 
   }
   const o = await newPage(PHONE, { colorScheme: 'light', pref: 'dark' }); // switch set against the OS setting
   await o.page.goto(BASE);
-  await o.page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await o.page.waitForFunction(() => window.__ag);
   await o.page.keyboard.press('Escape');
   await o.page.evaluate((id) => window.__ag.debugStart(id), HUB);
   await settled(o.page);
@@ -352,7 +356,7 @@ await test('QA screenshots: 390px and desktop, light and dark, plus overrides', 
   await o.ctx.close();
   const p = await newPage(DESKTOP, { colorScheme: 'dark', pref: 'light' });
   await p.page.goto(BASE);
-  await p.page.waitForFunction(() => window.__ag && window.__ag.main.length > 0);
+  await p.page.waitForFunction(() => window.__ag);
   await p.page.keyboard.press('Escape');
   await p.page.evaluate((id) => window.__ag.debugStart(id), HUB);
   await settled(p.page);

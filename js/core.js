@@ -144,6 +144,12 @@ export function addDays(dateStr, n) {
 export const msUntilNextUtcDay = (now = new Date()) =>
   Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime();
 
+// The Daily follows the player's LOCAL calendar date: everyone with the same date on their clock gets the same airport.
+const pad2 = (n) => String(n).padStart(2, '0');
+export const localDateString = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** Milliseconds until the next local midnight (correct across DST changes: the Date constructor does the calendar maths). */
+export const msUntilNextLocalDay = (now = new Date()) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+
 /** Deterministic ordering of `pool` for a UTC date. Element 0 is the airport of the day; later elements are
  *  the fallback order if imagery for earlier ones is unusable. `salt` gives each pool its own daily. */
 export function dailyOrder(pool, dateStr, salt = '') {

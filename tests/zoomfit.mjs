@@ -37,9 +37,10 @@ const report = [];
 const problems = [];
 for (const [pname, profile] of PROFILES) {
   const ctx = await browser.newContext({ ...profile, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
   if (await page.locator('#dlg-help[open]').count()) await page.keyboard.press('Escape');
   await page.evaluate(() => window.__ag.debugStart(21)); // loads the Hard data
   await page.waitForFunction(() => window.__ag.round && document.querySelector('#veil').hidden, null, { timeout: 60000 });

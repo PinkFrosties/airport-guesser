@@ -22,6 +22,7 @@ for (const opts of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) { try { b
 // service workers are blocked for the throttled first-visit measurements (SW fetches are not throttled by page-level emulation)
 async function freshPage({ throttleFromStart = false, sw = false } = {}) {
   const ctx = await browser.newContext({ ...PHONE, serviceWorkers: sw ? 'allow' : 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Network.enable');

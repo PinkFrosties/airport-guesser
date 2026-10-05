@@ -30,6 +30,7 @@ const test = async (name, fn) => {
 };
 async function newPage(profile, colorScheme = 'light') {
   const ctx = await browser.newContext({ ...profile, colorScheme, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } }); // the first-run help dialog opens after the first image; tests do not want it
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -37,7 +38,7 @@ async function newPage(profile, colorScheme = 'light') {
 }
 async function open(page) {
   await page.goto(BASE);
-  await page.waitForFunction(() => window.__ag && window.__ag.main.length > 0, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__ag, null, { timeout: 30000 });
   if (await page.locator('#dlg-help[open]').count()) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
 }
 const settled = (page) => page.waitForFunction(() => window.__ag.round && (document.querySelector('#veil').hidden || document.querySelector('#veil').classList.contains('out')) && document.querySelectorAll('.sat.front img.leaflet-tile-loaded').length > 0, null, { timeout: 60000 });
@@ -177,7 +178,7 @@ for (const [scheme, profile, name] of [['light', PHONE, 'phone'], ['dark', PHONE
 
 await test('nothing is credited that the code does not use; everything that is used is credited', async () => {
   const about = read('index.html').match(/<dialog id="dlg-about"[\s\S]*?<\/dialog>/)[0];
-  const code = read('js/app.js') + read('js/config.js') + read('js/satview.js') + read('css/style.css') + read('index.html');
+  const code = read('js/app.js') + read('js/extras.js') + read('js/config.js') + read('js/satview.js') + read('css/style.css') + read('index.html');
   // used -> credited
   assert.ok(/arcgisonline\.com/.test(code) && /Esri/.test(about), 'imagery');
   assert.ok(/data\/airports\.json/.test(code) && /OurAirports/.test(about), 'airport data');

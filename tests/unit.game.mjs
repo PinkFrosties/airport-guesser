@@ -75,7 +75,7 @@ test('Daily: every airport once per cycle, reshuffled each cycle, and never twic
   assert.equal(C.dailyTopOrder(topList, '2027-03-09')[0].id, C.dailyTopOrder([...topList].reverse(), '2027-03-09')[0].id);
 });
 test('Daily simulation: 30 consecutive days from today are all distinct and all in the list', () => {
-  const start = C.utcDateString();
+  const start = C.localDateString();
   const days = Array.from({ length: 30 }, (_, i) => C.dailyTopOrder(topList, C.addDays(start, i))[0]);
   const ids = new Set(days.map((x) => x.id));
   assert.equal(ids.size, 30, 'no repeats in 30 days');
@@ -104,6 +104,66 @@ test('practice sets', () => {
   assert.ok(n('medium') > 500 && n('hard') > 1000);
   assert.ok(C.practiceOrder(airports, 'hard').every((a) => a.type === 'medium'));
   assert.equal(C.practiceOrder(hard, null).length, hard.length);
+});
+
+console.log('daily schedule (build) and local dates');
+const { buildDaily, inlineSubset } = await import('../scripts/daily_build.mjs');
+const { execFileSync } = await import('node:child_process');
+const schedule = buildDaily({ root: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), now: new Date('2026-10-05T12:00:00Z') });
+test('schedule: dates cover yesterday..+14 days, 3 candidates per kind, entries are complete records equal to the full data', () => {
+  const dates = Object.keys(schedule.days);
+  assert.equal(schedule.from, '2026-10-04');
+  assert.equal(schedule.to, '2026-10-19');
+  assert.equal(dates.length, 16);
+  assert.ok(schedule.meta && /^\d{4}-\d{2}-\d{2}$/.test(schedule.meta.ourairports_retrieved), 'data date travels with the schedule');
+  const byId = new Map([...airports, ...hard].map((a) => [a.id, a]));
+  for (const d of dates) {
+    for (const kind of ['daily', 'hard']) {
+      const e = schedule.days[d][kind];
+      assert.equal(e.length, 3);
+      assert.equal(new Set(e.map((x) => x.id)).size, 3, 'distinct fallbacks');
+      for (const x of e) {
+        const full = byId.get(x.id);
+        for (const k of Object.keys(x)) assert.deepEqual(x[k], full[k], d + ' ' + kind + ' ' + x.name + ' ' + k);
+        for (const k of ['id', 'name', 'lat', 'lon', 'view', 'z', 'nz', 'rw', 'continent', 'country', 'type']) assert.ok(x[k] !== undefined, 'has ' + k);
+      }
+    }
+    assert.ok(schedule.days[d].daily.every((x) => x.top >= 1), 'Daily entries are top-list airports');
+    assert.ok(schedule.days[d].hard.every((x) => !x.top), 'Hard entries are outside the top list');
+  }
+});
+test('schedule equals what the app computes from the full lists (so the inlined entry is the same answer)', () => {
+  const day = schedule.days['2026-10-06'];
+  assert.deepEqual(day.daily.map((x) => x.id), C.dailyTopOrder(topList, '2026-10-06').slice(0, 3).map((x) => x.id));
+  assert.deepEqual(day.hard.map((x) => x.id), C.dailyOrder(hardPool, '2026-10-06', 'hard:').slice(0, 3).map((x) => x.id));
+});
+test('inlined subset: yesterday, today, tomorrow (UTC) only, small enough to inline', () => {
+  const sub = inlineSubset(schedule, new Date('2026-10-05T12:00:00Z'));
+  assert.deepEqual(Object.keys(sub.days), ['2026-10-04', '2026-10-05', '2026-10-06']);
+  assert.ok(JSON.stringify(sub).length < 12000, 'inline size ' + JSON.stringify(sub).length);
+  assert.ok(JSON.stringify(schedule).length < 60000, 'daily.json size');
+});
+test('local date helpers across time zones and DST (run in separate processes with TZ set)', () => {
+  const run = (tz, code) => execFileSync(process.execPath, ['--input-type=module', '-e', "import * as C from '" + new URL('../js/core.js', import.meta.url).href + "';" + code], { env: { ...process.env, TZ: tz } }).toString().trim();
+  // 23:30 local on 5 Oct is still 5 Oct locally even though it is already 6 Oct in UTC (New York, UTC-4)
+  assert.equal(run('America/New_York', "console.log(C.localDateString(new Date('2026-10-06T03:30:00Z')))"), '2026-10-05');
+  // 00:30 local on 6 Oct in Auckland (UTC+13) is 5 Oct in UTC
+  assert.equal(run('Pacific/Auckland', "console.log(C.localDateString(new Date('2026-10-05T11:30:00Z')))"), '2026-10-06');
+  // everyone with the same local date gets the same airport: the date string is the only input
+  assert.equal(run('Asia/Tokyo', "console.log(C.localDateString(new Date(2026, 9, 5, 0, 1)))"), run('America/Los_Angeles', "console.log(C.localDateString(new Date(2026, 9, 5, 23, 59)))"));
+  // hours to the next local midnight on DST days: 23-hour day (spring forward) and 25-hour day (fall back)
+  const h = (tz, y, m, d) => Number(run(tz, "console.log(C.msUntilNextLocalDay(new Date(" + y + ", " + m + ", " + d + ", 0, 30)) / 3600000)"));
+  assert.equal(h('America/New_York', 2026, 2, 8), 22.5, 'spring forward day');
+  assert.equal(h('America/New_York', 2026, 10, 1), 24.5, 'fall back day');
+  assert.equal(h('Europe/Zurich', 2026, 2, 29), 22.5);
+  assert.equal(h('Asia/Tokyo', 2026, 5, 15), 23.5, 'no DST');
+  // the schedule window (UTC date +-1) always contains the local date of every time zone
+  for (const tz of ['Pacific/Kiritimati', 'Pacific/Pago_Pago', 'America/Los_Angeles', 'Asia/Kolkata', 'Pacific/Auckland']) {
+    for (const iso of ['2026-10-05T00:00:00Z', '2026-10-05T12:00:00Z', '2026-10-05T23:59:00Z']) {
+      const local = run(tz, "console.log(C.localDateString(new Date('" + iso + "')))");
+      assert.ok(Object.keys(inlineSubset(schedule, new Date(iso)).days).includes(local), tz + ' ' + iso + ' -> ' + local);
+    }
+  }
 });
 
 console.log('locked view: zoom fitting and image quality');

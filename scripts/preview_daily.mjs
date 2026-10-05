@@ -15,7 +15,7 @@ for (const r of ranking.airports) {
   const a = top.find((x) => x.top === r.rank);
   console.log(`${String(r.rank).padStart(4)}  ${a.iata}   ${a.icao}  ${String(r.passengers).padStart(11)}  ${a.name} (${a.city || r.city}, ${a.country})`);
 }
-const start = C.utcDateString();
+const start = C.localDateString();
 const seq = Array.from({ length: days }, (_, i) => ({ date: C.addDays(start, i), a: C.dailyTopOrder(top, C.addDays(start, i))[0] }));
 console.log(`\nNext ${days} days:`);
 console.log(seq.map((s, i) => `${String(i + 1).padStart(2)} ${s.date} #${String(s.a.top).padStart(2)} ${s.a.iata}`).join('\n'));
