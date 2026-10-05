@@ -40,6 +40,15 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
 
+### v1.2.6 (audit fixes) - 2026-10-05
+- Full audit: game logic, schedule, data, layout, failures, performance, accessibility, security
+- Touch targets: the mode and theme switches and the About link now have a 44 px hit area (same look)
+- A wrong guess can no longer show "0 km / 100%" when two airports share coordinates
+- Airport names with doubled spaces cleaned up
+- About states that map tile requests send the player's IP address to Esri (no accounts, analytics or cookies)
+- Opt-in Content-Security-Policy build (`AG_CSP=1 node scripts/build_site.mjs`), tested with 0 violations, not enabled by default
+- New tests: touch targets, wrong-guess floor, 5-year Daily schedule, local-date/DST handling (run in four time zones), hostile search input
+
 ### v1.2.5 (wikipedia link) - 2026-10-05
 - The result card (win or lose; Daily, Hard and Practice) has a "Read about <airport> on Wikipedia" row with an external-link icon: new tab, `rel="noopener noreferrer"`, 48 px tall, both themes, long names wrap
 - Nothing about the article exists before the round ends: no link, title or Wikipedia text in the DOM, alt text or hint area, and no prefetch; the previous round's result card is emptied when a new round starts
@@ -128,6 +137,8 @@ npm install                      # dev-only: Playwright + the vendored Leaflet s
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
+node tests/targets.mjs           # every control has a 44 px touch target
+node tests/wikipedia.mjs         # Wikipedia link: never before the game ends, correct and safe after it
 node tests/credits.mjs           # footer, attribution never covering the airfield, About & credits
 node tests/theme.mjs             # light/dark, live OS switching, no-flash, WCAG AA contrast, QA screenshots
 node tests/e2e.mjs               # headless Playwright: phone 390x844 and desktop 1280x800 (needs network for Esri tiles)

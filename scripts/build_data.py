@@ -284,7 +284,7 @@ def main():
             continue
         kept.append({
             "id": int(r["id"]),
-            "name": r["name"].strip(),
+            "name": " ".join(r["name"].split()),
             "iata": r["iata_code"].strip().upper(),
             "icao": (r["icao_code"] or r["ident"]).strip().upper(),
             "lat": round(lat, 5),
@@ -383,7 +383,7 @@ def main():
             continue
         a = {
             "id": aid,
-            "name": r["name"].strip(),
+            "name": " ".join(r["name"].split()),
             "iata": r["iata_code"].strip().upper(),
             "icao": (r["icao_code"] or r["ident"]).strip().upper(),
             "lat": round(lat, 5),

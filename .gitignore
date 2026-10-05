@@ -4,3 +4,7 @@ scripts/.cache/
 test-output/
 
 dist
+
+# private audit notes and evidence (kept local)
+AUDIT.md
+qa/audit/

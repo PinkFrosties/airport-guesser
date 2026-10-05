@@ -41,10 +41,11 @@ export function evaluateGuess(g, a) {
   return {
     id: g.id,
     correct,
-    km: Math.round(km),
+    // a wrong guess is never shown as "0 km / 100%" (two different airports can share coordinates in the source data)
+    km: correct ? 0 : Math.max(1, Math.round(km)),
     bearing,
     dir: compassLabel(bearing),
-    pct: correct ? 100 : proximityPct(km),
+    pct: correct ? 100 : Math.min(99, proximityPct(km)),
   };
 }
 

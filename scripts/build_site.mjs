@@ -59,6 +59,19 @@ sub(/<link rel="modulepreload" href="js\/app\.js">\s*/, () => `<link rel="module
 html = html.replace(/<link rel="modulepreload" href="js\/[^"]*">\s*/g, ''); // the other modules are inside the bundle
 sub(/<script src="vendor\/leaflet\/leaflet\.js"><\/script>\s*<script type="module" src="js\/app\.js"><\/script>/, `<script>${preloadJs}</script>\n<script defer src="${leafletFile}"></script>\n<script type="module" src="${appFile}"></script>`, 'scripts');
 html = html.replace(/<!--(?!\[)[\s\S]*?-->/g, '').replace(/\n\s+/g, '\n').replace(/\n{2,}/g, '\n').trim() + '\n';
+// Opt-in Content-Security-Policy (proposal, tested; not enabled): AG_CSP=1 node scripts/build_site.mjs. Inline scripts are allowed by hash only.
+if (process.env.AG_CSP) {
+  const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => "'sha256-" + createHash('sha256').update(m[1]).digest('base64') + "'");
+  const csp = [
+    "default-src 'none'",
+    "script-src 'self' " + hashes.join(' '),
+    "style-src 'self' 'unsafe-inline'", // inline <style> and style="" attributes (Leaflet positions tiles with inline styles)
+    "img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com",
+    "connect-src 'self' https://services.arcgisonline.com https://server.arcgisonline.com",
+    "manifest-src 'self'", "worker-src 'self'", "font-src 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'none'",
+  ].join('; ');
+  html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="' + csp + '">');
+}
 writeFileSync(join(dist, 'index.html'), html);
 
 // ---- static files

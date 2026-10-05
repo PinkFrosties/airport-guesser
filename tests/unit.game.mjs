@@ -308,6 +308,48 @@ test('isWikipediaUrl rejects anything that is not https + *.wikipedia.org (look-
   assert.equal(C.isWikipediaUrl('https://de.wikipedia.org/wiki/Flughafen_Z%C3%BCrich'), true);
 });
 
+console.log('audit regressions (v1.2.6)');
+test('a wrong guess is never shown as 0 km / 100% (different airports can share coordinates)', () => {
+  const r = C.evaluateGuess({ id: 1, lat: -34.16917, lon: -71.53111 }, { id: 2, lat: -34.16917, lon: -71.53111 });
+  assert.equal(r.correct, false); assert.ok(r.km >= 1 && r.pct <= 99, JSON.stringify(r));
+  const ok = C.evaluateGuess({ id: 2, lat: 1, lon: 1 }, { id: 2, lat: 1, lon: 1 });
+  assert.equal(ok.km, 0); assert.equal(ok.pct, 100);
+});
+test('distance edge cases: antimeridian, poles, antipodes stay finite and sensible', () => {
+  const e = (a, b, c, d) => C.evaluateGuess({ id: 1, lat: a, lon: b }, { id: 2, lat: c, lon: d });
+  assert.ok(e(0, 179.9, 0, -179.9).km < 30 && e(0, 179.9, 0, -179.9).dir === 'E');
+  assert.ok(e(0, 0, 0, 180).km > 20000 && e(0, 0, 0, 180).pct === 0);
+  for (const r of [e(89.99, 0, 89.99, 180), e(-89, 0, -89, 90), e(0, 0, 0, 180)]) assert.ok(Number.isFinite(r.km) && Number.isFinite(r.bearing) && r.pct >= 0 && r.pct <= 99);
+});
+test('airport names have no leading, trailing or doubled whitespace', () => {
+  const bad = [...airports, ...hard].filter((a) => a.name !== a.name.trim() || /\s{2,}/.test(a.name));
+  assert.deepEqual(bad.map((a) => a.name), []);
+});
+test('Daily over five years: every airport once per cycle, never twice within 30 days (also across cycles), identical for any input order', () => {
+  const dates = Array.from({ length: 365 * 5 }, (_, i) => C.addDays('2026-01-01', i));
+  const ids = dates.map((d) => C.dailyTopOrder(topList, d)[0].id);
+  assert.equal(new Set(ids.slice(0, 50)).size, 50);
+  const last = new Map();
+  ids.forEach((id, i) => { if (last.has(id)) assert.ok(i - last.get(id) >= 30, 'repeat after ' + (i - last.get(id)) + ' days'); last.set(id, i); });
+  for (const d of dates.slice(0, 80)) assert.equal(C.dailyTopOrder([...topList].reverse(), d)[0].id, C.dailyTopOrder(topList, d)[0].id);
+});
+test('local calendar dates: no skipped or repeated day across the year, midnight countdown positive and < 25 h every day (DST)', () => {
+  let prev = null;
+  for (let t = Date.parse('2026-01-01T00:00:00Z'); t < Date.parse('2027-01-02T00:00:00Z'); t += 15 * 60e3) {
+    const s = C.localDateString(new Date(t));
+    if (prev && s !== prev) assert.equal(C.addDays(prev, 1), s);
+    prev = s;
+  }
+  for (let i = 0; i < 800; i++) { const ms = C.msUntilNextLocalDay(new Date(2026, 0, 1 + i, 12, 0, 0)); assert.ok(ms > 0 && ms <= 25 * 3600e3); }
+  assert.equal(C.localDateString(new Date(2026, 11, 31, 23, 59, 59)), '2026-12-31');
+  assert.equal(C.localDateString(new Date(2027, 0, 1, 0, 0, 0)), '2027-01-01');
+});
+test('search tolerates hostile and odd input (regex characters, HTML, huge strings, __proto__)', () => {
+  const idx = C.prepareIndex(airports);
+  for (const q of ['', '   ', '.*', '(', '\\', '<img src=x onerror=alert(1)>', '✈️', 'a'.repeat(5000), '__proto__', 'constructor', '北京']) assert.ok(Array.isArray(C.search(idx, q)), q);
+  assert.equal(C.search(idx, 'zürich')[0].iata, 'ZRH');
+});
+
 console.log('hints and attempts');
 test('hint values', () => {
   const z = byIata('ZRH');

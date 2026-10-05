@@ -60,6 +60,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .modebar{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;padding:6px 0 16px}
 .seg{display:inline-flex;background:var(--fill-2);border-radius:12px;padding:3px;gap:2px}
 .seg button{background:none;border:0;border-radius:9px;padding:0 20px;min-height:40px;color:var(--text);font-weight:500;transition:background .25s var(--ease),box-shadow .25s,color .25s}
+.seg button{position:relative}
+.seg button::after{content:'';position:absolute;left:0;right:0;top:50%;height:max(100%,44px);transform:translateY(-50%)} /* 44pt touch target, same look */
 .seg button[aria-pressed="true"]{background:var(--seg-thumb);box-shadow:var(--seg-shadow)}
 .seg-sm button{padding:0 14px;min-height:36px;font-size:15px}
 .switch{display:inline-flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;user-select:none;position:relative}
@@ -223,7 +225,7 @@ dialog[open]{animation:rise .3s var(--ease)}
 .foot{margin-top:28px;color:var(--muted);font-size:13px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
 .foot .seg-sm button{min-height:34px;font-size:14px;padding:0 14px}
 .foot-line{margin:0}
-.link-inline{background:none;border:0;padding:12px 6px;margin:-12px 0;color:var(--accent-text);font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.link-inline{background:none;border:0;padding:12px 6px;margin:-12px 0;min-height:44px;color:var(--accent-text);font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 .prose a{color:var(--accent-text);text-underline-offset:2px}
 .prose i{color:var(--text)}
 .prose .muted{color:var(--muted)}
