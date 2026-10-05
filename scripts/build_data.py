@@ -423,7 +423,24 @@ def main():
         a["z"] = base_zoom(a)
     if "--verify" in sys.argv:
         verify_tilemap(kept + hard)
+    # ---- Wikipedia article titles (scripts/wikipedia_links.py: validated at build time; the app builds the URL itself)
+    wp_path = os.path.join(CACHE, "wp_links.json")
+    if os.path.exists(wp_path):
+        with open(wp_path, encoding="utf-8") as f:
+            links = json.load(f)
+        n_wp = Counter()
+        for a in kept + hard:
+            link = links.get(str(a["id"]))
+            if link:
+                a["wp"] = link["wp"]
+                n_wp[link["src"]] += 1
+        print("wikipedia titles attached: %s of %d airports (the rest use a Wikipedia search link in the app)" % (dict(n_wp), len(kept) + len(hard)))
+    else:
+        print("WARNING: scripts/.cache/wp_links.json missing (run scripts/wikipedia_links.py); no Wikipedia titles written")
     mark_top_airports(kept)
+    missing_wp = [a["iata"] for a in kept if a.get("top") and not a.get("wp")]
+    if missing_wp:
+        raise SystemExit("top airports without a verified Wikipedia article: %s" % missing_wp)
     kept, n_daily_before, daily_dropped = quality_filter(kept, "Daily")
     hard, n_hard_before, hard_dropped = quality_filter(hard, "Hard")
     top_ids &= {a["id"] for a in kept}

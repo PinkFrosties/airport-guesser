@@ -56,6 +56,7 @@ Used only for the test scripts and to generate icons.
 
 - **Esri World Imagery** (map tiles; the build also queries the tile availability service). Used under Esri's terms, with the required attribution shown on every image. https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9
 - **OurAirports** airport, runway and country data (airports.csv, runways.csv, countries.csv). Public domain. https://ourairports.com/data/
+- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
 - **OpenFlights** route data (routes.dat), used only at build time to order the Practice "Top 100" set. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
 
 ## Disclaimer

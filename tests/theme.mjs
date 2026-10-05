@@ -78,7 +78,7 @@ const AUDIT = () => {
     '#guess-input', '#guess-btn', '.btn.ghost', '.cost', '#suggestions .s-name', '#suggestions .s-meta', '#suggestions .s-meta b', '#suggestions mark', '.noresults',
     '.sheet h4', '.sheet p', '.sheet .opt', '.sheet .opt small', '.sheet .cancel', '.sheet .btn', '.sheet .btn.primary',
     '.hints-used h3', '.hints-used li span', '.hints-used li b', '.row .n', '.row .nm', '.row .code', '.row .nums b', '.row .nums > span:not(.bar)', '.row .dir span',
-    '.result .eyebrow', '.result h2', '.result .codes', '.result .where', '.result .next', '.result .next b', '.result .btn',
+    '.result .eyebrow', '.result h2', '.result .codes', '.result .where', '.result .next', '.result .next b', '.result .btn', '.result .wiki', '.result .wiki b',
     '#toast.show', '.veil p', '.veil small', '#veil-retry', '.chip', '.leaflet-control-attribution', '.leaflet-control-attribution a',
     'dialog[open] .dlg-head h2', 'dialog[open] .link', 'dialog[open] .prose p', 'dialog[open] .prose li', 'dialog[open] .prose h3', 'dialog[open] .prose b',
     '.tile b', '.tile span', '.drow', '.drow .fill', 'dialog[open] .seg button'];

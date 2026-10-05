@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import * as C from '../js/core.js';
 
 /** Fields the app needs for an answer (everything the full record has except nothing optional is left out). */
-const FIELDS = ['id', 'name', 'iata', 'icao', 'lat', 'lon', 'country', 'countryCode', 'continent', 'city', 'type', 'tier', 'rw', 'view', 'z', 'nz', 'top'];
+const FIELDS = ['id', 'name', 'iata', 'icao', 'lat', 'lon', 'country', 'countryCode', 'continent', 'city', 'type', 'tier', 'rw', 'view', 'z', 'nz', 'top', 'wp'];
 const slim = (a) => Object.fromEntries(FIELDS.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
 
 export function loadPools(root) {

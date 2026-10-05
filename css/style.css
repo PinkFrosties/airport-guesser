@@ -183,6 +183,13 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .result .codes{margin:10px 0 2px;font:600 15px/1 var(--mono);color:var(--accent-text)}
 .result .codes span{color:var(--muted);font-weight:400}
 .result .where{margin:6px 0 0;color:var(--muted)}
+.wiki{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;min-height:48px;padding:10px 14px 10px 16px;border-radius:var(--r-md);background:var(--fill);color:var(--accent-text);text-decoration:none;font-weight:500;line-height:1.3;transition:background .2s,transform .1s}
+.wiki:hover{background:var(--fill-2)}
+.wiki:active{transform:scale(.99)}
+.wiki-text{min-width:0;overflow-wrap:anywhere}
+.wiki-text b{font-weight:600}
+.wiki svg{flex:none;width:18px;height:18px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .result .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .result .next{margin:14px 0 0;font-size:14px;color:var(--muted)}
 .result .next b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}

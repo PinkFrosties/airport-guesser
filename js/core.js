@@ -109,6 +109,26 @@ export function suggestionLabel(a) {
   return `${a.name} · ${a.iata || a.icao} · ${a.city ? a.city + ', ' : ''}${a.countryCode}`;
 }
 
+// ---------- Wikipedia link: shown only on the result card, after the game has ended ----------
+// The data stores only the article title in `wp` ("Zurich_Airport", or "de|Flughafen_Zürich" for another language);
+// the URL is built here. Airports without a verified article get a Wikipedia SEARCH link built from their name
+// (never a guessed article URL). The app itself never requests anything from Wikipedia.
+const encodeTitle = (t) => encodeURIComponent(t).replace(/%28/g, '(').replace(/%29/g, ')').replace(/%2C/g, ',').replace(/%3A/g, ':').replace(/%27/g, "'").replace(/%2F/g, '/');
+export function parseWp(wp) {
+  const i = wp.indexOf('|');
+  return i > 0 ? { lang: wp.slice(0, i), title: wp.slice(i + 1) } : { lang: 'en', title: wp };
+}
+/** { kind: 'article' | 'search', url } for an airport record. */
+export function wikipediaLink(a) {
+  if (a.wp) {
+    const { lang, title } = parseWp(a.wp);
+    return { kind: 'article', url: `https://${lang}.wikipedia.org/wiki/${encodeTitle(title)}` };
+  }
+  return { kind: 'search', url: `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(a.name)}` };
+}
+/** Safety rule used by tests and the build: https, a wikipedia.org host, an article path or a search. */
+export const isWikipediaUrl = (u) => /^https:\/\/[a-z-]+\.wikipedia\.org\/(wiki\/[^\s?#]+|w\/index\.php\?search=[^\s&#]+)$/.test(u);
+
 // ---------- seeded RNG / daily ----------
 export function hashSeed(str) {
   // xmur3

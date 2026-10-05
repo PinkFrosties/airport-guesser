@@ -343,6 +343,7 @@ async function startMode() {
 
 /** Test hook: start a practice round on a specific airport (the data is client-side anyway). */
 game.viewParams = (a) => viewParams(a); // test hook
+game.wikiRow = wikiRow; // test hook
 game.debugStart = async (id) => {
   const token = ++game.token;
   closeSheet(); clearSelection(); closeList();
@@ -527,10 +528,18 @@ function renderAll(animateLast = false) {
   renderResult();
 }
 
+// The Wikipedia link exists in the DOM only here, on the result card (game over): never during play, never prefetched.
+const externalIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+function wikiRow(a) {
+  const { kind, url } = C.wikipediaLink(a);
+  const label = kind === 'article' ? `Read about <b>${esc(a.name)}</b> on Wikipedia` : `Search Wikipedia for <b>${esc(a.name)}</b>`;
+  return `<a class="wiki" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><span class="wiki-text">${label}</span>${externalIcon}<span class="sr">(opens Wikipedia in a new tab)</span></a>`;
+}
+
 function renderResult() {
   const r = game.round;
   stopCountdown();
-  if (!r.done) { el.result.hidden = true; return; }
+  if (!r.done) { el.result.hidden = true; el.result.textContent = ''; return; } // nothing of the previous answer (incl. its Wikipedia link) stays in the DOM
   const a = r.answer;
   el.result.hidden = false;
   el.result.className = 'result' + (r.won ? '' : ' lost');
@@ -540,6 +549,7 @@ function renderResult() {
     <h2>${esc(a.name)}</h2>
     <p class="codes">${esc([a.iata, a.icao].filter(Boolean).join(' / '))}</p>
     <p class="where">${esc(place)}</p>
+    ${wikiRow(a)}
     <div class="acts">
       <button type="button" class="btn primary" id="btn-share">Share</button>
       ${r.kind === 'practice' ? '<button type="button" class="btn" id="btn-next">Next airport</button>' : ''}

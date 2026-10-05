@@ -268,6 +268,46 @@ test('zoom-out is 2 levels wider (whole levels)', () => {
   assert.equal(C.zoomedOut(13), 11);
 });
 
+console.log('wikipedia link (result card only)');
+test('Daily list: every top-50 airport has a verified direct article link, https, wikipedia.org', () => {
+  for (const a of topList) {
+    assert.ok(a.wp, a.iata + ' has a title');
+    const l = C.wikipediaLink(a);
+    assert.equal(l.kind, 'article', a.iata);
+    assert.ok(C.isWikipediaUrl(l.url) && l.url.startsWith('https://'), a.iata + ' ' + l.url);
+  }
+});
+test('all airports: stored value is a title only (no URL), and the built link is safe', () => {
+  let withTitle = 0;
+  for (const a of [...airports, ...hard]) {
+    const l = C.wikipediaLink(a);
+    assert.ok(C.isWikipediaUrl(l.url), a.name + ' -> ' + l.url);
+    if (a.wp) { withTitle++; assert.match(a.wp, /^([a-z-]{2,10}\|)?[^\s|?#<>]+$/, a.wp); assert.ok(!/^https?:/i.test(a.wp)); }
+  }
+  assert.ok(withTitle / (airports.length + hard.length) > 0.8, 'most airports have a verified article: ' + withTitle);
+});
+test('link building: English and other-language titles, special characters; search fallback never invents an article URL', () => {
+  assert.deepEqual(C.wikipediaLink({ wp: 'Zurich_Airport', name: 'Zürich Airport' }), { kind: 'article', url: 'https://en.wikipedia.org/wiki/Zurich_Airport' });
+  assert.equal(C.wikipediaLink({ wp: 'de|Flughafen_Zürich', name: 'x' }).url, 'https://de.wikipedia.org/wiki/Flughafen_Z%C3%BCrich');
+  assert.equal(C.wikipediaLink({ wp: "O'Hare_International_Airport", name: 'x' }).url, "https://en.wikipedia.org/wiki/O'Hare_International_Airport");
+  assert.equal(C.wikipediaLink({ wp: 'Chicago_Midway_International_Airport_(MDW)', name: 'x' }).url, 'https://en.wikipedia.org/wiki/Chicago_Midway_International_Airport_(MDW)');
+  assert.equal(C.wikipediaLink({ wp: 'São_Paulo/Guarulhos_International_Airport', name: 'x' }).url, 'https://en.wikipedia.org/wiki/S%C3%A3o_Paulo/Guarulhos_International_Airport');
+  // no verified article: a SEARCH link built from the name
+  const s = C.wikipediaLink({ name: 'Smith & Sons Field "North" – Ünïcode?' });
+  assert.equal(s.kind, 'search');
+  assert.equal(s.url, 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent('Smith & Sons Field "North" – Ünïcode?'));
+  assert.ok(!s.url.includes('/wiki/'), 'a search link is never an article path');
+  const long = C.wikipediaLink({ name: 'A'.repeat(300) });
+  assert.ok(C.isWikipediaUrl(long.url) && long.kind === 'search');
+});
+test('isWikipediaUrl rejects anything that is not https + *.wikipedia.org (look-alike hosts, userinfo, other schemes)', () => {
+  for (const bad of ['http://en.wikipedia.org/wiki/X', 'https://evil.com/wiki/X', 'https://en.wikipedia.org.evil.com/wiki/X', 'https://en.wikipedia.org@evil.com/wiki/X',
+    'javascript:alert(1)', 'https://en.wikipedia.org/w/index.php?title=X&oldid=1', 'https://web.archive.org/web/2017/https://en.wikipedia.org/wiki/X', 'https://en.wikipedia.org/wiki/']) {
+    assert.equal(C.isWikipediaUrl(bad), false, bad);
+  }
+  assert.equal(C.isWikipediaUrl('https://de.wikipedia.org/wiki/Flughafen_Z%C3%BCrich'), true);
+});
+
 console.log('hints and attempts');
 test('hint values', () => {
   const z = byIata('ZRH');
