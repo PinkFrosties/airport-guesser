@@ -700,7 +700,7 @@ el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();
 
 // ---------- about & credits ----------
-const versionLabel = 'v' + APP_VERSION.replace(/\.0$/, '');
+const versionLabel = 'v' + APP_VERSION;
 $('#app-version').textContent = versionLabel;
 let aboutFilled = false;
 async function fillAbout() {

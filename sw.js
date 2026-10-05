@@ -1,7 +1,8 @@
 // Caches the app shell and airport data. Map tiles (cross-origin) always go to the network.
-// Bump VERSION when shipping changes so old caches are dropped.
-const VERSION = 'v8';
-const CACHE = `airport-guesser-${VERSION}`;
+// VERSION is written by scripts/sync_version.mjs from js/version.js (the single source of truth); a new version
+// means a new cache name, so old caches are dropped.
+const VERSION = '1.2.2';
+const CACHE = `airport-guesser-v${VERSION}`;
 // Map tiles live in their own cache that survives app updates (they never change with the app version).
 const TILE_CACHE = 'airport-guesser-tiles-v1';
 const TILE_LIMIT = 500; // roughly 10 MB
@@ -16,6 +17,7 @@ const SHELL = [
   'js/config.js',
   'js/satview.js',
   'js/theme.js',
+  'js/version.js',
   'data/airports.json',
   'data/airports-hard.json',
   'data/credits.json',

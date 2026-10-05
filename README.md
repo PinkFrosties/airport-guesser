@@ -38,23 +38,25 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 ## Changelog
 
-### v1.2.1 (top 50 Daily)
+Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
+
+### v1.2.2 (top 50 Daily) - 2026-10-05
 - Daily now draws only from the busiest airports worldwide by total passengers (ACI World 2025 ranking, `data/top50.json`); every airport comes up once per cycle, the order is reshuffled each cycle, and no airport repeats within 30 days
 - Hard pool is now every airport outside that list (12,728); autocomplete searches the full database in all modes
 - Source and ranking year shown in About & credits. The free ranking sources publish only the top 50, so the pool is 50 airports, not 100
 
-### v1.2 (credits)
+### v1.2.1 (credits) - 2026-10-05
 - New "About & credits" screen (footer link): imagery, airport data, other data, open-source software, disclaimer, version
 - Esri attribution always visible on the image in a translucent pill; the airfield is lifted slightly so the pill never covers it
 - Footer on every screen: Created by Kevin Pahud, About & credits, version number, theme switch
 - THIRD_PARTY_NOTICES.md and data/credits.json generated from the real dependencies
 
-### v1.2.2 (system theme)
+### v1.2.0 (system theme) - 2026-10-05
 - Light and dark themes in the same Apple style; follows the OS setting live, with a System / Light / Dark switch in the footer (stored in localStorage)
 - All colours are CSS variables (design tokens); the theme is applied before first paint, so there is no flash of the wrong theme
 - `color-scheme: light dark` and a per-theme browser-bar colour; WCAG AA contrast verified in both themes (`tests/theme.mjs`)
 
-### v1.1.2 (load speed)
+### v1.1.2 (load speed) - 2026-10-05
 - Image appears in about 0.6 s on Fast 4G (was 1.8-2.4 s), cold page load to image in about 1.2 s (was 4.3 s)
 - Extra tile levels capped at +1 (16 tiles per view instead of 42-49); +2 gave slightly finer detail at 3x but tripled the load
 - Only the frame is loaded; tiles are plain cacheable GETs spread over two Esri hosts; preconnect and preloaded data
@@ -63,13 +65,13 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 - Service worker caches map tiles (Cache API); a reload is instant and works offline for seen airports
 - 10 s stall timeout, one automatic retry, then a tap-to-retry state
 
-### v1.1.1 (image quality)
+### v1.1.1 (image quality) - 2026-10-04
 - Fixed blurry images on phones: tiles are now requested 1-2 levels deeper (by devicePixelRatio) and drawn at 256/2^n CSS px, so every device pixel is backed by a real pixel
 - Whole-number zooms only (no CSS scaling of the tile layer); no stand-in tiles from other zoom levels; the image is revealed only after every tile of the view has loaded
 - Per-airport native imagery level (`nz`) precomputed at build time; zoom never exceeds it
 - Airports whose real imagery cannot show the airfield at 45% or more of the frame (on a reference phone at 3x) are removed from both pools
 
-### v1.1
+### v1.1.0 (v1.1 features) - 2026-10-04
 - Light theme and Apple-style UI
 - Tighter, per-airport locked zoom; removed all image interaction
 - Zoom-out button (costs 1 guess) and hint system
@@ -78,7 +80,7 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 - Desktop layout with guess panel on the right
 - Credit footer
 
-### v1.0
+### v1.0 (initial release) - 2026-10-04
 - Initial release
 
 ## Run locally

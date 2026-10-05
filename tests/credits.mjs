@@ -73,10 +73,10 @@ await test('footer on the page: Created by Kevin Pahud, About & credits link, ve
   const f = await page.evaluate(() => ({ credit: document.querySelector('.foot span').innerText, about: document.querySelector('#btn-about').innerText, version: document.querySelector('#app-version').innerText, seg: document.querySelectorAll('#theme-seg button').length }));
   assert.equal(f.credit, 'Created by Kevin Pahud');
   assert.equal(f.about, 'About & credits');
-  assert.equal(f.version, 'v' + pkg.version.replace(/\.0$/, ''));
+  assert.equal(f.version, 'v' + pkg.version);
   assert.equal(f.seg, 3);
-  const cfg = read('js/config.js').match(/APP_VERSION = '([^']+)'/)[1];
-  assert.equal(cfg, pkg.version, 'config APP_VERSION matches package.json');
+  const cfg = read('js/version.js').match(/APP_VERSION = '([^']+)'/)[1];
+  assert.equal(cfg, pkg.version, 'js/version.js matches package.json');
   await ctx.close();
 });
 
