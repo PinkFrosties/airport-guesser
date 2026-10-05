@@ -16,7 +16,7 @@ const el = {
 };
 
 const game = {
-  main: [], hardList: [], hardLoaded: false,
+  main: [], top: [], hardList: [], hardPool: [], hardLoaded: false,
   byId: new Map(), mainIndex: [], fullIndex: [],
   mode: 'daily', hard: false, diff: 'medium',
   round: null, // { kind, date, answer, log, results, hints, zoomed, done, won, cap }
@@ -170,20 +170,29 @@ function preloadWider() {
 // ---------- rounds ----------
 const todayKey = () => C.utcDateString();
 
-async function ensureHard() {
+// The other airports (regional, small, remote). Needed for Hard mode, and for autocomplete in every mode
+// ("search the full database"), so it is also fetched quietly in the background after the first image is up.
+let hardPromise = null;
+async function ensureHard(loud = true) {
   if (game.hardLoaded) return true;
-  showVeil('Loading airports', false, true);
-  try {
-    const res = await fetch('data/airports-hard.json');
-    if (!res.ok) throw new Error(res.status);
-    game.hardList = (await res.json()).airports;
-  } catch {
-    return false;
-  }
-  for (const a of game.hardList) game.byId.set(a.id, a);
-  game.fullIndex = C.prepareIndex([...game.main, ...game.hardList]);
-  game.hardLoaded = true;
-  return true;
+  if (loud) showVeil('Loading airports', false, true);
+  hardPromise ||= (async () => {
+    try {
+      const res = await fetch('data/airports-hard.json');
+      if (!res.ok) throw new Error(res.status);
+      game.hardList = (await res.json()).airports;
+    } catch {
+      return false;
+    }
+    for (const a of game.hardList) game.byId.set(a.id, a);
+    game.fullIndex = C.prepareIndex([...game.main, ...game.hardList]);
+    game.hardPool = [...game.main.filter((a) => !a.top), ...game.hardList]; // Hard pool = every airport not in the Daily top list
+    game.hardLoaded = true;
+    return true;
+  })();
+  const ok = await hardPromise;
+  if (!ok) hardPromise = null;
+  return ok;
 }
 
 function newRound(kind, date, answer) {
@@ -225,12 +234,18 @@ async function startMode() {
   if (token !== game.token) return;
 
   const kind = kindOf();
-  const pool = game.hard ? game.hardList : game.main;
 
   // Resume today's daily from storage: the airport was fixed when first played.
   if (kind !== 'practice') {
     const saved = S.loadDaily(kind);
     if (saved && saved.date === todayKey()) {
+      // a saved guess may be an airport from the other file
+      if (saved.log.some((e) => e.t === 'g' && !game.byId.has(e.id)) && !(await ensureHard())) {
+        if (token !== game.token) return;
+        showVeil('Could not load the airport data. Check your connection and retry.', true);
+        return;
+      }
+      if (token !== game.token) return;
       const r = restoreRound(kind, saved);
       if (r) {
         game.round = r;
@@ -243,8 +258,10 @@ async function startMode() {
 
   const date = kind === 'practice' ? null : todayKey();
   const order = kind === 'practice'
-    ? C.practiceOrder(pool, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId)
-    : C.dailyOrder(pool, date, game.hard ? 'hard:' : '');
+    ? C.practiceOrder(game.hard ? game.hardPool : game.main, game.hard ? null : game.diff).filter((a) => a.id !== game.lastPracticeId)
+    : kind === 'daily'
+      ? C.dailyTopOrder(game.top, date) // the busiest airports, each once per cycle
+      : C.dailyOrder(game.hardPool, date, 'hard:');
 
   // Start loading the first candidate's tiles right away. A candidate whose tiles still fail after one retry is skipped
   // (deterministic fallback order for the Daily); a stalled network stops here with a tap-to-retry state.
@@ -391,7 +408,7 @@ function renderChrome() {
   el.hardToggle.checked = game.hard;
   el.diffSeg.hidden = !(game.mode === 'practice' && !game.hard);
   for (const b of el.diffSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.diff === game.diff));
-  el.input.placeholder = game.hard ? 'Search all airports' : 'Airport, city or code';
+  el.input.placeholder = 'Airport, city or code';
 }
 
 function renderAll(animateLast = false) {
@@ -529,7 +546,7 @@ async function share() {
 
 // ---------- autocomplete ----------
 let active = -1, shown = [];
-const searchIndex = () => (game.hard && game.hardLoaded ? game.fullIndex : game.mainIndex);
+const searchIndex = () => (game.hardLoaded ? game.fullIndex : game.mainIndex); // full database in every mode once loaded
 const hl = (text, q) => {
   const nq = C.normalize(q).replace(/ /g, '');
   if (!nq) return esc(text);
@@ -692,6 +709,11 @@ async function fillAbout() {
   $('#about-data-date').textContent = date || 'unknown';
   if (aboutFilled) return;
   try {
+    const rank = await (await fetch('data/top50.json')).json();
+    $('#about-rank-year').textContent = rank.year;
+    $('#about-rank-date').textContent = rank.retrieved;
+  } catch { /* the static text stays */ }
+  try {
     const res = await fetch('data/credits.json');
     const c = await res.json();
     $('#oss-list').innerHTML = c.software.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${esc(p.version)}, ${esc(p.license)} licence. ${esc(p.purpose)}</li>`).join('');
@@ -727,8 +749,10 @@ async function boot() {
   }
   for (const a of game.main) game.byId.set(a.id, a);
   game.mainIndex = C.prepareIndex(game.main);
+  game.top = game.main.filter((a) => a.top).sort((a, b) => a.top - b.top);
   if (!S.hasSeenHelp()) { el.dlgHelp.showModal(); S.markHelpSeen(); }
   await startMode();
+  ensureHard(false); // background: full-database autocomplete in every mode
 }
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {

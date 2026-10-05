@@ -1,5 +1,5 @@
 // App version shown in the footer (keep in sync with package.json; tests check it).
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.1';
 
 // Everything provider-specific lives here. To switch imagery, change only this object.
 export const IMAGERY = {

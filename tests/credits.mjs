@@ -181,6 +181,9 @@ await test('nothing is credited that the code does not use; everything that is u
   // used -> credited
   assert.ok(/arcgisonline\.com/.test(code) && /Esri/.test(about), 'imagery');
   assert.ok(/data\/airports\.json/.test(code) && /OurAirports/.test(about), 'airport data');
+  assert.ok(/top50\.json/.test(code) && /ACI World/.test(about) && /Wikipedia/.test(about) && /top 50 only/.test(about), 'ranking source is credited with its year slot');
+  const rank = JSON.parse(read('data/top50.json'));
+  assert.ok(about.includes('id="about-rank-year"') && rank.year >= 2025, 'ranking year shown');
   assert.ok(/vendor\/leaflet/.test(read('index.html')) && credits.software.some((s) => s.name === 'Leaflet'), 'Leaflet');
   // not used -> not credited
   assert.ok(!/@font-face|fonts\.googleapis|@import/.test(read('css/style.css') + read('index.html')), 'no bundled or remote fonts');

@@ -195,6 +195,44 @@ def verify_tilemap(items, n=40):
           % (len(sample), bad_native, bad_next, checked_next))
 
 
+def passes_quality(a):
+    z_max = a["nz"] - REF_RETINA_LEVELS
+    if z_max < 8:
+        return False, "no usable imagery (nz %d)" % a["nz"]
+    z = min(fit_zoom(a, REF_W, REF_H), z_max)
+    fill = fill_at(a, REF_W, REF_H, z)
+    return (fill >= MIN_FILL), "airfield would fill %d%% of the frame (nz %d)" % (round(fill * 100), a["nz"])
+
+
+def mark_top_airports(kept):
+    """Read data/top50.json (scripts/fetch_top_airports.py) and flag those airports with `top` = passenger rank.
+    Every listed airport must match the dataset by IATA + ICAO and pass the imagery quality filter; otherwise the
+    build stops (nothing is dropped silently)."""
+    path = os.path.join(ROOT, "data", "top50.json")
+    with open(path, encoding="utf-8") as f:
+        top = json.load(f)["airports"]
+    by_iata = {a["iata"]: a for a in kept}
+    missing, bad_icao, failing = [], [], []
+    for t in top:
+        a = by_iata.get(t["iata"])
+        if not a:
+            missing.append("%d %s/%s %s" % (t["rank"], t["iata"], t["icao"], t["name"]))
+            continue
+        if a["icao"] != t["icao"]:
+            bad_icao.append("%d %s: ranking says %s, dataset has %s" % (t["rank"], t["iata"], t["icao"], a["icao"]))
+        ok, why = passes_quality(a)
+        if not ok:
+            failing.append("%d %s %s: %s" % (t["rank"], t["iata"], a["name"], why))
+        a["top"] = t["rank"]
+    problems = [("not in the dataset", missing), ("ICAO mismatch", bad_icao), ("fails the image-quality filter", failing)]
+    if any(v for _, v in problems):
+        for label, v in problems:
+            for line in v:
+                print("TOP AIRPORT %s: %s" % (label, line))
+        raise SystemExit("top-airport check failed: resolve the entries above (nothing was dropped silently)")
+    print("top airports: %d matched by IATA+ICAO, all pass the quality filter" % len(top))
+
+
 def quality_filter(items, label):
     """Drop airports whose real imagery cannot reach a frame fill of MIN_FILL on a reference phone at devicePixelRatio 3."""
     kept_items, dropped = [], Counter()
@@ -378,6 +416,7 @@ def main():
         a["nz"] = nzs[a["id"]]
     if "--verify" in sys.argv:
         verify_tilemap(kept + hard)
+    mark_top_airports(kept)
     kept, n_daily_before, daily_dropped = quality_filter(kept, "Daily")
     hard, n_hard_before, hard_dropped = quality_filter(hard, "Hard")
     top_ids &= {a["id"] for a in kept}

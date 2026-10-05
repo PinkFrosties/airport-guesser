@@ -156,6 +156,63 @@ export function dailyOrder(pool, dateStr, salt = '') {
   return list;
 }
 
+// ---------- Daily: the busiest airports, no repeats until all of them have been used ----------
+export const TOP_EPOCH = '2026-01-01'; // fixed: day 0 of the first cycle (never change, it would reshuffle every future day)
+const DAY_MS = 86_400_000;
+export const dayIndex = (dateStr) => Math.round((Date.parse(dateStr + 'T00:00:00Z') - Date.parse(TOP_EPOCH + 'T00:00:00Z')) / DAY_MS);
+
+export const TOP_MIN_GAP = 30; // days between two plays of the same airport, also across cycles
+const cycleCache = new Map();
+/**
+ * The play order of cycle `c`. Cycle 0 is a fixed-seed shuffle. Each later cycle is a fixed-seed shuffle constrained so
+ * that an airport is never played less than TOP_MIN_GAP days after its play in the previous cycle (so no 30-day window
+ * ever contains a repeat, even across the reshuffle). Always feasible: at position j at least n - gap + j + 1 airports
+ * are still eligible.
+ */
+function topCycle(top, c) {
+  const key = `${top.map((a) => a.id).join(',')}:${c}`;
+  if (cycleCache.has(key)) return cycleCache.get(key);
+  const n = top.length;
+  const base = [...top].sort((a, b) => (a.top ?? 0) - (b.top ?? 0) || a.id - b.id);
+  const rnd = mulberry32(hashSeed(`airport-guesser:top:cycle:${c}`));
+  let order;
+  if (c <= 0) {
+    order = base;
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+  } else {
+    const prev = topCycle(top, c - 1);
+    const posPrev = new Map(prev.map((x, i) => [x.id, i]));
+    const slack = n - Math.min(TOP_MIN_GAP, n - 1); // may appear at most this many places earlier than last time
+    const remaining = base;
+    order = [];
+    for (let j = 0; j < n; j++) {
+      const eligible = remaining.filter((x) => posPrev.get(x.id) <= j + slack);
+      const pick = eligible[Math.floor(rnd() * eligible.length)];
+      order.push(pick);
+      remaining.splice(remaining.indexOf(pick), 1);
+    }
+  }
+  cycleCache.set(key, order);
+  return order;
+}
+
+/**
+ * Candidate list for a UTC date: element 0 is the airport of the day (same for everyone), the rest is the fallback
+ * order if its imagery cannot load. Day d plays position d mod n of cycle floor(d / n): every airport is used exactly
+ * once per cycle, then the list is reshuffled with the next cycle's fixed seed.
+ */
+export function dailyTopOrder(top, dateStr) {
+  const n = top.length;
+  const d = dayIndex(dateStr);
+  const c = Math.floor(d / n);
+  const p = ((d % n) + n) % n;
+  const order = topCycle(top, c);
+  return [...order.slice(p), ...order.slice(0, p)];
+}
+
 export const DIFFICULTIES = {
   easy: { label: 'Top 100', filter: (a) => a.tier === 1 },
   medium: { label: 'Large', filter: (a) => a.type === 'large' },

@@ -29,17 +29,68 @@ test('Hard search covers the full database; airports without IATA show their ICA
 });
 
 console.log('pools');
-test('Daily is deterministic per date; Daily and Hard have separate draws', () => {
-  const a1 = C.dailyOrder(airports, '2026-10-04').map((x) => x.id);
-  assert.deepEqual(a1.slice(0, 20), C.dailyOrder([...airports].reverse(), '2026-10-04').slice(0, 20).map((x) => x.id), 'independent of input order');
+const topList = airports.filter((x) => x.top).sort((x, y) => x.top - y.top);
+const hardPool = [...airports.filter((x) => !x.top), ...hard]; // what the app builds: every airport not in the Daily top list
+const ranking = JSON.parse(readFileSync(new URL('../data/top50.json', import.meta.url), 'utf8'));
+
+test('Daily pool = the busiest airports from the ACI ranking (data/top50.json): all matched by IATA and ICAO', () => {
+  assert.equal(ranking.count, ranking.airports.length);
+  assert.equal(topList.length, ranking.airports.length);
+  assert.ok(ranking.year >= 2025 && /ACI/.test(ranking.source) && /wikipedia/.test(ranking.sourceUrl) && ranking.retrieved);
+  ranking.airports.forEach((r, i) => {
+    const a = topList[i];
+    assert.equal(r.rank, i + 1);
+    assert.equal(a.top, r.rank);
+    assert.equal(a.iata, r.iata);
+    assert.equal(a.icao, r.icao, 'ICAO matches for ' + r.iata);
+    assert.ok(r.passengers > 1e7 && r.year === ranking.year && r.sourceUrl && r.name && r.city && r.country);
+    if (i) assert.ok(r.passengers <= ranking.airports[i - 1].passengers, 'sorted by passengers');
+  });
+  assert.deepEqual(topList.slice(0, 3).map((x) => x.iata), ['ATL', 'DXB', 'HND']);
+});
+test('Daily: same airport for everyone on a date, drawn only from the top list', () => {
+  const o1 = C.dailyTopOrder(topList, '2026-10-04');
+  assert.deepEqual(o1.map((x) => x.id), C.dailyTopOrder([...topList].reverse(), '2026-10-04').map((x) => x.id), 'independent of input order');
+  assert.equal(o1.length, topList.length, 'fallback list covers the whole cycle');
+  assert.ok(o1.every((x) => x.top >= 1 && x.top <= 50));
+  assert.notEqual(C.dailyTopOrder(topList, '2026-10-05')[0].id, o1[0].id);
+});
+test('Daily: every airport once per cycle, reshuffled each cycle, and never twice within 30 days (also across cycles)', () => {
+  const n = topList.length;
+  const total = n * 6 + 11;
+  const seq = [];
+  for (let d = 0; d < total; d++) seq.push(C.dailyTopOrder(topList, C.addDays(C.TOP_EPOCH, d))[0].id);
+  for (let c = 0; c < 6; c++) assert.equal(new Set(seq.slice(c * n, (c + 1) * n)).size, n, 'cycle ' + c + ' uses every airport exactly once');
+  for (let c = 1; c < 6; c++) assert.notEqual(seq.slice((c - 1) * n, c * n).join(), seq.slice(c * n, (c + 1) * n).join(), 'cycle ' + c + ' is reshuffled');
+  const last = new Map();
+  for (let d = 0; d < seq.length; d++) {
+    if (last.has(seq[d])) assert.ok(d - last.get(seq[d]) >= C.TOP_MIN_GAP, `airport repeated after ${d - last.get(seq[d])} days (day ${d})`);
+    last.set(seq[d], d);
+  }
+  // any 30 consecutive days are distinct, including windows spanning a cycle boundary
+  for (let d = 0; d + 30 <= seq.length; d++) assert.equal(new Set(seq.slice(d, d + 30)).size, 30, 'window at day ' + d);
+  // dates before the epoch work too
+  assert.ok(topList.some((x) => x.id === C.dailyTopOrder(topList, '2025-06-01')[0].id));
+  // the schedule is a pure function of the date (recomputed from scratch it is identical)
+  assert.equal(C.dailyTopOrder(topList, '2027-03-09')[0].id, C.dailyTopOrder([...topList].reverse(), '2027-03-09')[0].id);
+});
+test('Daily simulation: 30 consecutive days from today are all distinct and all in the list', () => {
+  const start = C.utcDateString();
+  const days = Array.from({ length: 30 }, (_, i) => C.dailyTopOrder(topList, C.addDays(start, i))[0]);
+  const ids = new Set(days.map((x) => x.id));
+  assert.equal(ids.size, 30, 'no repeats in 30 days');
+  assert.ok(days.every((x) => x.top >= 1 && x.top <= 50));
+});
+test('Hard pool = every airport not in the Daily list (main non-top + hard file), Hard daily is deterministic', () => {
+  const topIds = new Set(topList.map((x) => x.id));
+  assert.equal(hardPool.length, airports.length - topList.length + hard.length);
+  assert.ok(hardPool.every((x) => !topIds.has(x.id)));
+  assert.equal(new Set(hardPool.map((x) => x.id)).size, hardPool.length, 'no duplicates');
+  const h1 = C.dailyOrder(hardPool, '2026-10-04', 'hard:');
+  assert.deepEqual(h1.slice(0, 20).map((x) => x.id), C.dailyOrder([...hardPool].reverse(), '2026-10-04', 'hard:').slice(0, 20).map((x) => x.id));
   const days = new Set();
-  for (let d = 1; d <= 28; d++) days.add(C.dailyOrder(airports, '2026-11-' + String(d).padStart(2, '0'))[0].id);
+  for (let d = 1; d <= 28; d++) days.add(C.dailyOrder(hardPool, '2026-11-' + String(d).padStart(2, '0'), 'hard:')[0].id);
   assert.ok(days.size >= 25, 'variety across a month: ' + days.size);
-  assert.equal(a1.length, airports.length, 'Daily pool = all international (scheduled, IATA) airports');
-  const h1 = C.dailyOrder(hard, '2026-10-04', 'hard:');
-  assert.deepEqual(h1.slice(0, 20).map((x) => x.id), C.dailyOrder([...hard].reverse(), '2026-10-04', 'hard:').slice(0, 20).map((x) => x.id));
-  const ids = new Set(airports.map((a) => a.id));
-  assert.ok(h1.every((a) => a.tier === 4 && !ids.has(a.id)), 'Hard pool has no Daily airports');
 });
 test('UTC date helpers', () => {
   assert.equal(C.utcDateString(new Date('2026-10-04T23:59:59Z')), '2026-10-04');

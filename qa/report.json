@@ -2,7 +2,7 @@
   {
     "airport": "Hartsfield Jackson Atlanta International Airport",
     "iata": "ATL",
-    "pool": "daily",
+    "pool": "daily (top 1)",
     "dpr": 3,
     "zoomUsed": 13,
     "tileLevelRequested": 14,
@@ -24,7 +24,7 @@
   {
     "airport": "Duqm International Airport",
     "iata": "DQM",
-    "pool": "daily",
+    "pool": "hard",
     "dpr": 3,
     "zoomUsed": 14,
     "tileLevelRequested": 15,

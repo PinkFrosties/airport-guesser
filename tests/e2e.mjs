@@ -9,6 +9,8 @@ import * as C from '../js/core.js';
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8')).airports;
 const airports = read('airports.json');
 const hardList = read('airports-hard.json');
+const topList = airports.filter((x) => x.top).sort((x, y) => x.top - y.top);          // Daily pool: the busiest airports (ACI ranking)
+const hardPool = [...airports.filter((x) => !x.top), ...hardList];                      // Hard pool: every other airport
 const by = (iata) => airports.find((a) => a.iata === iata);
 const OUT = new URL('../test-output/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 mkdirSync(OUT, { recursive: true });
@@ -174,7 +176,7 @@ await test('DPR 3 phone: hub, small regional airfield, remote airfield are sharp
     await assertTilesReal(page);
     await page.screenshot({ path: QA + `phone-dpr3-${name}.png` });
     const a = await answerOf(page);
-    qaReport.push({ airport: a.name, iata: a.iata || a.icao, pool: a.tier === 4 ? 'hard' : 'daily', dpr: s.dpr, zoomUsed: s.zoom, tileLevelRequested: s.levels[0], nativeMaxLevel: s.nz, fillPct: Math.round(m.fill * 100), bitmapPxPerDevicePx: +s.minBitmapPerDevicePx.toFixed(2) });
+    qaReport.push({ airport: a.name, iata: a.iata || a.icao, pool: a.top ? 'daily (top ' + a.top + ')' : 'hard', dpr: s.dpr, zoomUsed: s.zoom, tileLevelRequested: s.levels[0], nativeMaxLevel: s.nz, fillPct: Math.round(m.fill * 100), bitmapPxPerDevicePx: +s.minBitmapPerDevicePx.toFixed(2) });
   }
   assert.ok(results.small.m.zoom - results.hub.m.zoom >= 1, `small airfield (${results.small.m.zoom}) tighter than hub (${results.hub.m.zoom})`);
   console.log('       zoom: hub ' + results.hub.m.zoom + ', small ' + results.small.m.zoom + ', remote ' + results.remote.m.zoom + ' (tile levels +2)');
@@ -561,16 +563,16 @@ await test('wide layout: image left, guess panel right, same height; light Apple
   await ctx.close();
 });
 
-await test('daily (default): international pool, seeded airport, refresh keeps guesses+hints+zoom, one attempt, countdown', async () => {
+await test('daily (default): one of the busiest airports, seeded cycle order, refresh keeps guesses+hints+zoom, one attempt, countdown', async () => {
   const { ctx, page } = await newPage(DESKTOP);
   await open(page);
   await ready(page);
   const today = C.utcDateString();
-  const order = C.dailyOrder(airports, today);
+  const order = C.dailyTopOrder(topList, today);
   const a = await answerOf(page);
   const idx = order.findIndex((x) => x.id === a.id);
   assert.ok(idx >= 0 && idx < 10, 'daily answer from the seeded order (index ' + idx + ')');
-  assert.ok(airports.some((x) => x.id === a.id), 'international pool');
+  assert.ok(a.top >= 1 && a.top <= topList.length, 'Daily airport is in the top list: rank ' + a.top);
   const w = wrongPick(a, 2);
   await guess(page, w[0].iata, { viaKeyboard: true });
   await page.locator('#btn-hint').click();
@@ -607,7 +609,7 @@ await test('daily (default): international pool, seeded airport, refresh keeps g
   await ctx.close();
 });
 
-await test('Hard mode: separate toggle, own daily from the non-international pool, full-database search, own state/streak/results', async () => {
+await test('Hard mode: separate toggle, own daily from every airport outside the top list, full-database search, own state/streak/results', async () => {
   const { ctx, page } = await newPage(DESKTOP);
   await open(page);
   await ready(page);
@@ -617,10 +619,9 @@ await test('Hard mode: separate toggle, own daily from the non-international poo
   await page.waitForFunction(() => window.__ag.hard && window.__ag.hardLoaded && window.__ag.round && window.__ag.round.kind === 'hard', null, { timeout: 60000 });
   await ready(page);
   const a = await answerOf(page);
-  const mainIds = new Set(airports.map((x) => x.id));
-  assert.ok(!mainIds.has(a.id), 'hard answer is not an international (Daily-pool) airport: ' + a.name);
-  assert.equal(a.tier, 4);
-  const order = C.dailyOrder(hardList, C.utcDateString(), 'hard:');
+  assert.ok(!a.top, 'hard answer is not in the Daily top list: ' + a.name);
+  assert.ok(hardPool.some((x) => x.id === a.id));
+  const order = C.dailyOrder(hardPool, C.utcDateString(), 'hard:');
   assert.ok(order.slice(0, 10).some((x) => x.id === a.id), 'seeded hard order');
   assert.notEqual(a.id, dailyAnswer.id);
   assert.equal(await page.locator('#hard-toggle').isChecked(), true);
@@ -665,6 +666,29 @@ await test('Hard mode: separate toggle, own daily from the non-international poo
   await ctx.close();
 });
 
+await test('autocomplete in Daily (and every mode) searches the full database: hard-file airports appear once loaded in the background', async () => {
+  const { ctx, page } = await newPage(DESKTOP);
+  await open(page);
+  await ready(page);
+  assert.equal(await page.evaluate(() => window.__ag.kind ?? window.__ag.round.kind), 'daily');
+  await page.waitForFunction(() => window.__ag.hardLoaded, null, { timeout: 60000 });
+  const other = hardList.find((x) => x.iata === '' && x.name.length < 40 && !/[^\x20-\x7e]/.test(x.name));
+  await page.locator('#guess-input').fill(other.name);
+  await page.waitForSelector('#suggestions li[role=option]');
+  assert.ok((await page.locator('#suggestions').innerText()).includes(other.name), 'Daily autocomplete finds ' + other.name);
+  // a non-top international airport too, and a guess on it counts as a normal wrong guess
+  const plain = airports.find((x) => !x.top && x.type === 'medium' && /^[A-Za-z .'-]+$/.test(x.name));
+  await page.locator('#guess-input').fill(plain.iata);
+  await page.waitForSelector('#suggestions li[role=option]');
+  await page.locator('#suggestions li[role=option]').first().click();
+  await page.locator('#guess-btn').click();
+  await page.waitForFunction(() => document.querySelectorAll('#guesses .row').length === 1);
+  await page.reload();
+  await ready(page);
+  assert.equal(await rowCount(page), 1, 'a guess on an airport from the other file survives a reload');
+  await ctx.close();
+});
+
 await test('autocomplete: accent-insensitive, ranking, max 6, keyboard nav, Escape, free text cannot be guessed', async () => {
   const { ctx, page } = await newPage(DESKTOP);
   await open(page);
@@ -703,7 +727,7 @@ await test('practice mode still works; Hard toggle hides the practice set picker
   await page.waitForSelector('#result:not([hidden])');
   assert.ok(await page.locator('#btn-next').isVisible());
   await page.locator('#hard-switch').click();
-  await page.waitForFunction(() => window.__ag.round && window.__ag.round.answer.tier === 4, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__ag.round && !window.__ag.round.answer.top && window.__ag.hard, null, { timeout: 60000 });
   assert.equal(await page.locator('#diff-seg').isHidden(), true);
   await ctx.close();
 });
@@ -734,7 +758,7 @@ console.log('imagery failure and PWA');
 
 await test('daily deterministic fallback when imagery for the first candidate is unreachable', async () => {
   const { ctx, page } = await newPage(DESKTOP, { watch: false, sw: false });
-  const order = C.dailyOrder(airports, C.utcDateString());
+  const order = C.dailyTopOrder(topList, C.utcDateString());
   // Block the centre tile of the first candidate at every level it might use
   await page.route('**/World_Imagery/MapServer/tile/**', (route) => {
     const m = route.request().url().match(/tile\/(\d+)\/(\d+)\/(\d+)/);
