@@ -101,8 +101,8 @@ test('UTC date helpers', () => {
 test('practice sets', () => {
   const n = (d) => C.practiceOrder(airports, d).length;
   assert.equal(n('easy'), 100);
-  assert.ok(n('medium') > 500 && n('hard') > 1000);
-  assert.ok(C.practiceOrder(airports, 'hard').every((a) => a.type === 'medium'));
+  assert.ok(n('medium') >= 200 && n('medium') <= 700 && n('hard') >= 800 && n('hard') <= 1500, `tier sizes ${n('easy')} / ${n('medium')} / ${n('hard')}`);
+  assert.ok(C.practiceOrder(airports, 'hard').every((a) => a.tier === 3));
   assert.equal(C.practiceOrder(hard, null).length, hard.length);
 });
 
@@ -359,6 +359,63 @@ test('Practice set is called "Major hubs" and still holds 100 airports', () => {
   assert.equal(C.DIFFICULTIES.easy.label, 'Major hubs');
 });
 
+console.log('Practice tiers (v1.4.0)');
+const tiersFile = JSON.parse(readFileSync(new URL('../data/tiers.json', import.meta.url), 'utf8'));
+const { scoreFeatures, T2, T3, PAX_YEARS } = await import('../scripts/practice_tiers.mjs');
+const allAirports = [...airports, ...hard];
+const inTier = (n) => allAirports.filter((a) => a.tier === n);
+test('tiers are disjoint, every airport is in at most one, the Hard file holds only tier-4 airports; sizes: 100 / 300-ish / 800-1500', () => {
+  assert.equal(new Set(allAirports.map((a) => a.id)).size, allAirports.length, 'no airport in both files');
+  for (const a of allAirports) assert.ok([1, 2, 3, 4].includes(a.tier), a.name + ' tier ' + a.tier);
+  for (const a of hard) assert.equal(a.tier, 4, 'the Hard file only holds airports in no Practice tier');
+  assert.equal(inTier(1).length, 100); assert.ok(inTier(2).length >= 200 && inTier(2).length <= 700, 'tier 2: ' + inTier(2).length); assert.ok(inTier(3).length >= 800 && inTier(3).length <= 1500, 'tier 3: ' + inTier(3).length);
+  for (const t of [1, 2, 3]) assert.equal(C.practiceOrder(airports, ['easy', 'medium', 'hard'][t - 1]).length, inTier(t).length, 'tab ' + t + ' draws from exactly its tier');
+});
+test('Major hubs: ranks 1-50 are exactly the Daily list (data/top50.json), the other 50 carry a passenger-count year 2019-2025', () => {
+  const daily = new Set(topList.map((a) => a.iata)), listed = new Set(ranking.airports.map((r) => r.iata));
+  assert.deepEqual([...daily].sort(), [...listed].sort());
+  for (const a of topList) { assert.equal(a.tier, 1); assert.equal(a.py, ranking.year, a.iata); }
+  const extra = inTier(1).filter((a) => !a.top); assert.equal(extra.length, 50);
+  for (const a of extra) assert.ok(a.py >= PAX_YEARS[0] && a.py <= PAX_YEARS[1], a.iata + ' year ' + a.py);
+  assert.deepEqual(extra.filter((a) => daily.has(a.iata)), []);
+});
+test('every Large (tier 2) airport has the Main airline clue and no Mid-size (tier 3) airport has it; tier 3 has a clue that does not repeat the country or the city', () => {
+  assert.deepEqual(inTier(2).filter((a) => C.hint3Of(a)?.type !== 'airline').map((a) => a.name), []);
+  assert.deepEqual(inTier(3).filter((a) => !C.hint3Of(a) || C.hint3Of(a).type === 'airline').map((a) => a.name), []);
+  const seqOf = (s) => C.normalize(s).split(' ').filter((w) => w && !['city', 'province', 'state', 'region', 'prefecture', 'county', 'district', 'municipality', 'metropolitan', 'governorate', 'autonomous', 'capital', 'territory', 'department', 'community', 'of', 'the', 'de'].includes(w));
+  const has = (big, small) => small.length > 0 && big.some((_, i) => small.every((w, j) => big[i + j] === w));
+  for (const a of inTier(3)) { const h = C.hint3Of(a); if (h.type === 'region') { assert.notEqual(C.normalize(h.v), C.normalize(a.country)); assert.ok(!has(seqOf(h.v), seqOf(a.city || '')) && !has(seqOf(a.city || ''), seqOf(h.v)), a.name + ': ' + h.v + ' repeats ' + a.city); } }
+});
+test('playability scores reproduce from the stored features with the build formula; tier thresholds hold', () => {
+  const names = tiersFile.meta.features; let n = 0;
+  for (const [id, row] of Object.entries(tiersFile.features)) {
+    const f = Object.fromEntries(names.map((k, i) => [k, row[i]])); const t = tiersFile.tiers[id];
+    if (t) { assert.equal(scoreFeatures(f), t[1], 'score of ' + id); n++; }
+  }
+  assert.ok(n >= 1500);
+  for (const a of allAirports) { const t = tiersFile.tiers[a.id]; if (t) { assert.equal(a.tier, t[0]); assert.equal(a.ps, t[1]); if (t[0] === 2) assert.ok(a.ps >= T2); if (t[0] === 3) assert.ok(a.ps >= T3); } else assert.equal(a.tier, 4); }
+});
+test('Major hubs are drawn with weights 2 : 1 (the 50 ACI airports twice as often as the extra 50) over a large simulated sample', () => {
+  let seed = 7; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const hubs = inTier(1); let first = 0; const N = 40000, withTop = new Map();
+  for (let i = 0; i < N; i++) { const a = C.practiceOrder(hubs, 'easy', rnd)[0]; if (a.top) first++; withTop.set(a.id, (withTop.get(a.id) || 0) + 1); }
+  const share = first / N; assert.ok(Math.abs(share - 2 / 3) < 0.012, 'top-50 share ' + share.toFixed(3) + ' (expected 0.667)');
+  const perTop = first / 50, perExtra = (N - first) / 50; assert.ok(Math.abs(perTop / perExtra - 2) < 0.2, 'per-airport ratio ' + (perTop / perExtra).toFixed(2));
+  assert.equal(C.practiceOrder(inTier(2), 'medium', rnd).length, inTier(2).length, 'tier 2 is a plain shuffle of all its airports');
+});
+test('hint costs in every tier: Main airline 2 (needs 3 attempts left), Region / position / elevation / country / letter 1', () => {
+  for (const t of [1, 2, 3]) for (const a of inTier(t).slice(0, 300)) {
+    const h = C.hint3Of(a), cost = C.hintCost('extra', a);
+    assert.equal(cost, h.type === 'airline' ? 2 : 1, a.name); assert.equal(C.hintCost('country', a), 1); assert.equal(C.hintCost('letter', a), 1);
+    if (t === 2) assert.equal(cost, 2); if (t === 3) assert.equal(cost, 1);
+    assert.equal(C.canAfford(2, cost), true, '3 attempts left'); assert.equal(C.canAfford(3, 2), false, '2 left: no airline hint'); assert.equal(C.canAfford(3, 1), true);
+  }
+});
+test('the Practice tab subtitles', () => {
+  assert.equal(C.DIFFICULTIES.easy.sub, "100 of the world's busiest airports"); assert.equal(C.DIFFICULTIES.medium.sub, 'Airline hubs and bases, with an airline hint'); assert.equal(C.DIFFICULTIES.hard.sub, 'Regional airports, region hint');
+  assert.deepEqual(Object.keys(C.DIFFICULTIES), ['easy', 'medium', 'hard']); assert.deepEqual(Object.values(C.DIFFICULTIES).map((d) => d.label), ['Major hubs', 'Large', 'Mid-size']);
+});
+
 console.log('hints and attempts');
 test('exactly three hints: country, first letter, and a per-airport third clue; no continent or runway count anywhere', () => {
   assert.deepEqual(C.HINTS.map((h) => h.key), ['country', 'letter', 'extra']);
@@ -433,7 +490,7 @@ test('data: every airport has a valid hint3 (type|value), the Top 50 included; v
   }
   assert.ok(bad.length <= 1, bad.slice(0, 5).join(' | '));
   for (const a of topList) assert.ok(C.hint3Of(a), a.iata + ' has a third clue');
-  assert.ok(types.airline > 300 && types.region > 9000 && types.grid > 500, JSON.stringify(types));
+  assert.ok(types.airline > 200 && types.region > 9000 && types.grid > 500, JSON.stringify(types));
 });
 test('attempt budget: guesses, hints and zoom share 5; hints need 2 left', () => {
   assert.equal(C.attemptsLeft(0), 5);
@@ -518,11 +575,12 @@ console.log('data');
 test('Daily pool integrity', () => {
   assert.ok(airports.length > 2000);
   assert.equal(new Set(airports.map((a) => a.id)).size, airports.length);
-  assert.equal(new Set(airports.map((a) => a.iata)).size, airports.length);
+  const withIata = airports.filter((a) => a.iata);
+  assert.equal(new Set(withIata.map((a) => a.iata)).size, withIata.length);
   for (const a of airports) {
-    assert.match(a.iata, /^[A-Z0-9]{3}$/);
+    if (a.iata) assert.match(a.iata, /^[A-Z0-9]{3}$/);
     assert.ok(a.name && a.icao && a.country && a.countryCode);
-    assert.ok(['large', 'medium'].includes(a.type) && [1, 2, 3].includes(a.tier));
+    assert.ok(['large', 'medium', 'small'].includes(a.type) && [1, 2, 3, 4].includes(a.tier));
     assert.ok(a.view.length === 4 && a.view.every(Number.isFinite));
   }
 });

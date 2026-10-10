@@ -9,14 +9,9 @@ Sources (downloaded and cached in scripts/.cache/):
 Filter: IATA code present, scheduled_service == yes, type large_airport or
 medium_airport, not closed.
 
-Tier (difficulty):
-  1 = "top"  : the 100 large airports with the most routes in OpenFlights
-               (routes departing from + arriving at the airport). Route count is
-               a connectivity-based proxy for traffic: no free dataset has
-               current passenger numbers with global coverage, but the busiest
-               hubs are also the best connected. -> Easy
-  2 = remaining large airports (tier 1 + 2 together = Medium)
-  3 = medium airports with scheduled service -> Hard
+Practice tier ("tier" in the data; defined by scripts/practice_tiers.mjs, which writes data/tiers.json that this build applies):
+  1 = Major hubs (100: the Daily list + the next 50 by Wikidata passenger count), 2 = Large (airports whose third hint is Main airline),
+  3 = Mid-size (regional airports with scheduled service), 4 = in no Practice tab. Practice airports are all kept in airports.json.
 
 Per-airport view box: "view": [centre lat, centre lon, width m, height m] is the bounding box of the
 runway endpoints (falls back to runway length around the reference point, then to a size by type).
@@ -260,6 +255,34 @@ except OSError:
     print("WARNING: scripts/.cache/contrast.json missing (run node scripts/image_contrast.mjs); no visibility filter applied")
 
 
+def apply_tiers(kept, hard):
+    """Practice tiers from data/tiers.json: tier (1-3, else 4), playability score `ps` (tiers 1-3) and the passenger-count year `py` (tier 1).
+    Every Practice airport lives in data/airports.json (loaded at start), so Practice never waits for the big Hard file."""
+    path = os.path.join(ROOT, "data", "tiers.json")
+    if not os.path.exists(path):
+        print("WARNING: data/tiers.json missing (run node scripts/practice_tiers.mjs); every airport is in no Practice tier")
+        return kept, hard
+    with open(path, encoding="utf-8") as f:
+        tiers = json.load(f)["tiers"]
+    moved = 0
+    for a in kept + hard:
+        t = tiers.get(str(a["id"]))
+        if t:
+            a["tier"], a["ps"] = t[0], t[1]
+            if t[0] == 1 and t[2]:
+                a["py"] = t[2]
+    keep_hard = []
+    for a in hard:
+        if a["tier"] <= 3:
+            kept.append(a)
+            moved += 1
+        else:
+            keep_hard.append(a)
+    kept.sort(key=lambda a: a["id"])
+    print("tiers applied (%d airports moved from the Hard file to the main file)" % moved)
+    return kept, keep_hard
+
+
 def quality_filter(items, label):
     """Drop airports whose real imagery cannot show the airfield (see passes_quality)."""
     kept_items, dropped = [], Counter()
@@ -324,18 +347,10 @@ def main():
         by_iata.setdefault(a["iata"], a)
     kept = sorted(by_iata.values(), key=lambda a: a["id"])
 
-    # ---- tier via route-count proxy
-    routes = Counter()
-    for line in routes_dat.splitlines():
-        f = next(csv.reader([line]), [])
-        if len(f) >= 5:
-            routes[f[2]] += 1
-            routes[f[4]] += 1
-    large = [a for a in kept if a["type"] == "large"]
-    ranked = sorted(large, key=lambda a: (-routes[a["iata"]], a["id"]))
-    top_ids = {a["id"] for a in ranked[:TOP_N]}
+    # ---- practice tier: 4 = in no Practice tab (Hard and autocomplete only). The real tiers (1 Major hubs, 2 Large, 3 Mid-size) come from
+    # data/tiers.json, written by `node scripts/practice_tiers.mjs` once this build exists (see apply_tiers below).
     for a in kept:
-        a["tier"] = 1 if a["id"] in top_ids else (2 if a["type"] == "large" else 3)
+        a["tier"] = 4
 
     # ---- runway data: count, and the airfield's bounding box
     runways = defaultdict(list)
@@ -483,13 +498,12 @@ def main():
         raise SystemExit("top airports without a verified Wikipedia article: %s" % missing_wp)
     kept, n_daily_before, daily_dropped = quality_filter(kept, "Daily")
     hard, n_hard_before, hard_dropped = quality_filter(hard, "Hard")
-    top_ids &= {a["id"] for a in kept}
+    kept, hard = apply_tiers(kept, hard)
 
     dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts; nz = native Esri imagery level")
     dump(OUT_HARD, hard, "OurAirports (public domain); nz = native Esri imagery level")
-    n = Counter(a["tier"] for a in kept)
-    print("daily tiers: tier1=%d tier2=%d tier3=%d" % (n[1], n[2], n[3]))
-    print("top 10 by routes:", [a["iata"] for a in ranked[:10]])
+    n = Counter(a["tier"] for a in kept + hard)
+    print("practice tiers: tier1=%d tier2=%d tier3=%d, in no tier=%d (main file %d, Hard file %d)" % (n[1], n[2], n[3], n[4], len(kept), len(hard)))
 
 
 if __name__ == "__main__":

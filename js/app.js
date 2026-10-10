@@ -11,7 +11,7 @@ const el = {
   guesses: $('#guesses'), result: $('#result'), play: $('#play'), stage: $('#stage'), left: $('#left'),
   tools: $('#tools'), btnHint: $('#btn-hint'), btnZoom: $('#btn-zoom'), sheet: $('#sheet'),
   resetView: $('#reset-view'), zoomLive: $('#zoom-live'), hintsUsed: $('#hints-used'), hintsList: $('#hints-list'),
-  modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), hardToggle: $('#hard-toggle'), toast: $('#toast'),
+  modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), diffSub: $('#diff-sub'), hardToggle: $('#hard-toggle'), toast: $('#toast'),
 };
 
 const game = {
@@ -491,6 +491,8 @@ function renderChrome() {
   for (const b of el.modeSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.mode === game.mode));
   el.hardToggle.checked = game.hard;
   el.diffSeg.hidden = !(game.mode === 'practice' && !game.hard);
+  el.diffSub.hidden = el.diffSeg.hidden;
+  el.diffSub.textContent = C.DIFFICULTIES[game.diff].sub;
   for (const b of el.diffSeg.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.diff === game.diff));
   el.input.placeholder = 'Airport, city or code';
 }

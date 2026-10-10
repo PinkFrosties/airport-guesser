@@ -1,45 +1,47 @@
 {
  "airports": 12725,
  "why": {
-  "airline: wikidata (only hub airline)": 268,
-  "region": 11566,
-  "airline: openflights routes": 225,
-  "airline: wikidata + routes": 161,
-  "several hub airlines, no clear leader": 123,
-  "airline: openflights (overrides a minor Wikidata hub)": 96,
-  "grid": 373,
-  "elev": 35,
-  "airline suppressed by review (top 50)": 7,
+  "airline: openflights routes (clear leader)": 238,
+  "region": 11121,
+  "airline: wikidata (only hub airline, little route data)": 30,
+  "grid": 1255,
+  "airline: no dominant carrier (close race)": 254,
+  "airline: several hub airlines, little route data": 232,
+  "airline: the biggest carrier in the route data no longer exists": 236,
+  "airline: blocked after review": 11,
+  "elev": 80,
+  "airline: cargo / charter operator, not offered": 8,
   "none": 1
  },
  "top50": {
-  "airline": 31,
-  "region": 19
+  "airline": 14,
+  "grid": 13,
+  "region": 23
  },
  "hard_pool": {
-  "airline": 719,
-  "region": 11547,
-  "grid": 373,
-  "elev": 35,
+  "airline": 254,
+  "region": 11098,
+  "grid": 1242,
+  "elev": 80,
   "none": 1
  },
  "practice": {
   "major_hubs": {
-   "airline": 71,
-   "region": 28,
-   "grid": 1
+   "region": 45,
+   "airline": 31,
+   "grid": 24
   },
   "large": {
-   "airline": 528,
-   "region": 610,
-   "grid": 19,
-   "elev": 12
+   "airline": 218,
+   "region": 657,
+   "grid": 264,
+   "elev": 30
   },
   "mid_size": {
-   "region": 3465,
-   "airline": 201,
-   "grid": 99,
-   "elev": 19
+   "region": 3223,
+   "airline": 49,
+   "grid": 475,
+   "elev": 37
   }
  },
  "top50_list": [
@@ -62,21 +64,21 @@
    "code": "HND",
    "name": "Tokyo Haneda International Airport",
    "country": "Japan",
-   "hint3": "airline|All Nippon Airways"
+   "hint3": "grid|east"
   },
   {
    "rank": 4,
    "code": "DFW",
    "name": "Dallas Fort Worth International Airport",
    "country": "United States",
-   "hint3": "airline|American Airlines"
+   "hint3": "region|Texas"
   },
   {
    "rank": 5,
    "code": "PVG",
    "name": "Shanghai Pudong International Airport",
    "country": "China",
-   "hint3": "airline|China Eastern Airlines"
+   "hint3": "grid|east"
   },
   {
    "rank": 6,
@@ -118,14 +120,14 @@
    "code": "DEL",
    "name": "Indira Gandhi International Airport",
    "country": "India",
-   "hint3": "region|Delhi"
+   "hint3": "grid|north-west"
   },
   {
    "rank": 12,
    "code": "ICN",
    "name": "Incheon International Airport",
    "country": "South Korea",
-   "hint3": "region|Incheon Metropolitan City"
+   "hint3": "grid|north-west"
   },
   {
    "rank": 13,
@@ -153,28 +155,28 @@
    "code": "SIN",
    "name": "Singapore Changi Airport",
    "country": "Singapore",
-   "hint3": "airline|Singapore Airlines"
+   "hint3": "region|South East"
   },
   {
    "rank": 17,
    "code": "AMS",
    "name": "Amsterdam Airport Schiphol",
    "country": "Netherlands",
-   "hint3": "airline|KLM"
+   "hint3": "region|Noord-Holland"
   },
   {
    "rank": 18,
    "code": "MAD",
    "name": "Adolfo Suárez Madrid–Barajas Airport",
    "country": "Spain",
-   "hint3": "region|Madrid"
+   "hint3": "grid|north"
   },
   {
    "rank": 19,
    "code": "SZX",
    "name": "Shenzhen Bao'an International Airport",
    "country": "China",
-   "hint3": "airline|Shenzhen Airlines"
+   "hint3": "region|Guangdong Province"
   },
   {
    "rank": 20,
@@ -195,21 +197,21 @@
    "code": "BKK",
    "name": "Suvarnabhumi Airport",
    "country": "Thailand",
-   "hint3": "airline|Thai Airways"
+   "hint3": "grid|centre"
   },
   {
    "rank": 23,
    "code": "JFK",
    "name": "John F. Kennedy International Airport",
    "country": "United States",
-   "hint3": "region|New York"
+   "hint3": "grid|east"
   },
   {
    "rank": 24,
    "code": "HKG",
    "name": "Hong Kong International Airport",
    "country": "Hong Kong",
-   "hint3": "airline|Cathay Pacific"
+   "hint3": "region|New Territories"
   },
   {
    "rank": 25,
@@ -244,7 +246,7 @@
    "code": "MIA",
    "name": "Miami International Airport",
    "country": "United States",
-   "hint3": "airline|American Airlines"
+   "hint3": "region|Florida"
   },
   {
    "rank": 30,
@@ -279,14 +281,14 @@
    "code": "PKX",
    "name": "Beijing Daxing International Airport",
    "country": "China",
-   "hint3": "region|Beijing Municipality"
+   "hint3": "grid|north-east"
   },
   {
    "rank": 35,
    "code": "CLT",
    "name": "Charlotte Douglas International Airport",
    "country": "United States",
-   "hint3": "airline|American Airlines"
+   "hint3": "region|North Carolina"
   },
   {
    "rank": 36,
@@ -307,21 +309,21 @@
    "code": "MNL",
    "name": "Ninoy Aquino International Airport",
    "country": "Philippines",
-   "hint3": "region|National Capital Region"
+   "hint3": "grid|north-west"
   },
   {
    "rank": 39,
    "code": "PHX",
    "name": "Phoenix Sky Harbor International Airport",
    "country": "United States",
-   "hint3": "airline|American Airlines"
+   "hint3": "region|Arizona"
   },
   {
    "rank": 40,
    "code": "FCO",
    "name": "Rome–Fiumicino Leonardo da Vinci International Airport",
    "country": "Italy",
-   "hint3": "airline|ITA Airways"
+   "hint3": "region|Lazio"
   },
   {
    "rank": 41,
@@ -335,28 +337,28 @@
    "code": "SHA",
    "name": "Shanghai Hongqiao International Airport",
    "country": "China",
-   "hint3": "airline|China Eastern Airlines"
+   "hint3": "grid|east"
   },
   {
    "rank": 43,
    "code": "CKG",
    "name": "Chongqing Jiangbei International Airport",
    "country": "China",
-   "hint3": "region|Chongqing Municipality"
+   "hint3": "grid|south"
   },
   {
    "rank": 44,
    "code": "KMG",
    "name": "Kunming Changshui International Airport",
    "country": "China",
-   "hint3": "airline|China Eastern Airlines"
+   "hint3": "region|Yunnan Province"
   },
   {
    "rank": 45,
    "code": "XIY",
    "name": "Xi'an Xianyang International Airport",
    "country": "China",
-   "hint3": "airline|China Eastern Airlines"
+   "hint3": "region|Shaanxi Province"
   },
   {
    "rank": 46,
@@ -377,21 +379,21 @@
    "code": "TPE",
    "name": "Taiwan Taoyuan International Airport",
    "country": "Taiwan",
-   "hint3": "region|Taoyuan City"
+   "hint3": "grid|north-east"
   },
   {
    "rank": 49,
    "code": "YYZ",
    "name": "Toronto Pearson International Airport",
    "country": "Canada",
-   "hint3": "airline|Air Canada"
+   "hint3": "region|Ontario"
   },
   {
    "rank": 50,
    "code": "GRU",
    "name": "São Paulo/Guarulhos–Governor André Franco Montoro International Airport",
    "country": "Brazil",
-   "hint3": "airline|LATAM Brasil"
+   "hint3": "grid|south"
   }
  ]
 }

@@ -234,6 +234,7 @@ dialog[open]{animation:rise .3s var(--ease)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 .foot{margin-top:28px;color:var(--muted);font-size:0.8125rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
 .foot .seg-sm button{min-height:34px;font-size:0.875rem;padding:0 14px}
+.diff-sub{flex-basis:100%;margin:-4px 0 0;color:var(--muted);font-size:0.8125rem}
 .foot-line{margin:0}
 .history{margin:36px auto 8px;max-width:640px;color:var(--text-2)}
 .history h2{margin:0 0 10px;font-size:0.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}

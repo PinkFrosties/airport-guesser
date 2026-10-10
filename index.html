@@ -64,6 +64,7 @@
       <button type="button" data-diff="medium" aria-pressed="true">Large</button>
       <button type="button" data-diff="hard" aria-pressed="false">Mid-size</button>
     </div>
+    <p class="diff-sub" id="diff-sub" hidden></p>
   </div>
 
   <main class="board">
@@ -178,7 +179,7 @@
       <li>The Daily airport is drawn from the 50 busiest airports worldwide by total passengers: ACI World annual figures for <span id="about-rank-year">2025</span>, as compiled on <a href="https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic" target="_blank" rel="noopener">Wikipedia</a> (retrieved <span id="about-rank-date"></span>). The source publishes the top 50 only. <a href="https://aci.aero/resources/busiest-airports-in-the-world/" target="_blank" rel="noopener">ACI World</a></li>
       <li><b>Wikipedia</b> is used as a link target only: after a round ends, the result card offers a link to the airport's Wikipedia article. The app never contacts Wikipedia itself, and nothing is shown or prefetched before the round ends. <b>Opening the link leaves the app</b> and goes to wikipedia.org (new tab, text under CC BY-SA, see Wikipedia). The article titles were looked up at build time from OurAirports' Wikipedia links, falling back to <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> (CC0); airports without a verified article get a Wikipedia search link instead.</li>
       <li>The third hint (an airport's <b>main airline</b>, or its region) is decided at build time. Main airline: <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> (CC0) airline-hub relations, checked against <a href="https://github.com/jpatokal/openflights" target="_blank" rel="noopener">OpenFlights</a> (ODbL) route counts and airline records; names only, no logos. Region: OurAirports region names. The route data is from 2014, so a few airlines may be out of date.</li>
-      <li>The Practice "Major hubs" set is ranked by route counts from <a href="https://github.com/jpatokal/openflights" target="_blank" rel="noopener">OpenFlights</a> (ODbL) routes data, used only to order airports at build time.</li>
+      <li><b>Practice tabs.</b> Major hubs: ranks 1-50 are the Daily list (ACI World 2025); additional major hubs come from <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> passenger counts, mixed years 2019-2025 (the tab is 100 busy airports, not a strict ranking). Large: airports where one airline clearly dominates. Mid-size: regional airports with scheduled service. Airports are chosen with a build-time score from Wikipedia and Wikidata fame, <a href="https://github.com/jpatokal/openflights" target="_blank" rel="noopener">OpenFlights</a> (ODbL) routes, imagery quality and runway layout.</li>
     </ul>
     <h3>Open-source software</h3>
     <ul id="oss-list"><li>Loading&hellip;</li></ul>

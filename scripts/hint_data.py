@@ -34,7 +34,9 @@ REPORT = os.path.join(ROOT, "qa", "hint3-report.json")
 UA = "airport-guesser-build/1.0 (https://github.com/PinkFrosties/airport-guesser)"
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 OPENFLIGHTS = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/"
-MARGIN = 2.0          # the main airline needs this many times the routes of the runner-up (v1.3.6: was 1.5)
+MIN_SHARE = 0.3        # ... and at least this share of all routes departing the airport
+MIN_AIRLINE_ROUTES = 5   # a Wikidata-only carrier that OpenFlights knows must have at least this many routes (and an IATA airline code)
+MARGIN = float(os.environ.get("HINT_MARGIN", "2.0"))          # the main airline needs this many times the routes of the runner-up (v1.3.6: was 1.5)
 MIN_ROUTES = 10       # OpenFlights fallback: the airport needs at least this many routes
 MIN_GRID_AIRPORTS = 5
 # Top-50 airports whose "main airline" the sources get wrong (OpenFlights routes are from 2014, Wikidata hub links are partial):
@@ -91,6 +93,9 @@ COMMON = {"lion mentari airlines": "Lion Air", "aeroflot russian airlines": "Aer
           "sunexpress": "SunExpress", "aerolinea del estado mexicano": "Mexicana", "lineas aereas del estado": "LADE"}
 
 
+NOT_SCHEDULED = re.compile(r"cargo|express|aviation|flying service|charter|air ?taxi|logistic|freight|courier|helicopter|jet service|flight service|aero ?club|skydiv", re.I)
+
+
 def common_name(name):
     n = re.sub(r"\s*\([^)]*\)", "", name).strip()   # drop "(Priv)", "(7I/INC)" ...
     if norm(n) in {norm(k) for k in COMMON}:
@@ -120,9 +125,41 @@ GENERIC = {"city", "province", "state", "region", "prefecture", "county", "distr
            "territory", "department", "community", "of", "the", "de", "new", "san", "santa", "saint", "st", "north", "south", "east", "west", "port", "fort", "lake", "mount", "great", "greater"}
 
 
+ADMIN = {"city", "province", "state", "region", "prefecture", "county", "district", "municipality", "metropolitan", "governorate", "autonomous", "capital", "territory", "department", "community", "of", "the", "de"}
+
+
+def seq(s):
+    """The name as a list of words without administrative filler (so \"Santa Fe Province\" -> [santa, fe])."""
+    return [w for w in re.findall(r"[a-z0-9]+", fold(s).lower()) if w not in ADMIN]
+
+
+def contains_seq(big, small):
+    return bool(small) and any(big[i:i + len(small)] == small for i in range(len(big) - len(small) + 1))
+
+
 def words(s):
     s = fold(s).lower()
     return {w for w in re.findall(r"[a-z0-9]+", s) if w not in GENERIC and len(w) > 2}
+
+
+# carriers the sources list but that are wrong for the airport or no longer fly (found when reviewing the Practice tiers); never offered
+BLOCK_AIRLINES = {norm(x): why for x, why in {
+    "Baikotovitchestrian Airlines": "not a real carrier at Kinshasa (bad Wikidata hub entry)",
+    "Volotea Costa Rica": "not a carrier at Barcelona/Anzoategui (bad data)",
+    "Interjet": "ceased operations in 2020",
+    "Lesotho Airways": "ceased operations around 2000",
+    "Metro Batavia": "Indonesian carrier that ceased in 2013 (not at Panama)",
+    "Caucasus Airlines": "no longer operating",
+    "Trinity Airways": "doubtful: not a real scheduled network at Daegu (reviewed v1.4.0)",
+    "Parata Air": "doubtful: not operating at Yangyang (reviewed v1.4.0)",
+    "Arik Air": "doubtful: suspended and restructured, no longer dominant at Lagos (reviewed v1.4.0)",
+}.items()}
+
+
+# carrier / airport pairs that are wrong although the carrier is fine elsewhere
+BLOCK_AT = {(code, norm(x)): why for (code, x), why in {
+    ("LFW", "Ethiopian Airlines"): "a stake in ASKY, not the main carrier at Lome (reviewed v1.4.0)",
+}.items()}
 
 
 # regions that ARE one city (city-states, capital municipalities): the name of the region names the airport's city
@@ -159,6 +196,7 @@ def main():
         if a["icao"] and (a["icao"] not in by_icao or a["active"]):
             by_icao[a["icao"]] = a
     routes = defaultdict(Counter)  # airport IATA -> airline id -> routes departing (non-codeshare)
+    airline_routes = Counter()      # airline id -> routes in total (a real scheduled carrier has many)
     for row in csv.reader(io.StringIO(fetch(OPENFLIGHTS + "routes.dat", "routes.dat"))):
         if len(row) < 8 or row[6] == "Y":
             continue
@@ -168,6 +206,7 @@ def main():
             aid = al["id"] if al else None
         if aid and row[2] and row[2] != "\\N":
             routes[row[2]][aid] += 1
+            airline_routes[aid] += 1
 
     # ---------- Wikidata: current airline hubs ----------
     q = """
@@ -273,7 +312,7 @@ SELECT ?airlineLabel ?aiata WHERE {
             return None
         # ... and nothing that contains the airport's own city (Madrid, New York, Beijing Municipality, ...)
         city = (a.get("city") or "")
-        if city and (words(name) & words(city) or norm(name) == norm(city)):
+        if city and (words(name) & words(city) or norm(name) == norm(city) or contains_seq(seq(name), seq(city)) or contains_seq(seq(city), seq(name))):
             return None
         return name  # the app shows "<region>, <country>"
 
@@ -309,7 +348,7 @@ SELECT ?airlineLabel ?aiata WHERE {
         if total >= MIN_ROUTES and leader and leader[0] >= 3:
             if gone and gone[0] * 2 >= leader[0]:
                 why["airline: the biggest carrier in the route data no longer exists"] += 1
-            elif not runner or leader[0] >= MARGIN * runner:
+            elif (not runner or leader[0] >= MARGIN * runner) and leader[0] >= MIN_SHARE * total:
                 names = hub_by_id.get(leader[1]["id"], [])
                 exact = [x for x in names if norm(x) == norm(leader[1]["name"])]
                 choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"])}, "openflights routes (clear leader)"
@@ -318,7 +357,8 @@ SELECT ?airlineLabel ?aiata WHERE {
         elif cand:
             names = {norm(i["name"]) for i in cand.values()}
             groups = {(of_airline(i) or {}).get("id") or "n:" + norm(i["name"]) for i in cand.values()}
-            if len(groups) == 1:
+            real = [i for i in cand.values() if i.get('iata') and (not of_airline(i) or (still_flying(of_airline(i)) and airline_routes[of_airline(i)['id']] >= MIN_AIRLINE_ROUTES))]
+            if len(groups) == 1 and real:  # a hub link alone is not enough: the carrier must be a real scheduled airline (not a stale or one-plane entry)
                 choice, source = {"name": min((i["name"] for i in cand.values()), key=len)}, "wikidata (only hub airline, little route data)"
             else:
                 why["airline: several hub airlines, little route data"] += 1
@@ -327,6 +367,12 @@ SELECT ?airlineLabel ?aiata WHERE {
             choice = None
         if choice:
             name = common_name(choice["name"])
+            if norm(name) in BLOCK_AIRLINES or (iata, norm(name)) in BLOCK_AT:
+                why["airline: blocked after review"] += 1
+                name = ""
+            elif NOT_SCHEDULED.search(name):  # cargo, charter, air-taxi and flying-service operators are not the airline of an airport
+                why["airline: cargo / charter operator, not offered"] += 1
+                name = ""
             if name and len(name) <= 40:
                 out[aid] = "airline|" + name
                 why["airline: " + source] += 1

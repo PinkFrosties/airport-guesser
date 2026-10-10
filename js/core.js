@@ -254,20 +254,19 @@ export function dailyTopOrder(top, dateStr) {
   return [...order.slice(p), ...order.slice(0, p)];
 }
 
+// The three Practice tabs (ids and labels unchanged; since v1.4.0 each is a disjoint tier built by scripts/practice_tiers.mjs).
 export const DIFFICULTIES = {
-  easy: { label: 'Major hubs', filter: (a) => a.tier === 1 },
-  medium: { label: 'Large', filter: (a) => a.type === 'large' },
-  hard: { label: 'Mid-size', filter: (a) => a.type === 'medium' },
+  easy: { label: 'Major hubs', sub: "100 of the world's busiest airports", filter: (a) => a.tier === 1, weight: (a) => (a.top ? 2 : 1) }, // the 50 ACI World airports are drawn twice as often as the extra 50
+  medium: { label: 'Large', sub: 'Airline hubs and bases, with an airline hint', filter: (a) => a.tier === 2 },
+  hard: { label: 'Mid-size', sub: 'Regional airports, region hint', filter: (a) => a.tier === 3 },
 };
 
-/** Random candidate order for practice (all candidates, shuffled). */
+/** Random candidate order for practice: a weighted shuffle (Efraimidis-Spirakis), so a weight-2 airport comes first twice as often as a weight-1 one. */
 export function practiceOrder(pool, difficulty, rnd = Math.random) {
-  const list = difficulty && DIFFICULTIES[difficulty] ? pool.filter(DIFFICULTIES[difficulty].filter) : [...pool];
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list;
+  const d = difficulty && DIFFICULTIES[difficulty];
+  const list = d ? pool.filter(d.filter) : [...pool];
+  const w = d && d.weight ? d.weight : () => 1;
+  return list.map((a) => ({ a, k: Math.log(Math.max(rnd(), 1e-12)) / w(a) })).sort((x, y) => y.k - x.k).map((x) => x.a);
 }
 
 // ---------- locked view: zoom that fits the airfield, sharp on any screen ----------

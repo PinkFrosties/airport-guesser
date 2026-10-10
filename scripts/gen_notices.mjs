@@ -37,8 +37,8 @@ writeFileSync(join(root, 'data/credits.json'), JSON.stringify({
   // data used at BUILD time only (the app contacts none of them)
   data: [
     { name: 'OurAirports', license: 'public domain', url: 'https://ourairports.com/data/', purpose: 'airports, runways, countries, regions, elevation' },
-    { name: 'OpenFlights', license: 'ODbL', url: 'https://github.com/jpatokal/openflights', purpose: 'route counts (Major hubs), airline names and routes (main-airline hint)' },
-    { name: 'Wikidata', license: 'CC0', url: 'https://www.wikidata.org/', purpose: 'airline-hub relations (main-airline hint), Wikipedia article titles' },
+    { name: 'OpenFlights', license: 'ODbL', url: 'https://github.com/jpatokal/openflights', purpose: 'route and destination counts (Practice playability score), airline names and routes (main-airline hint)' },
+    { name: 'Wikidata', license: 'CC0', url: 'https://www.wikidata.org/', purpose: 'airline-hub relations (main-airline hint), Wikipedia article titles, passenger counts P3872 (Major hubs 51-100, mixed years 2019-2025), language-edition counts (playability score)' },
     { name: 'Wikipedia', license: 'link target only', url: 'https://www.wikipedia.org/', purpose: 'article link on the result card' },
   ],
 }, null, 2) + '\n');
@@ -63,8 +63,8 @@ Used only for the test scripts and to generate icons.
 
 - **Esri World Imagery** (map tiles; the build also queries the tile availability service). Used under Esri's terms, with the required attribution shown on every image. https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9
 - **OurAirports** airport, runway and country data (airports.csv, runways.csv, countries.csv). Public domain. https://ourairports.com/data/
-- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py) and to read airline-hub relations for the third hint (scripts/hint_data.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
-- **OpenFlights** route data (routes.dat) and airline records (airlines.dat), used only at build time to order the Practice "Major hubs" set and to choose an airport's main airline for the third hint. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
+- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py) to read airline-hub relations for the third hint (scripts/hint_data.py), and passenger counts (P3872, mixed years 2019-2025) and language-edition counts for the Practice tiers (scripts/practice_tiers.mjs). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
+- **OpenFlights** route data (routes.dat) and airline records (airlines.dat), used only at build time for the Practice playability score (route and destination counts) and to choose an airport's main airline for the third hint. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
 
 ## Disclaimer
 

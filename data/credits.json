@@ -20,13 +20,13 @@
       "name": "OpenFlights",
       "license": "ODbL",
       "url": "https://github.com/jpatokal/openflights",
-      "purpose": "route counts (Major hubs), airline names and routes (main-airline hint)"
+      "purpose": "route and destination counts (Practice playability score), airline names and routes (main-airline hint)"
     },
     {
       "name": "Wikidata",
       "license": "CC0",
       "url": "https://www.wikidata.org/",
-      "purpose": "airline-hub relations (main-airline hint), Wikipedia article titles"
+      "purpose": "airline-hub relations (main-airline hint), Wikipedia article titles, passenger counts P3872 (Major hubs 51-100, mixed years 2023-2025), language-edition counts (playability score)"
     },
     {
       "name": "Wikipedia",
