@@ -30,6 +30,19 @@ export function compassIndex(bearing) {
   return Math.round((((bearing % 360) + 360) % 360) / 45) % 8;
 }
 export const compassLabel = (bearing) => COMPASS[compassIndex(bearing)];
+export const COMPASS_WORDS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+/** Closer than this the direction is noise (airports of one city): the row says "Very close" instead of showing an arrow. */
+export const NEAR_KM = 10;
+/** The arrow's rotation in degrees (clockwise, 0 = up) taking the SHORT way round: -180 < angle <= 180, so a transition from 0 never spins the long way. */
+export const arrowAngle = (bearing) => { const b = ((bearing % 360) + 360) % 360; return b > 180 ? b - 360 : b; };
+/** Screen-reader text for a guess row. */
+export function directionPhrase(r) {
+  if (r.correct) return 'Correct';
+  const km = r.km.toLocaleString('en-US');
+  if (r.near) return `Very close, about ${km} km away`;
+  return `About ${km} km to the ${COMPASS_WORDS[compassIndex(r.bearing)]}`;
+}
 
 export const proximityPct = (km) => Math.max(0, Math.min(100, Math.floor(100 * (1 - km / HALF_EARTH_KM))));
 
@@ -46,6 +59,7 @@ export function evaluateGuess(g, a) {
     bearing,
     dir: compassLabel(bearing),
     pct: correct ? 100 : Math.min(99, proximityPct(km)),
+    near: !correct && km < NEAR_KM,
   };
 }
 

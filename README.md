@@ -40,6 +40,14 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
 
+### v1.3.2 (direction arrow audit) - 2026-10-10
+- Audited distance and direction end to end against an independent implementation (Turf, dev-only): over 5,025 random airport pairs the largest difference is 3e-11 km in distance and 2e-12 degrees in bearing; antimeridian, poles, antipodes and due N/S/E/W cases have expected-value tests. The maths was correct; the display had four faults, now fixed:
+- Arrows no longer swing the long way round: a bearing of 350 degrees now turns 10 degrees anticlockwise instead of 350 clockwise
+- Only the newest guess row animates its arrow; the older rows are simply drawn at their angle on every redraw (hint, zoom-out, extra guess, theme switch)
+- Each row has a proper accessible name, for example "About 6,310 km to the north-west" (the old label sat on an element screen readers ignore)
+- Airports less than 10 km apart (airports of one city, or two records at the same coordinates) now show a ring and "NEAR" ("Very close, about 4 km away") instead of an arrow pointing in a noisy direction
+- New `tests/direction.mjs`
+
 ### v1.3.1 (typing zoom fix) - 2026-10-10
 - Fixed: the satellite view zoomed out while typing a guess. Cause: opening the keyboard switched to the compact layout, which shrank the image frame, and the shrunk frame re-ran the zoom fit (zoom 13 became 11 in the Android test, and back when the keyboard closed). The map now keeps the exact size its view was fitted to and is only scaled down into the compact frame, so zoom and framing are identical before, during and after typing
 - A re-fit now happens only when the width changes (rotation, window resize); height-only changes (keyboard, browser bar, window height) never refit, and the compact layout is used with touch only
@@ -154,6 +162,7 @@ npm install                      # dev-only: Playwright + the vendored Leaflet s
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
+node tests/direction.mjs         # distance and bearing vs Turf, edge cases, the rendered arrow, label and spoken text
 node tests/typing.mjs            # typing, keyboard open/close and rotation never change zoom or framing
 node tests/all.mjs               # every script, one line each (--dist, --webkit)
 node tests/textscale.mjs         # text follows the browser font size, no overflow at 150/200% on narrow screens

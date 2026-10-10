@@ -453,6 +453,7 @@ el.btnHint.addEventListener('click', () => { closeList(); sheet = sheet && sheet
 el.btnZoom.addEventListener('click', () => { closeList(); sheet = { type: 'confirm', what: 'zoom' }; renderSheet(); });
 
 // ---------- rendering ----------
+const nearSvg = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>';
 const arrowSvg = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4M5.5 10.5 12 4l6.5 6.5"/></svg>';
 const fmt = (n) => n.toLocaleString('en-US');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -517,11 +518,14 @@ function renderAll(animateLast = false) {
       <span class="n">${i + 1}</span>
       <div class="who"><span class="nm">${esc(g.name)}</span><span class="code">${esc(codeOf(g))}</span></div>
       <div class="nums">${res.correct ? '<b>Correct</b>' : `<b>${fmt(res.km)} km</b><span>${res.pct}%</span>`}<span class="bar"><i style="width:${res.pct}%"></i></span></div>
-      <div class="dir" aria-label="${res.correct ? 'Correct' : `Answer is ${res.dir} of this airport`}">${arrowSvg}<span>${res.correct ? 'HIT' : res.dir}</span></div>`;
-    if (!res.correct) {
+      <div class="dir" role="img" aria-label="${esc(C.directionPhrase(res))}">${res.near ? nearSvg : arrowSvg}<span>${res.correct ? 'HIT' : res.near ? 'NEAR' : res.dir}</span></div>`;
+    if (!res.correct && !res.near) {
       const svg = li.querySelector('svg');
-      svg.style.transform = 'rotate(0deg)';
-      requestAnimationFrame(() => requestAnimationFrame(() => { svg.style.transform = `rotate(${res.bearing.toFixed(1)}deg)`; }));
+      const turn = `rotate(${C.arrowAngle(res.bearing).toFixed(1)}deg)`;
+      if (animateLast && i === r.results.length - 1) { // only the newest arrow swings into place (the short way round); the others are simply there
+        svg.style.transform = 'rotate(0deg)';
+        requestAnimationFrame(() => requestAnimationFrame(() => { svg.style.transform = turn; }));
+      } else { svg.style.transition = 'none'; svg.style.transform = turn; }
     }
     el.guesses.prepend(li);
   });
