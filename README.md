@@ -2,11 +2,11 @@
 
 **Play it: https://pinkfrosties.github.io/airport-guesser/**
 
-A static, backend-free guessing game for phone and desktop: you get a locked satellite image of one airport and five attempts to name it. Every miss shows the distance to the answer, a compass arrow pointing from your guess toward it, and a proximity percentage. There is one shared Daily airport per UTC date, a separate Hard mode, and endless Practice. It is vanilla JS + Leaflet, installable as a PWA, and keeps stats in `localStorage`.
+A static, backend-free guessing game for phone and desktop: you get a satellite image of one airport (zoom in as much as the real imagery allows, never wider than the start view) and five attempts to name it. Every miss shows the distance to the answer, a compass arrow pointing from your guess toward it, and a proximity percentage. There is one shared Daily airport per UTC date, a separate Hard mode, and endless Practice. It is vanilla JS + Leaflet, installable as a PWA, and keeps stats in `localStorage`.
 
 ## How to play
 
-You get a locked satellite view of an airport. Name it in 5 guesses or fewer.
+You get a satellite view of an airport. Name it in 5 guesses or fewer. Zooming in is free (pinch, mouse wheel, double-tap / double-click, + and -; drag while zoomed; 0, Esc or Reset view go back); you can never zoom out past the start view.
 
 - Type the airport name; autocomplete suggests matches.
 - Each wrong guess shows the distance and direction to the answer.
@@ -31,6 +31,7 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 - Retina-sharp imagery: tiles are requested at the screen's pixel density (up to +1 level), never CSS-upscaled beyond that
 - Fast loading: only the visible tiles, background preload of the zoom-out view, service-worker tile cache
 - Desktop layout: image left, guess panel right
+- Interactive zoom-in from the start view: pinch, wheel / trackpad pinch, double tap, + - 0 Esc, drag to pan while zoomed (clamped to the start frame), never beyond the native imagery; retina-sharp tiles at every level
 - Distance and direction feedback on every wrong guess
 - Optional hints and one-time zoom-out, each costing a guess
 - Light and dark themes, follows system setting with manual override
@@ -39,6 +40,14 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 ## Changelog
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
+
+### v1.3.4 (interactive zoom) - 2026-10-10
+- The locked view is replaced by a view you can zoom IN from: pinch on touch, mouse wheel and trackpad pinch on desktop, double-tap / double-click for one step (again to reset), + and - on the keyboard, 0 or Esc to reset. Zooming is free and has no effect on guesses, hints or the Daily answer; the start view is identical for everyone
+- Limits: never wider than the start view (or the wider Zoom out view once bought, which becomes the new start view), never deeper than the real imagery (at most 3 levels in, and never past the airport's native level); pan only while zoomed in, clamped so the view never leaves the start frame; one-finger swipes scroll the page normally at the start view and the wheel over the image never scrolls the page on desktop
+- Reset: a "Reset view" chip appears only while zoomed in; resetting returns to exactly the start centre (checked to within 1 px) with a smooth animation (none with reduced motion); a screen-reader note says "Zoomed in. Press 0 to reset."
+- Image quality: tiles are requested at the sharp level at every zoom (zoom + retina offset, never past native); scaled stand-in tiles exist only while a zoom is in progress, never for the first reveal; extra tiles stay within about one screen and go through the service-worker tile cache
+- Typing a guess still never changes the view (also while zoomed in); the attribution pill, Reset chip and result card stay correct at every zoom level
+- New `tests/zoominteract.mjs`; the old "locked view" end-to-end check now asserts that nothing pans the start view
 
 ### v1.3.3 (hints rework) - 2026-10-10
 - Exactly three hints, each still costing 1 of the 5 attempts: **Country**, **Name starts with** (the first character of the name exactly as the suggestions show it, so it is not mistaken for the city), and a **third clue** chosen per airport at build time: the airport's **main airline** (name only, no logos), else its **region** ("Washington, United States"), else its part of the country ("North-west of Brazil"), else an elevation band. The menu names the kind of clue; the clue appears only after it is bought
@@ -171,6 +180,7 @@ node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
 node tests/direction.mjs         # distance and bearing vs Turf, edge cases, the rendered arrow, label and spoken text
+node tests/zoominteract.mjs       # pinch, wheel, double tap, keys, pan clamp, reset exactness, native cap, typing while zoomed
 node tests/hints.mjs             # three hints: spend, no double spend, last attempt, reload, nothing leaks before purchase
 node tests/typing.mjs            # typing, keyboard open/close and rotation never change zoom or framing
 node tests/all.mjs               # every script, one line each (--dist, --webkit)

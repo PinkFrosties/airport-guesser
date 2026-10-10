@@ -91,7 +91,7 @@ const wrongPick = (answer, n) => ['JFK', 'LHR', 'SIN', 'GRU', 'SYD', 'DXB'].map(
 
 // Playwright's WebKit/Firefox have no CDP, no Touch constructor, no clipboard-read and an unstable service worker on Windows:
 // these tests exercise the test harness, not the app, so they run on Chromium only (AG_BROWSER=chromium, the default).
-const CHROMIUM_ONLY = /stalled tiles|built site only|locked view: no pan|win after a hint|Hard mode: separate toggle|PWA: manifest|service worker caches tiles/;
+const CHROMIUM_ONLY = /stalled tiles|built site only|start view: nothing moves|win after a hint|Hard mode: separate toggle|PWA: manifest|service worker caches tiles/;
 async function test(name, fn) {
   if (browserName !== 'chromium' && CHROMIUM_ONLY.test(name)) { console.log(`  skip ${name} (needs Chromium test tooling)`); return; }
   const t0 = Date.now();
@@ -460,7 +460,7 @@ await test('first paint: header, mode switches and the guess panel are there imm
   await ctx.close();
 });
 
-await test('locked view: no pan, pinch, wheel, double-click, keys or +/- buttons', async () => {
+await test('start view: nothing moves it sideways (no pan, no arrow keys, no on-screen +/- buttons); it only zooms IN (see tests/zoominteract.mjs)', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
   await start(page, HUB);
@@ -469,26 +469,14 @@ await test('locked view: no pan, pinch, wheel, double-click, keys or +/- buttons
   const before = await snap();
   const box = await page.locator('#map').boundingBox();
   const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-  // touch drag + double tap + synthetic pinch via touch events
-  await page.touchscreen.tap(cx, cy);
-  await page.touchscreen.tap(cx, cy);
-  await page.evaluate(({ cx, cy }) => {
-    const t = (id, x, y) => new Touch({ identifier: id, target: document.querySelector('#map'), clientX: x, clientY: y });
-    const fire = (type, touches) => document.querySelector('#map').dispatchEvent(new TouchEvent(type, { touches, targetTouches: touches, changedTouches: touches, bubbles: true, cancelable: true }));
-    fire('touchstart', [t(1, cx - 20, cy), t(2, cx + 20, cy)]);
-    fire('touchmove', [t(1, cx - 80, cy), t(2, cx + 80, cy)]);
-    fire('touchend', []);
-    const m = document.querySelector('#map');
-    m.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, ctrlKey: true, clientX: cx, clientY: cy, bubbles: true, cancelable: true }));
-  }, { cx, cy });
-  await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + 120, cy + 90, { steps: 6 }); await page.mouse.up();
-  await page.mouse.wheel(0, -800); await page.mouse.dblclick(cx, cy);
+  await page.touchscreen.tap(cx, cy); // a single tap does nothing
+  await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + 120, cy + 90, { steps: 6 }); await page.mouse.up(); // dragging at the start view does not pan
   await page.locator('#map').click({ position: { x: 100, y: 100 } });
-  await page.keyboard.press('+'); await page.keyboard.press('-'); await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft'); await page.keyboard.press('-'); // arrow keys never pan, minus never goes wider
   await page.waitForTimeout(600);
   assert.equal(await snap(), before, 'view unchanged');
-  const opts = await page.evaluate(() => { const m = window.__ag.map; return ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'].map((k) => [k, !!m[k].enabled()]); });
-  assert.deepEqual(opts.filter(([, on]) => on), []);
+  assert.equal(await page.locator('.leaflet-control-zoom').count(), 0, 'no on-screen zoom buttons');
+  assert.equal(await page.evaluate(() => !!window.__ag.map.dragging.enabled()), false, 'panning is off until the player zooms in');
   await ctx.close();
 });
 

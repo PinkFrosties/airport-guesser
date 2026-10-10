@@ -10,7 +10,7 @@ const el = {
   form: $('#guess-form'), input: $('#guess-input'), btn: $('#guess-btn'), list: $('#suggestions'),
   guesses: $('#guesses'), result: $('#result'), play: $('#play'), stage: $('#stage'), left: $('#left'),
   tools: $('#tools'), btnHint: $('#btn-hint'), btnZoom: $('#btn-zoom'), sheet: $('#sheet'),
-  hintsUsed: $('#hints-used'), hintsList: $('#hints-list'),
+  resetView: $('#reset-view'), zoomLive: $('#zoom-live'), hintsUsed: $('#hints-used'), hintsList: $('#hints-list'),
   modeSeg: $('#mode-seg'), diffSeg: $('#diff-seg'), hardToggle: $('#hard-toggle'), toast: $('#toast'),
 };
 
@@ -65,7 +65,7 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.toast.classList.remove('show'), 2200);
 }
 
-// ---------- map (locked: no pan, zoom, drag, keys or controls) ----------
+// ---------- map (start view fitted per airport; the player can only zoom IN from it) ----------
 // Two stacked, identical-size satellite views: `main` (the airfield) and `wide` (the zoom-out). The wide one is loaded
 // in the background once the main view is complete, so Zoom out is just a visibility swap.
 const dprNow = () => window.devicePixelRatio || 1;
@@ -81,6 +81,27 @@ function setFront() {
   const f = frontView();
   for (const v of Object.values(views)) v.container.classList.toggle('front', v === f);
 }
+
+// ---- zooming in from the start view (pinch, wheel, double tap / click, + - 0 Esc). Never wider than the start view, never past real imagery.
+const MAX_ZOOM_LEVELS = 3;
+function zoomChanged(v, st) {
+  if (v !== frontView()) return;
+  el.resetView.hidden = !st.zoomed;
+  el.zoomLive.textContent = st.zoomed ? (st.atMax ? 'Zoomed in as far as the imagery goes. Press 0 to reset.' : 'Zoomed in. Press 0 to reset.') : (zoomAnnounced ? 'View reset.' : '');
+  zoomAnnounced = st.zoomed;
+}
+let zoomAnnounced = false;
+/** After a reveal: let the player zoom the front view in; the other view goes back to its own start view. */
+function armZoom() {
+  const r = game.round;
+  if (!r) return;
+  const { center, zMain, zWide } = viewParams(r.answer);
+  const wide = r.zoomed && !r.done;
+  const v = wide ? views.wide : views.main, z = wide ? zWide : zMain, other = wide ? views.main : views.wide;
+  other.resetView(false); other.disableInteraction(); // the base changed: zoom state resets with it
+  v.enableInteraction({ center, z, zmax: Math.min(z + MAX_ZOOM_LEVELS, r.answer.nz - v.retinaLevels), onChange: (st) => zoomChanged(v, st) });
+}
+function revealed() { hideVeil(); armZoom(); preloadWider(); }
 
 // loading skeleton: spinner + progress (tiles loaded / total); fades out only when every tile is in
 let hideTimer;
@@ -144,7 +165,7 @@ async function presentRound() {
   const v = wide ? views.wide : views.main;
   const z = wide ? zWide : zMain;
   el.hint.textContent = wide ? 'Wider view' : 'Airfield view';
-  if (v.isReady(center, z)) { hideVeil(); preloadWider(); return 'ok'; }
+  if (v.isReady(center, z)) { revealed(); return 'ok'; }
   awaiting = v;
   showVeil('Loading imagery', false, true);
   setProgress(0, v.tilesFor(center, z).length);
@@ -154,7 +175,7 @@ async function presentRound() {
 }
 
 function finishLoad(res) {
-  if (res === 'ok') { hideVeil(); preloadWider(); }
+  if (res === 'ok') revealed();
   else if (res === 'timeout') showVeil('Imagery is taking too long to load.', true);
   else showVeil('Imagery failed to load. Check your connection.', true);
   return res;
@@ -343,8 +364,7 @@ async function startMode() {
   if (kind === 'practice') game.lastPracticeId = answer.id; else persist();
   renderAll();
   setFront();
-  hideVeil();
-  preloadWider();
+  revealed();
 }
 
 /** Test hook: start a practice round on a specific airport (the data is client-side anyway). */
@@ -366,7 +386,7 @@ game.debugStart = async (id) => {
   game.round = newRound('practice', null, a);
   renderAll();
   setFront();
-  if (res === 'ok') { hideVeil(); preloadWider(); } else finishLoad(res);
+  if (res === 'ok') revealed(); else finishLoad(res);
   return { status: res, z: zMain };
 };
 
@@ -727,6 +747,36 @@ el.diffSeg.addEventListener('click', (e) => {
   game.diff = b.dataset.diff; savePrefs(); startMode();
 });
 
+// ---------- zoom controls ----------
+el.resetView.addEventListener('click', () => frontView().resetView(true));
+let lastTap = { t: 0, x: 0, y: 0 }, downAt = null, lastDouble = 0;
+function doubleAction(clientX, clientY) {
+  const v = frontView();
+  if (!v.interactive) return;
+  if (v.level > 0) v.resetView(true); // a second double tap goes back to the start view
+  else { const b = v.container.getBoundingClientRect(); v.zoomBy(1, [clientX - b.left, clientY - b.top]); }
+  lastDouble = performance.now();
+}
+el.stage.addEventListener('pointerdown', (e) => { downAt = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY }; });
+el.stage.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse' || !e.isPrimary || !downAt || e.target.closest('button')) return;
+  if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 10) { lastTap.t = 0; return; } // a drag, not a tap
+  const now = performance.now();
+  if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) { lastTap.t = 0; doubleAction(e.clientX, e.clientY); }
+  else lastTap = { t: now, x: e.clientX, y: e.clientY };
+});
+el.stage.addEventListener('dblclick', (e) => { if (e.target.closest('button') || performance.now() - lastDouble < 500) return; doubleAction(e.clientX, e.clientY); });
+document.addEventListener('keydown', (e) => {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  const v = frontView();
+  if (!v.interactive || document.querySelector('dialog[open]')) return;
+  const t = e.target;
+  if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return; // typing a guess
+  if (e.key === '+' || e.key === '=') { if (v.zoomBy(1)) e.preventDefault(); }
+  else if (e.key === '-' || e.key === '_') { if (v.zoomBy(-1)) e.preventDefault(); }
+  else if (e.key === '0' || (e.key === 'Escape' && v.level > 0 && !sheet && el.list.hidden)) { if (v.level > 0) { v.resetView(true); e.preventDefault(); } }
+});
+
 // ---------- viewport / keyboard ----------
 // The on-screen keyboard shrinks the visual viewport (iOS, and Android with interactive-widget=resizes-visual) or the layout
 // viewport (older Android). While a touch player types, the layout switches to a compact one so the image, the input and the
@@ -747,9 +797,10 @@ function onViewport() {
   const was = root.classList.contains('kb');
   if (kb) {
     const compact = Math.min(240, Math.max(110, h * 0.27)); // keep in sync with html.kb --map-h in the stylesheet
-    root.style.setProperty('--fw', game.frame.W);
-    root.style.setProperty('--fh', game.frame.H);
-    root.style.setProperty('--fk', String(Math.min(1, compact / game.frame.H)));
+    const f = views.main.cachedSize() || game.frame; // exactly the size Leaflet already has: a different pixel would shift the view
+    root.style.setProperty('--fw', f.W);
+    root.style.setProperty('--fh', f.H);
+    root.style.setProperty('--fk', String(Math.min(1, compact / f.H)));
   }
   root.classList.toggle('kb', kb);
   if (kb && !was) requestAnimationFrame(() => window.scrollTo({ top: 0 }));

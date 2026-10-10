@@ -78,10 +78,17 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
 /* board: image + panel */
 .board{display:flex;flex-direction:column;gap:16px}
-.stage{position:relative;height:var(--map-h);overflow:hidden;background:var(--sat-bg);box-shadow:var(--shadow),0 0 0 1px var(--frame-ring);transition:height .3s var(--ease)}
+.stage{position:relative;height:var(--map-h);overflow:hidden;background:var(--sat-bg);box-shadow:var(--shadow),0 0 0 1px var(--frame-ring)} /* no height transition: the fit measures the frame, so it must be final the moment the layout changes */
 .sat{position:absolute;inset:0;background:var(--sat-bg);touch-action:pan-y;visibility:hidden}
 .sat.front{visibility:visible}
-.sat .leaflet-pane,.sat .leaflet-control-container .leaflet-control-zoom{pointer-events:none}
+.sat .leaflet-control-container .leaflet-control-zoom{pointer-events:none}
+/* the image is interactive only by zooming IN from the start view: at the start zoom a one-finger swipe scrolls the page (pan-y), pinch / wheel / double tap zoom, and while zoomed one finger pans */
+#stage .sat{touch-action:pan-y!important;-webkit-user-select:none;user-select:none}
+#stage .sat.zoomed{touch-action:none!important;cursor:grab}
+#stage .sat.zoomed.leaflet-dragging{cursor:grabbing}
+.chip-btn{position:absolute;left:12px;bottom:12px;z-index:500;border:0;cursor:pointer;color:var(--text);min-height:30px}
+.chip-btn::after{content:'';position:absolute;left:-6px;right:-6px;top:50%;height:max(100%,44px);transform:translateY(-50%)}
+.chip-btn:active{opacity:.7}
 .leaflet-container{font-family:var(--sans);background:var(--sat-bg)}
 .leaflet-control-attribution{background:var(--scrim)!important;color:var(--scrim-ink)!important;font-size:10px;padding:2px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:10px 0 0 0}
 .leaflet-control-attribution a{color:var(--scrim-link)!important}

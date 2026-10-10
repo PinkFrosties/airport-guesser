@@ -74,6 +74,8 @@
         <span class="chip" id="hint-label">Airfield view</span>
         <span class="chip pips" id="pips" aria-label="Attempts used"></span>
       </div>
+      <button type="button" class="chip chip-btn" id="reset-view" hidden>Reset view</button>
+      <p class="sr" id="zoom-live" role="status" aria-live="polite"></p>
       <div class="veil loading" id="veil">
         <div class="spinner" aria-hidden="true"></div>
         <p id="veil-msg">Loading imagery</p>
@@ -131,13 +133,14 @@
     <button class="link" value="close">Done</button>
   </form>
   <div class="dlg-body prose">
-    <p>You get a locked satellite view of an airport. Name it in <b>5 attempts</b> or fewer. Pick an airport from the suggestions, then press Guess.</p>
+    <p>You get a satellite view of an airport. Name it in <b>5 attempts</b> or fewer. Pick an airport from the suggestions, then press Guess.</p>
     <p>Each wrong guess shows the <b>distance</b> and <b>compass direction</b> from your guess to the answer, and how close you were.</p>
     <h3>Help along the way</h3>
     <ul>
-      <li><b>Zoom out</b>: a wider view, once per game, costs 1 attempt.</li>
+      <li><b>Zooming in is free</b>: pinch, scroll the mouse wheel over the image, double-tap or double-click, or press + and -. Drag to look around while zoomed in; 0, Esc or the Reset view button return to the start view. You can never zoom out past the start view or in past the real imagery.</li>
+      <li><b>Zoom out</b>: a wider view, once per game, costs 1 attempt (zooming in then starts from that wider view).</li>
       <li><b>Hints</b>: the country, the first letter of the name, or a third clue (the airport's main airline, or its region). Each costs 1 attempt.</li>
-      <li>Guesses, hints and zoom-outs share the same 5 attempts. The image is fixed: no panning or zooming.</li>
+      <li>Guesses, hints and zoom-outs share the same 5 attempts. Zooming in never costs an attempt.</li>
     </ul>
     <h3>Modes</h3>
     <p><b>Daily</b>: one of the world's 50 busiest airports by passengers, the same for everyone each UTC day; every airport comes up once before any repeats. <b>Hard mode</b>: a separate daily drawn from every other airport, with its own results and streak. <b>Practice</b>: endless random airports. Autocomplete searches every airport in all modes.</p>
@@ -154,7 +157,7 @@
   </form>
   <div class="dlg-body prose" id="about-body">
     <h3>About</h3>
-    <p>Airport Guesser shows a locked satellite view of an airport. Name it in 5 attempts or fewer: each wrong guess gives the distance and direction to the answer, and you can spend an attempt on a hint (country, first letter, main airline or region) or a wider view. The Daily airport is the same for everyone.</p>
+    <p>Airport Guesser shows a satellite view of an airport. Name it in 5 attempts or fewer: each wrong guess gives the distance and direction to the answer, and you can spend an attempt on a hint (country, first letter, main airline or region) or a wider view. The Daily airport is the same for everyone.</p>
     <h3>Created by</h3>
     <p><b>Kevin Pahud</b>. Version <span id="about-version"></span>.</p>
     <h3>Imagery</h3>

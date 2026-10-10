@@ -1,5 +1,10 @@
 // A locked Leaflet satellite view that loads exactly the tiles of one view and tells you when all of them are in.
 //
+// Interaction (v1.3.4): after the first reveal the player can zoom IN from the start view (pinch, wheel, double tap / click,
+// keys) and pan while zoomed, never wider than the start view and never beyond the real imagery. Zoom levels are whole
+// numbers, tiles are always requested at the sharp level (zoom + retina offset, never past the native level); scaled
+// stand-in tiles exist only while a zoom is in progress, never for the first reveal.
+//
 // Sharp rendering: tiles are requested `n` levels deeper than the map zoom and drawn at 256/2^n CSS px, so each CSS
 // pixel is backed by >= devicePixelRatio real pixels. Zoom is a whole number (Leaflet never applies a CSS scale to
 // the tile layer) and no stand-in tiles from other zoom levels are ever kept.
@@ -9,12 +14,15 @@
 // once after `tileTimeoutMs`, and a failed view reports 'failed' / 'timeout' instead of hanging.
 
 const SharpTiles = L.TileLayer.extend({
-  _retainParent() { return false; },
-  _retainChildren() { return false; },
+  // no stand-in tiles for a reveal; while the player zooms, Leaflet keeps the old level scaled until the new one is in
+  _retainParent(x, y, z, minZoom) { return this._standIns ? L.TileLayer.prototype._retainParent.call(this, x, y, z, minZoom) : false; },
+  _retainChildren(x, y, z, maxZoom) { return this._standIns ? L.TileLayer.prototype._retainChildren.call(this, x, y, z, maxZoom) : false; },
 });
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function createSatView({ container, imagery, onProgress }) {
   let map = null, layer = null, n = 0;
+  let ia = null; // interaction: { center, z, zmax, size, onChange } while the player may zoom in
   let state = { key: null, status: 'idle', promise: null, stats: { ok: 0, err: 0 }, total: 0 };
   const subs = Array.isArray(imagery.subdomains) ? imagery.subdomains : [];
 
@@ -25,11 +33,29 @@ export function createSatView({ container, imagery, onProgress }) {
     map = L.map(container, {
       zoomControl: false, attributionControl: true, dragging: false, touchZoom: false, scrollWheelZoom: false,
       doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false, zoomSnap: 1, zoomDelta: 1,
-      zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false, inertia: false,
+      zoomAnimation: !reducedMotion(), fadeAnimation: false, markerZoomAnimation: false, inertia: false,
+      maxBoundsViscosity: 1, wheelPxPerZoomLevel: 120, bounceAtZoomLimits: false,
       minZoom: imagery.minZoom, maxZoom: imagery.maxZoom, worldCopyJump: false,
     });
     map.attributionControl.setPrefix(false);
     map.attributionControl.addAttribution(imagery.attribution); // always on the image, even while tiles load
+    map.on('zoomend', onZoomEnd);
+  }
+
+  const levelNow = () => (ia && map ? map.getZoom() - ia.z : 0);
+  function onZoomEnd() {
+    if (!ia) return;
+    // with updateWhenZooming off (a reveal never loads intermediate levels) the tile layer must be told the zoom ended, or a pinch would keep the old level scaled
+    if (layer && layer._tileZoom !== Math.round(map.getZoom())) layer._setView(map.getCenter(), map.getZoom(), false, false);
+    const zoomed = levelNow() > 0;
+    if (zoomed) map.dragging.enable(); else {
+      map.dragging.disable();
+      // back at the start zoom: exactly the start centre (the clamped centre can be a pixel off after a zoom around a point)
+      const off = map.project(map.getCenter(), ia.z).distanceTo(map.project(L.latLng(ia.center), ia.z));
+      if (off > 0.5) map.setView(ia.center, ia.z, { animate: false });
+    }
+    container.classList.toggle('zoomed', zoomed);
+    if (ia.onChange) ia.onChange({ level: levelNow(), zoomed, atMax: map.getZoom() >= ia.zmax });
   }
 
   function makeLayer() {
@@ -38,6 +64,7 @@ export function createSatView({ container, imagery, onProgress }) {
       tileSize: 256 / 2 ** n, zoomOffset: n, minZoom: imagery.minZoom, maxZoom: imagery.maxZoom - n,
       keepBuffer: 0, updateWhenIdle: true, updateWhenZooming: false, detectRetina: false,
     });
+    l._standIns = !!ia; // stand-ins only while the player can zoom
     l.on('tileload', () => { state.stats.ok++; emit(); });
     l.on('tileerror', () => { state.stats.err++; emit(); });
     return l;
@@ -84,6 +111,8 @@ export function createSatView({ container, imagery, onProgress }) {
     get retinaLevels() { return n; },
     get stats() { return { ...state.stats, total: state.total }; },
     size() { ensureMap(); map.invalidateSize(); const s = map.getSize(); return { W: Math.max(s.x, 200), H: Math.max(s.y, 150) }; },
+    /** The size Leaflet currently believes in (no DOM measuring): the keyboard layout freezes the frame to exactly this, so no resize can shift the view by a pixel. */
+    cachedSize() { return map && map._size ? { W: map._size.x, H: map._size.y } : null; },
     tilesFor,
 
     /** The centre of the view moved so the airfield appears `dy` CSS px higher in the frame (room for the attribution pill). */
@@ -106,7 +135,58 @@ export function createSatView({ container, imagery, onProgress }) {
 
     /** True when the view is already fully loaded (so showing it needs no waiting). */
     isReady(center, z) {
-      return !!map && state.status === 'ready' && !!state.key && state.key.startsWith(`${center[0]},${center[1]},${z},${n}|`) && map.getZoom() === z && allLoaded();
+      if (!map || state.status !== 'ready' || !state.key || !state.key.startsWith(`${center[0]},${center[1]},${z},${n}|`)) return false;
+      return ia ? true : map.getZoom() === z && allLoaded(); // zoomed in by the player: the view is valid, whatever level it is at
+    },
+
+    // ---- interaction (zooming in from the start view)
+    get interactive() { return !!ia; },
+    get level() { return levelNow(); },
+    get maxLevel() { return ia ? ia.zmax - ia.z : 0; },
+
+    /** Let the player zoom in from this view: start zoom `z` is the minimum, `zmax` the maximum, the pan range is the start frame. Keeps the player's zoom if nothing changed. */
+    enableInteraction({ center, z, zmax, onChange }) {
+      ensureMap();
+      const size = map.getSize();
+      if (ia && ia.z === z && ia.center[0] === center[0] && ia.center[1] === center[1] && ia.size.x === size.x && ia.size.y === size.y) { ia.zmax = zmax; ia.onChange = onChange; return; }
+      api.disableInteraction();
+      if (zmax <= z || map.getZoom() !== z) return; // no real imagery deeper than this view: nothing to zoom into
+      const half = size.divideBy(2), pc = map.project(map.getCenter(), z);
+      map.setMaxBounds(L.latLngBounds(map.unproject(pc.add([-half.x, half.y]), z), map.unproject(pc.add([half.x, -half.y]), z))); // the start frame
+      map.setMinZoom(z); map.setMaxZoom(zmax);
+      ia = { center, z, zmax, size, onChange };
+      map.touchZoom.enable(); map.scrollWheelZoom.enable(); map.dragging.disable();
+      if (layer) { layer._standIns = true; layer.options.updateWhenIdle = false; layer.options.keepBuffer = 1; }
+      if (onChange) onChange({ level: 0, zoomed: false, atMax: false });
+    },
+
+    /** Back to a plain locked view (new view loading, or another view took over). */
+    disableInteraction() {
+      if (!map) return;
+      const was = ia; ia = null;
+      map.touchZoom.disable(); map.scrollWheelZoom.disable(); map.dragging.disable();
+      map.setMaxBounds(null); map.setMinZoom(imagery.minZoom); map.setMaxZoom(imagery.maxZoom - n);
+      container.classList.remove('zoomed');
+      if (layer) { layer._standIns = false; layer.options.updateWhenIdle = true; layer.options.keepBuffer = 0; }
+      if (was && was.onChange) was.onChange({ level: 0, zoomed: false, atMax: false });
+    },
+
+    /** One level in (about a container point, or the centre) or out. Returns false when already at the limit. */
+    zoomBy(delta, containerPoint) {
+      if (!ia) return false;
+      const target = Math.max(ia.z, Math.min(ia.zmax, map.getZoom() + delta));
+      if (target === map.getZoom()) return false;
+      if (containerPoint) map.setZoomAround(L.point(containerPoint), target, { animate: !reducedMotion() }); else map.setZoom(target, { animate: !reducedMotion() });
+      return true;
+    },
+
+    /** Back to exactly the start view (centre and zoom). Animated unless the player prefers reduced motion. */
+    resetView(animate = true) {
+      if (!ia) return;
+      if (levelNow() === 0 && map.project(map.getCenter(), ia.z).distanceTo(map.project(L.latLng(ia.center), ia.z)) <= 0.5) return; // already exactly there
+      const anim = animate && !reducedMotion();
+      map.setView(ia.center, ia.z, { animate: anim });
+      if (!anim) onZoomEnd();
     },
 
     /** Load a view; resolves 'ok' once every tile is in, 'failed' if tiles still fail after one retry, 'timeout' if stalled. */
@@ -117,6 +197,7 @@ export function createSatView({ container, imagery, onProgress }) {
       if (state.key === key && state.status === 'loading') return state.promise;
       if (state.key === key && state.status === 'ready' && allLoaded()) return Promise.resolve('ok');
       if (state.status === 'loading' && state.cancel) state.cancel(); // superseded by a different view
+      api.disableInteraction(); // a (re)load is a reveal: plain locked view, no stand-in tiles
       state = { key, status: 'loading', promise: null, cancel: null, stats: { ok: 0, err: 0 }, total: tilesFor(center, z).length };
       const mine = state;
       emit();
