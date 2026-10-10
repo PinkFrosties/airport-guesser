@@ -128,6 +128,7 @@ function viewParams(a) {
   const z = C.finalZoom(a, W, H, n, { minZoom: IMAGERY.minZoom, maxZoom: IMAGERY.maxZoom - n, pill: ref });
   const lift = C.airfieldLift(W, H, ref, C.CHIPS_BOTTOM); // constants, not measurements: the inline preloader computes exactly the same view
   game.lift = lift;
+  game.frame = { W, H }; // the frame this view was fitted to: the keyboard layout keeps the map at exactly this size
   return { center: views.main.shifted([a.view[0], a.view[1]], z, lift), zMain: z, zWide: C.zoomedOut(z), W, H, lift };
 }
 
@@ -718,31 +719,43 @@ el.diffSeg.addEventListener('click', (e) => {
 });
 
 // ---------- viewport / keyboard ----------
-// The on-screen keyboard shrinks the visual viewport (iOS) or the layout viewport (Android). Either way, while the
-// input is focused and the viewport is much shorter than at rest, switch to a compact layout (smaller map, no chrome)
-// so the image, the input and the suggestions all stay on screen.
+// The on-screen keyboard shrinks the visual viewport (iOS, and Android with interactive-widget=resizes-visual) or the layout
+// viewport (older Android). While a touch player types, the layout switches to a compact one so the image, the input and the
+// suggestions all stay on screen. The image itself is NEVER re-fitted for that: the map keeps the size its view was fitted to
+// (game.frame) and is only scaled down to the compact frame, so zoom and framing are identical before, during and after typing.
+// A re-fit happens only when the width changes (rotation, window resize): a height-only change is the keyboard or the browser bar.
 let restH = 0, restW = 0, resizeTimer;
 function onViewport() {
   const vv = window.visualViewport;
   const h = vv ? vv.height : window.innerHeight;
   const focused = document.activeElement === el.input;
-  if (window.innerWidth !== restW) { restW = window.innerWidth; restH = h; } // rotation / real resize
+  const widthChanged = restW !== 0 && window.innerWidth !== restW;
+  if (window.innerWidth !== restW) { restW = window.innerWidth; restH = h; } // rotation / real resize: new reference height
   if (!focused) restH = Math.max(restH, h);
-  const kb = focused && h < restH * 0.78;
+  const kb = focused && coarse() && h < restH * 0.78 && !!game.frame;
   const root = document.documentElement;
   root.style.setProperty('--vvh', h + 'px');
   const was = root.classList.contains('kb');
+  if (kb) {
+    const compact = Math.min(240, Math.max(110, h * 0.27)); // keep in sync with html.kb --map-h in the stylesheet
+    root.style.setProperty('--fw', game.frame.W);
+    root.style.setProperty('--fh', game.frame.H);
+    root.style.setProperty('--fk', String(Math.min(1, compact / game.frame.H)));
+  }
   root.classList.toggle('kb', kb);
   if (kb && !was) requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  if (kb !== was) refit(320);
+  if (kb !== was) for (const v of Object.values(views)) v.size(); // the map container changed size: re-sync Leaflet (centre and zoom are kept)
+  if (widthChanged) refit();
 }
-/** The locked view is fitted to the viewport, so re-fit whenever the image area changes size. */
+/** The locked view is fitted to the frame, so re-fit when the frame's WIDTH changed (rotation, window resize). */
 function refit(delay = 150) {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { if (game.round) presentRound(); }, delay);
 }
+// the stage animates its height when the compact layout comes or goes: re-sync Leaflet's size when it has settled (view is kept)
+el.stage.addEventListener('transitionend', (e) => { if (e.target === el.stage && e.propertyName === 'height') for (const v of Object.values(views)) v.size(); });
 if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewport);
-window.addEventListener('resize', () => { onViewport(); refit(); });
+window.addEventListener('resize', onViewport);
 el.input.addEventListener('blur', () => setTimeout(onViewport, 50));
 el.input.addEventListener('focus', () => setTimeout(onViewport, 50));
 onViewport();

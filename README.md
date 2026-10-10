@@ -40,6 +40,12 @@ Hard is a toggle next to the mode switch. Its daily is drawn from a different po
 
 Newest first. The top entry is the current version (`js/version.js`); `tests/changelog.mjs` enforces the order.
 
+### v1.3.1 (typing zoom fix) - 2026-10-10
+- Fixed: the satellite view zoomed out while typing a guess. Cause: opening the keyboard switched to the compact layout, which shrank the image frame, and the shrunk frame re-ran the zoom fit (zoom 13 became 11 in the Android test, and back when the keyboard closed). The map now keeps the exact size its view was fitted to and is only scaled down into the compact frame, so zoom and framing are identical before, during and after typing
+- A re-fit now happens only when the width changes (rotation, window resize); height-only changes (keyboard, browser bar, window height) never refit, and the compact layout is used with touch only
+- Viewport meta has `interactive-widget=resizes-visual` (Chrome on Android no longer resizes the page for the keyboard)
+- New `tests/typing.mjs` and `tests/all.mjs` (runs every test script, one line each)
+
 ### v1.3.0 (text size, cleaner pools, hardening) - 2026-10-05
 - Text follows the browser's text size: all type is in `rem`, so a larger default font size or zoom scales the whole app. The header, mode bar, dialogs and statistics reflow instead of overflowing (tested at 100/150/200% on 390 and 320 px wide screens). The chips and attribution on the satellite image keep fixed sizes because the airfield fit is measured against them
 - Hard pool cleaned: records the source marks closed, disused, duplicated or superseded are never offered, and so are airports whose runway cannot be seen in the imagery (visibility filter, `scripts/image_contrast.mjs`; the Daily top 50 are never filtered). Pools: Daily 3,222, Hard 12,675. The Hard Daily is drawn from the new pool, so today's and tomorrow's Hard airport may differ from what the previous version showed; a game already started keeps its airport
@@ -148,6 +154,8 @@ npm install                      # dev-only: Playwright + the vendored Leaflet s
 node tests/unit.mjs              # haversine, bearing, accent-insensitive search
 node tests/waterfall.mjs [label]    # cold/warm Daily load waterfall on throttled Fast/Slow 4G (qa/perf/)
 node tests/unit.game.mjs         # pools, zoom fitting, hints/attempts, share text, stats, data integrity
+node tests/typing.mjs            # typing, keyboard open/close and rotation never change zoom or framing
+node tests/all.mjs               # every script, one line each (--dist, --webkit)
 node tests/textscale.mjs         # text follows the browser font size, no overflow at 150/200% on narrow screens
 node tests/hardening.mjs         # debug hook only on localhost; CSP blocks injected scripts (AG_ROOT=dist for the CSP checks)
 node tests/targets.mjs           # every control has a 44 px touch target

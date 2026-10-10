@@ -37,6 +37,9 @@
   --dialog-shadow:0 30px 90px rgba(0,0,0,.7);--backdrop:rgba(0,0,0,.6);--toast-bg:rgba(245,245,247,.95);--toast-ink:#1d1d1f;
 }
 html.kb{--map-h:clamp(110px,calc(var(--vvh) * .27),240px)}
+/* keyboard open: the maps keep the exact size their view was fitted to (--fw x --fh) and are scaled down (--fk) into the compact frame */
+html.kb .sat{inset:auto;left:50%;top:0;width:calc(var(--fw) * 1px);height:calc(var(--fh) * 1px);transform-origin:0 0;transform:translateX(calc(var(--fw) * var(--fk) * -.5px)) scale(var(--fk))}
+html.kb .leaflet-control-attribution{transform:scale(calc(.75 / var(--fk)));transform-origin:100% 100%;max-width:calc(var(--fw) * var(--fk) / .75 * 1px)} /* stays readable (about 7 px) in the small frame */
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;color-scheme:light dark;background:var(--bg)}
