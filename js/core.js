@@ -365,15 +365,39 @@ export const ZOOM_OUT_LEVELS = 2;
 export const zoomedOut = (z) => Math.max(2, z - ZOOM_OUT_LEVELS);
 
 // ---------- hints ----------
-export const CONTINENT_NAMES = { AF: 'Africa', AN: 'Antarctica', AS: 'Asia', EU: 'Europe', NA: 'North America', OC: 'Oceania', SA: 'South America' };
-
-export const HINTS = [
-  { key: 'continent', label: 'Continent', value: (a) => CONTINENT_NAMES[a.continent] || a.continent },
-  { key: 'country', label: 'Country', value: (a) => a.country },
-  { key: 'letter', label: 'First letter of name', value: (a) => a.name.trim().charAt(0).toUpperCase() },
-  { key: 'runways', label: 'Number of runways', value: (a) => String(a.rw), available: (a) => a.rw > 0 },
-];
-export const hintAvailable = (h, a) => (h.available ? h.available(a) : true);
+// Exactly three, each costs 1 attempt: the country, the first letter of the name as shown in the suggestions, and a third clue
+// chosen per airport at build time ("hint3" = "type|value": main airline, region, part of the country or elevation band).
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+/** The first character of the airport name exactly as the suggestions show it ("H" for "Heathrow", "9" for "9 de Maio"). */
+export const firstChar = (name) => { const c = [...String(name).trim()][0] || ''; return c.toLocaleUpperCase('en'); };
+export function hint3Of(a) {
+  const i = a.hint3 ? a.hint3.indexOf('|') : -1;
+  return i > 0 ? { type: a.hint3.slice(0, i), v: a.hint3.slice(i + 1) } : null;
+}
+const HINT3 = {
+  airline: { menu: 'Main airline', label: 'Main airline', text: (v) => v },
+  region: { menu: 'Region', label: 'Region', text: (v, a) => `${v}, ${a.country}` },
+  grid: { menu: 'Part of the country', label: 'Part of the country', text: (v, a) => `${cap(v)} of ${a.country}` },
+  elev: { menu: 'Elevation', label: 'Elevation', text: (v) => `${v} above sea level` },
+};
+export const HINTS = [{ key: 'country' }, { key: 'letter' }, { key: 'extra' }];
+/** Menu label (what it is), chip label + text (the answer, only ever built after the hint was bought) and availability. */
+export function hintInfo(key, a) {
+  if (key === 'country') return { key, menu: 'Country', label: 'Country', available: !!a.country, text: () => a.country };
+  if (key === 'letter') return { key, menu: 'First letter of the name', label: 'Name starts with', available: !!firstChar(a.name), text: () => firstChar(a.name) };
+  const h = hint3Of(a), d = h && HINT3[h.type];
+  if (!d) return { key, menu: 'Extra clue', label: 'Extra clue', available: false, text: () => '' };
+  return { key, menu: d.menu, label: d.label, available: true, type: h.type, text: () => d.text(h.v, a) };
+}
+export const hintAvailable = (h, a) => hintInfo(h.key, a).available;
+/** 'ok' | 'used' | 'covered' (its information is already in a hint bought: the region and part-of-country clues contain the country) | 'unavailable'. */
+export function hintStatus(key, used, a) {
+  if (used.includes(key)) return 'used';
+  const info = hintInfo(key, a);
+  if (!info.available) return 'unavailable';
+  if (key === 'country' && used.includes('extra') && ['region', 'grid'].includes(hint3Of(a)?.type)) return 'covered';
+  return 'ok';
+}
 
 /** Attempts left. Every guess, hint and zoom-out spends one. */
 export const attemptsLeft = (spent) => MAX_GUESSES - spent;

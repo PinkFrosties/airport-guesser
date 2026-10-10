@@ -104,7 +104,7 @@ for (const [scheme, profile, name] of [['light', PHONE, 'phone'], ['dark', PHONE
     states.push(['start', await domLeak(page, answer)]);
     await guess(page, wrong[0]); states.push(['after 1 wrong guess', await domLeak(page, answer)]);
     await page.locator('#btn-hint').click(); states.push(['hint menu open', await domLeak(page, answer)]);
-    await page.locator('#sheet [data-hint=continent]').click(); states.push(['hint confirmation', await domLeak(page, answer)]);
+    await page.locator('#sheet [data-hint=country]').click(); states.push(['hint confirmation', await domLeak(page, answer)]);
     await page.locator('#sheet [data-confirm]').click(); states.push(['after a hint', await domLeak(page, answer)]);
     await page.locator('#btn-zoom').click(); states.push(['zoom confirmation', await domLeak(page, answer)]);
     await page.locator('#sheet [data-confirm]').click(); await page.waitForTimeout(400); states.push(['zoomed out', await domLeak(page, answer)]);

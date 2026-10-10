@@ -528,37 +528,39 @@ await test('wrong guesses do not zoom out; zoom-out costs 1 guess, needs confirm
   await ctx.close();
 });
 
-await test('hints: 4 kinds, each costs 1 guess with confirmation, shown persistently; budget shared; game over reveals answer', async () => {
+await test('hints: 3 kinds (country, first letter, third clue), each costs 1 guess with confirmation, shown persistently; budget shared; game over reveals answer', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
   await start(page, HUB);
   const a = await answerOf(page);
+  const third = C.hintInfo('extra', a);
   await page.locator('#btn-hint').click();
   const labels = await page.locator('#sheet .opt').allInnerTexts();
-  assert.deepEqual(labels.map((l) => l.split('\n')[0]), ['Continent', 'Country', 'First letter of name', 'Number of runways']);
+  assert.deepEqual(labels.map((l) => l.split('\n')[0]), ['Country', 'First letter of the name', third.menu]);
   assert.ok(labels.every((l) => /1 guess/.test(l)));
-  // continent
-  await page.locator('#sheet [data-hint=continent]').click();
-  assert.match(await page.locator('#sheet').innerText(), /Reveal: continent\?/i);
+  assert.ok(!(await page.locator('#sheet').innerText()).includes(third.text()), 'the menu names the kind of clue, not its content');
+  // country
+  await page.locator('#sheet [data-hint=country]').click();
+  assert.match(await page.locator('#sheet').innerText(), /Reveal: country\?/i);
   await page.locator('#sheet [data-cancel]').click();
   assert.equal(await spentOf(page), 0, 'cancel spends nothing');
   await page.locator('#btn-hint').click();
-  await page.locator('#sheet [data-hint=continent]').click();
+  await page.locator('#sheet [data-hint=country]').click();
   await page.locator('#sheet [data-confirm]').click();
   assert.equal(await spentOf(page), 1);
   const used = () => page.locator('#hints-list').innerText();
-  assert.match(await used(), new RegExp(C.CONTINENT_NAMES[a.continent]));
-  // first letter + runways
+  assert.match(await used(), new RegExp(a.country));
+  // first letter + third clue
   await page.locator('#btn-hint').click();
-  assert.equal(await page.locator('#sheet [data-hint=continent]').isDisabled(), true, 'used hint cannot be reused');
+  assert.equal(await page.locator('#sheet [data-hint=country]').isDisabled(), true, 'used hint cannot be reused');
   await page.locator('#sheet [data-hint=letter]').click();
   await page.locator('#sheet [data-confirm]').click();
   await page.locator('#btn-hint').click();
-  await page.locator('#sheet [data-hint=runways]').click();
+  await page.locator('#sheet [data-hint=extra]').click();
   await page.locator('#sheet [data-confirm]').click();
   const text = await used();
-  assert.ok(text.includes(a.name[0].toUpperCase()), 'first letter ' + text);
-  assert.match(text, new RegExp(`number of runways\\s*${a.rw}`, 'i'));
+  assert.ok(/Name starts with/i.test(text) && text.includes(C.firstChar(a.name)), 'first letter ' + text);
+  assert.ok(text.toLowerCase().includes(third.label.toLowerCase()) && text.includes(third.text()), 'third clue ' + text); // labels are upper-cased by CSS
   assert.equal(await spentOf(page), 3);
   assert.equal(await page.locator('#pips .pip.aid').count(), 3);
   assert.match(await leftText(page), /2\s*of 5 attempts left/i);
@@ -599,7 +601,7 @@ await test('win after a hint: attempts used counts hints; share has bulb + teles
   const lines = text.split(/\r?\n/); // the Windows clipboard turns \n into \r\n
   assert.equal(lines[1], '4/5');
   assert.deepEqual(lines.slice(3, 7).map((l) => l.codePointAt(0)), [lines[3].codePointAt(0), 0x1f4a1, 0x1f52d, 0x1f7e9]);
-  for (const bad of [a.name, a.iata, a.icao, a.city, a.country, C.CONTINENT_NAMES[a.continent]]) assert.ok(!text.toLowerCase().includes(String(bad).toLowerCase()), 'leak: ' + bad);
+  for (const bad of [a.name, a.iata, a.icao, a.city, a.country]) assert.ok(!text.toLowerCase().includes(String(bad).toLowerCase()), 'leak: ' + bad);
   await ctx.close();
 });
 

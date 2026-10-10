@@ -34,6 +34,13 @@ if (existsSync(pw) && !dev.some((d) => d.name === 'playwright-core')) {
 writeFileSync(join(root, 'data/credits.json'), JSON.stringify({
   generated: new Date().toISOString().slice(0, 10),
   software: shipped.map(({ licenseText, licenseUrl, ...p }) => p),
+  // data used at BUILD time only (the app contacts none of them)
+  data: [
+    { name: 'OurAirports', license: 'public domain', url: 'https://ourairports.com/data/', purpose: 'airports, runways, countries, regions, elevation' },
+    { name: 'OpenFlights', license: 'ODbL', url: 'https://github.com/jpatokal/openflights', purpose: 'route counts (Major hubs), airline names and routes (main-airline hint)' },
+    { name: 'Wikidata', license: 'CC0', url: 'https://www.wikidata.org/', purpose: 'airline-hub relations (main-airline hint), Wikipedia article titles' },
+    { name: 'Wikipedia', license: 'link target only', url: 'https://www.wikipedia.org/', purpose: 'article link on the result card' },
+  ],
 }, null, 2) + '\n');
 
 const md = `# Third-party notices
@@ -56,8 +63,8 @@ Used only for the test scripts and to generate icons.
 
 - **Esri World Imagery** (map tiles; the build also queries the tile availability service). Used under Esri's terms, with the required attribution shown on every image. https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9
 - **OurAirports** airport, runway and country data (airports.csv, runways.csv, countries.csv). Public domain. https://ourairports.com/data/
-- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
-- **OpenFlights** route data (routes.dat), used only at build time to order the Practice "Major hubs" set. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
+- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py) and to read airline-hub relations for the third hint (scripts/hint_data.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
+- **OpenFlights** route data (routes.dat) and airline records (airlines.dat), used only at build time to order the Practice "Major hubs" set and to choose an airport's main airline for the third hint. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
 
 ## Disclaimer
 

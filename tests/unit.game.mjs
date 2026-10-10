@@ -125,7 +125,7 @@ test('schedule: dates cover yesterday..tomorrow, 3 candidates per kind, entries 
       for (const x of e) {
         const full = byId.get(x.id);
         for (const k of Object.keys(x)) assert.deepEqual(x[k], full[k], d + ' ' + kind + ' ' + x.name + ' ' + k);
-        for (const k of ['id', 'name', 'lat', 'lon', 'view', 'z', 'nz', 'rw', 'continent', 'country', 'type']) assert.ok(x[k] !== undefined, 'has ' + k);
+        for (const k of ['id', 'name', 'lat', 'lon', 'view', 'z', 'nz', 'country', 'type']) assert.ok(x[k] !== undefined, 'has ' + k);
       }
     }
     assert.ok(schedule.days[d].daily.every((x) => x.top >= 1), 'Daily entries are top-list airports');
@@ -360,10 +360,45 @@ test('Practice set is called "Major hubs" and still holds 100 airports', () => {
 });
 
 console.log('hints and attempts');
-test('hint values', () => {
+test('exactly three hints: country, first letter, and a per-airport third clue; no continent or runway count anywhere', () => {
+  assert.deepEqual(C.HINTS.map((h) => h.key), ['country', 'letter', 'extra']);
+  const src = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8') + readFileSync(new URL('../js/core.js', import.meta.url), 'utf8') + readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(!/runways|continent|CONTINENT/.test(src.replace(/Esri|continental/gi, '')), 'continent / runway-count hints are gone from code, help and about');
+  for (const a of [...airports, ...hard].slice(0, 400)) { assert.equal(a.continent, undefined); assert.equal(a.rw, undefined); }
+});
+test('hint values: country, "Name starts with" the first character as the suggestions show it, third clue by type', () => {
   const z = byIata('ZRH');
-  assert.deepEqual(Object.fromEntries(C.HINTS.map((h) => [h.key, h.value(z)])), { continent: 'Europe', country: 'Switzerland', letter: 'Z', runways: '4' });
-  assert.equal(C.hintAvailable(C.HINTS[3], { rw: 0 }), false);
+  assert.equal(C.hintInfo('country', z).text(), 'Switzerland');
+  assert.deepEqual([C.hintInfo('letter', z).label, C.hintInfo('letter', z).text()], ['Name starts with', 'Z']);
+  assert.equal(C.firstChar('  Örebro Airport'), 'Ö'); assert.equal(C.firstChar('9 de Maio Airport'), '9'); assert.equal(C.firstChar('école'), 'É');
+  const t3 = (type, v, a = {}) => C.hintInfo('extra', { country: 'Brazil', name: 'X', hint3: type + '|' + v, ...a });
+  assert.deepEqual([t3('airline', 'Emirates').menu, t3('airline', 'Emirates').text()], ['Main airline', 'Emirates']);
+  assert.deepEqual([t3('region', 'Washington', { country: 'United States' }).menu, t3('region', 'Washington', { country: 'United States' }).text()], ['Region', 'Washington, United States']);
+  assert.equal(t3('grid', 'north-west').text(), 'North-west of Brazil'); assert.equal(t3('grid', 'centre').text(), 'Centre of Brazil');
+  assert.equal(t3('elev', '100-500 m').text(), '100-500 m above sea level');
+  assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y' }).available, false); assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y', hint3: 'bogus|x' }).available, false);
+});
+test('the menu never shows information twice: the country clue is "already shown" once a region / part-of-country clue is bought', () => {
+  const reg = { country: 'Brazil', name: 'X', hint3: 'region|Bahia' }, air = { country: 'Brazil', name: 'X', hint3: 'airline|LATAM' };
+  assert.equal(C.hintStatus('country', [], reg), 'ok'); assert.equal(C.hintStatus('country', ['extra'], reg), 'covered');
+  assert.equal(C.hintStatus('country', ['extra'], { ...reg, hint3: 'grid|north' }), 'covered');
+  assert.equal(C.hintStatus('country', ['extra'], air), 'ok', 'an airline name does not reveal the country');
+  assert.equal(C.hintStatus('extra', ['country'], reg), 'ok', 'a region adds information beyond the country');
+  assert.equal(C.hintStatus('letter', ['letter'], reg), 'used'); assert.equal(C.hintStatus('extra', [], { country: 'B', name: 'N' }), 'unavailable');
+});
+test('data: every airport has a valid hint3 (type|value), the Top 50 included; values are clean', () => {
+  const all = [...airports, ...hard]; const types = { airline: 0, region: 0, grid: 0, elev: 0 }; const bad = [];
+  for (const a of all) {
+    const h = C.hint3Of(a); if (!h || !(h.type in types) || !h.v.trim()) { bad.push(a.name + ' ' + a.hint3); continue; }
+    types[h.type]++;
+    if (h.type === 'airline' && (h.v.length > 40 || /[()\/]|\s{2,}/.test(h.v))) bad.push('airline ' + h.v);
+    if (h.type === 'region' && (h.v === a.country || /unassigned|unknown/i.test(h.v))) bad.push('region ' + h.v);
+    if (h.type === 'grid' && !/^(north|south)?-?(west|east)?$|^centre$/.test(h.v)) bad.push('grid ' + h.v);
+    if (h.type === 'elev' && !['below 100 m', '100-500 m', '500-1,500 m', 'above 1,500 m'].includes(h.v)) bad.push('elev ' + h.v);
+  }
+  assert.ok(bad.length <= 1, bad.slice(0, 5).join(' | '));
+  for (const a of topList) assert.ok(C.hint3Of(a), a.iata + ' has a third clue');
+  assert.ok(types.airline > 500 && types.region > 10000, JSON.stringify(types));
 });
 test('attempt budget: guesses, hints and zoom share 5; hints need 2 left', () => {
   assert.equal(C.attemptsLeft(0), 5);
@@ -451,9 +486,9 @@ test('Daily pool integrity', () => {
   assert.equal(new Set(airports.map((a) => a.iata)).size, airports.length);
   for (const a of airports) {
     assert.match(a.iata, /^[A-Z0-9]{3}$/);
-    assert.ok(a.name && a.icao && a.country && a.countryCode && a.continent);
+    assert.ok(a.name && a.icao && a.country && a.countryCode);
     assert.ok(['large', 'medium'].includes(a.type) && [1, 2, 3].includes(a.tier));
-    assert.ok(a.view.length === 4 && a.view.every(Number.isFinite) && Number.isInteger(a.rw));
+    assert.ok(a.view.length === 4 && a.view.every(Number.isFinite));
   }
 });
 test('Hard pool integrity: small/regional/remote, disjoint from Daily, runway data present', () => {
@@ -462,7 +497,7 @@ test('Hard pool integrity: small/regional/remote, disjoint from Daily, runway da
   const ids = new Set(airports.map((a) => a.id));
   for (const a of hard) {
     assert.ok(!ids.has(a.id));
-    assert.ok(a.name && a.icao && a.countryCode && a.continent && a.rw >= 1);
+    assert.ok(a.name && a.icao && a.countryCode);
     assert.ok(['large', 'medium', 'small'].includes(a.type) && a.tier === 4);
     assert.ok(a.view.length === 4 && a.view.every(Number.isFinite) && Math.abs(a.view[0]) <= 90 && Math.abs(a.view[1]) <= 180);
   }

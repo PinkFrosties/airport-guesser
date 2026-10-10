@@ -436,7 +436,9 @@ def main():
     def dump(path, items, source):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump({"source": source, "meta": meta, "airports": items}, f, ensure_ascii=False, separators=(",", ":"))
+            # fields only the build needs (the hints no longer use the continent or the runway count)
+            slim = [{k: v for k, v in a.items() if k not in ("continent", "rw")} for a in items]
+            json.dump({"source": source, "meta": meta, "airports": slim}, f, ensure_ascii=False, separators=(",", ":"))
         print("wrote %s: %d airports, %d bytes" % (path, len(items), os.path.getsize(path)))
 
     # ---- imagery quality: native max level per airport, then filter both pools
@@ -447,6 +449,20 @@ def main():
         a["z"] = base_zoom(a)
     if "--verify" in sys.argv:
         verify_tilemap(kept + hard)
+    # ---- third hint (scripts/hint_data.py: main airline / region / position in the country / elevation band, "type|value")
+    h3_path = os.path.join(CACHE, "hint3.json")
+    if os.path.exists(h3_path):
+        with open(h3_path, encoding="utf-8") as f:
+            h3 = json.load(f)
+        n_h3 = Counter()
+        for a in kept + hard:
+            v = h3.get(str(a["id"]))
+            if v:
+                a["hint3"] = v
+                n_h3[v.split("|")[0]] += 1
+        print("third hint attached: %s of %d airports" % (dict(n_h3), len(kept) + len(hard)))
+    else:
+        print("WARNING: scripts/.cache/hint3.json missing (run scripts/hint_data.py); airports have no third hint")
     # ---- Wikipedia article titles (scripts/wikipedia_links.py: validated at build time; the app builds the URL itself)
     wp_path = os.path.join(CACHE, "wp_links.json")
     if os.path.exists(wp_path):

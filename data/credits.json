@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05",
+  "generated": "2026-10-10",
   "software": [
     {
       "name": "Leaflet",
@@ -7,6 +7,32 @@
       "license": "BSD-2-Clause",
       "url": "https://leafletjs.com/",
       "purpose": "Map engine for the locked satellite view (vendored in vendor/leaflet)."
+    }
+  ],
+  "data": [
+    {
+      "name": "OurAirports",
+      "license": "public domain",
+      "url": "https://ourairports.com/data/",
+      "purpose": "airports, runways, countries, regions, elevation"
+    },
+    {
+      "name": "OpenFlights",
+      "license": "ODbL",
+      "url": "https://github.com/jpatokal/openflights",
+      "purpose": "route counts (Major hubs), airline names and routes (main-airline hint)"
+    },
+    {
+      "name": "Wikidata",
+      "license": "CC0",
+      "url": "https://www.wikidata.org/",
+      "purpose": "airline-hub relations (main-airline hint), Wikipedia article titles"
+    },
+    {
+      "name": "Wikipedia",
+      "license": "link target only",
+      "url": "https://www.wikipedia.org/",
+      "purpose": "article link on the result card"
     }
   ]
 }

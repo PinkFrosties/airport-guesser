@@ -1,0 +1,397 @@
+{
+ "airports": 12725,
+ "why": {
+  "airline: wikidata (only hub airline)": 268,
+  "region": 11566,
+  "airline: openflights routes": 225,
+  "airline: wikidata + routes": 161,
+  "several hub airlines, no clear leader": 123,
+  "airline: openflights (overrides a minor Wikidata hub)": 96,
+  "grid": 373,
+  "elev": 35,
+  "airline suppressed by review (top 50)": 7,
+  "none": 1
+ },
+ "top50": {
+  "airline": 31,
+  "region": 19
+ },
+ "hard_pool": {
+  "airline": 719,
+  "region": 11547,
+  "grid": 373,
+  "elev": 35,
+  "none": 1
+ },
+ "practice": {
+  "major_hubs": {
+   "airline": 71,
+   "region": 28,
+   "grid": 1
+  },
+  "large": {
+   "airline": 528,
+   "region": 610,
+   "grid": 19,
+   "elev": 12
+  },
+  "mid_size": {
+   "region": 3465,
+   "airline": 201,
+   "grid": 99,
+   "elev": 19
+  }
+ },
+ "top50_list": [
+  {
+   "rank": 1,
+   "code": "ATL",
+   "name": "Hartsfield Jackson Atlanta International Airport",
+   "country": "United States",
+   "hint3": "airline|Delta Air Lines"
+  },
+  {
+   "rank": 2,
+   "code": "DXB",
+   "name": "Dubai International Airport",
+   "country": "United Arab Emirates",
+   "hint3": "airline|Emirates"
+  },
+  {
+   "rank": 3,
+   "code": "HND",
+   "name": "Tokyo Haneda International Airport",
+   "country": "Japan",
+   "hint3": "airline|All Nippon Airways"
+  },
+  {
+   "rank": 4,
+   "code": "DFW",
+   "name": "Dallas Fort Worth International Airport",
+   "country": "United States",
+   "hint3": "airline|American Airlines"
+  },
+  {
+   "rank": 5,
+   "code": "PVG",
+   "name": "Shanghai Pudong International Airport",
+   "country": "China",
+   "hint3": "airline|China Eastern Airlines"
+  },
+  {
+   "rank": 6,
+   "code": "ORD",
+   "name": "Chicago O'Hare International Airport",
+   "country": "United States",
+   "hint3": "region|Illinois"
+  },
+  {
+   "rank": 7,
+   "code": "LHR",
+   "name": "London Heathrow Airport",
+   "country": "United Kingdom",
+   "hint3": "airline|British Airways"
+  },
+  {
+   "rank": 8,
+   "code": "IST",
+   "name": "İstanbul Airport",
+   "country": "Turkey",
+   "hint3": "airline|Turkish Airlines"
+  },
+  {
+   "rank": 9,
+   "code": "CAN",
+   "name": "Guangzhou Baiyun International Airport",
+   "country": "China",
+   "hint3": "airline|China Southern Airlines"
+  },
+  {
+   "rank": 10,
+   "code": "DEN",
+   "name": "Denver International Airport",
+   "country": "United States",
+   "hint3": "region|Colorado"
+  },
+  {
+   "rank": 11,
+   "code": "DEL",
+   "name": "Indira Gandhi International Airport",
+   "country": "India",
+   "hint3": "region|Delhi"
+  },
+  {
+   "rank": 12,
+   "code": "ICN",
+   "name": "Incheon International Airport",
+   "country": "South Korea",
+   "hint3": "region|Incheon Metropolitan City"
+  },
+  {
+   "rank": 13,
+   "code": "LAX",
+   "name": "Los Angeles International Airport",
+   "country": "United States",
+   "hint3": "region|California"
+  },
+  {
+   "rank": 14,
+   "code": "CDG",
+   "name": "Charles de Gaulle International Airport",
+   "country": "France",
+   "hint3": "airline|Air France"
+  },
+  {
+   "rank": 15,
+   "code": "PEK",
+   "name": "Beijing Capital International Airport",
+   "country": "China",
+   "hint3": "airline|Air China"
+  },
+  {
+   "rank": 16,
+   "code": "SIN",
+   "name": "Singapore Changi Airport",
+   "country": "Singapore",
+   "hint3": "airline|Singapore Airlines"
+  },
+  {
+   "rank": 17,
+   "code": "AMS",
+   "name": "Amsterdam Airport Schiphol",
+   "country": "Netherlands",
+   "hint3": "airline|KLM"
+  },
+  {
+   "rank": 18,
+   "code": "MAD",
+   "name": "Adolfo Suárez Madrid–Barajas Airport",
+   "country": "Spain",
+   "hint3": "region|Madrid"
+  },
+  {
+   "rank": 19,
+   "code": "SZX",
+   "name": "Shenzhen Bao'an International Airport",
+   "country": "China",
+   "hint3": "airline|Shenzhen Airlines"
+  },
+  {
+   "rank": 20,
+   "code": "KUL",
+   "name": "Kuala Lumpur International Airport",
+   "country": "Malaysia",
+   "hint3": "region|Selangor"
+  },
+  {
+   "rank": 21,
+   "code": "FRA",
+   "name": "Frankfurt Main Airport",
+   "country": "Germany",
+   "hint3": "airline|Lufthansa"
+  },
+  {
+   "rank": 22,
+   "code": "BKK",
+   "name": "Suvarnabhumi Airport",
+   "country": "Thailand",
+   "hint3": "airline|Thai Airways"
+  },
+  {
+   "rank": 23,
+   "code": "JFK",
+   "name": "John F. Kennedy International Airport",
+   "country": "United States",
+   "hint3": "region|New York"
+  },
+  {
+   "rank": 24,
+   "code": "HKG",
+   "name": "Hong Kong International Airport",
+   "country": "Hong Kong",
+   "hint3": "airline|Cathay Pacific"
+  },
+  {
+   "rank": 25,
+   "code": "MCO",
+   "name": "Orlando International Airport",
+   "country": "United States",
+   "hint3": "region|Florida"
+  },
+  {
+   "rank": 26,
+   "code": "BCN",
+   "name": "Josep Tarradellas Barcelona-El Prat Airport",
+   "country": "Spain",
+   "hint3": "region|Catalonia"
+  },
+  {
+   "rank": 27,
+   "code": "TFU",
+   "name": "Chengdu Tianfu International Airport",
+   "country": "China",
+   "hint3": "region|Sichuan Province"
+  },
+  {
+   "rank": 28,
+   "code": "BOM",
+   "name": "Chhatrapati Shivaji Maharaj International Airport",
+   "country": "India",
+   "hint3": "region|Maharashtra"
+  },
+  {
+   "rank": 29,
+   "code": "MIA",
+   "name": "Miami International Airport",
+   "country": "United States",
+   "hint3": "airline|American Airlines"
+  },
+  {
+   "rank": 30,
+   "code": "LAS",
+   "name": "Harry Reid International Airport",
+   "country": "United States",
+   "hint3": "region|Nevada"
+  },
+  {
+   "rank": 31,
+   "code": "CGK",
+   "name": "Soekarno-Hatta International Airport",
+   "country": "Indonesia",
+   "hint3": "region|Banten"
+  },
+  {
+   "rank": 32,
+   "code": "SFO",
+   "name": "San Francisco International Airport",
+   "country": "United States",
+   "hint3": "airline|United Airlines"
+  },
+  {
+   "rank": 33,
+   "code": "DOH",
+   "name": "Hamad International Airport",
+   "country": "Qatar",
+   "hint3": "airline|Qatar Airways"
+  },
+  {
+   "rank": 34,
+   "code": "PKX",
+   "name": "Beijing Daxing International Airport",
+   "country": "China",
+   "hint3": "region|Beijing Municipality"
+  },
+  {
+   "rank": 35,
+   "code": "CLT",
+   "name": "Charlotte Douglas International Airport",
+   "country": "United States",
+   "hint3": "airline|American Airlines"
+  },
+  {
+   "rank": 36,
+   "code": "JED",
+   "name": "King Abdulaziz International Airport",
+   "country": "Saudi Arabia",
+   "hint3": "airline|Saudia"
+  },
+  {
+   "rank": 37,
+   "code": "SEA",
+   "name": "Seattle–Tacoma International Airport",
+   "country": "United States",
+   "hint3": "airline|Alaska Airlines"
+  },
+  {
+   "rank": 38,
+   "code": "MNL",
+   "name": "Ninoy Aquino International Airport",
+   "country": "Philippines",
+   "hint3": "region|National Capital Region"
+  },
+  {
+   "rank": 39,
+   "code": "PHX",
+   "name": "Phoenix Sky Harbor International Airport",
+   "country": "United States",
+   "hint3": "airline|American Airlines"
+  },
+  {
+   "rank": 40,
+   "code": "FCO",
+   "name": "Rome–Fiumicino Leonardo da Vinci International Airport",
+   "country": "Italy",
+   "hint3": "airline|ITA Airways"
+  },
+  {
+   "rank": 41,
+   "code": "HGH",
+   "name": "Hangzhou Xiaoshan International Airport",
+   "country": "China",
+   "hint3": "region|Zhejiang Province"
+  },
+  {
+   "rank": 42,
+   "code": "SHA",
+   "name": "Shanghai Hongqiao International Airport",
+   "country": "China",
+   "hint3": "airline|China Eastern Airlines"
+  },
+  {
+   "rank": 43,
+   "code": "CKG",
+   "name": "Chongqing Jiangbei International Airport",
+   "country": "China",
+   "hint3": "region|Chongqing Municipality"
+  },
+  {
+   "rank": 44,
+   "code": "KMG",
+   "name": "Kunming Changshui International Airport",
+   "country": "China",
+   "hint3": "airline|China Eastern Airlines"
+  },
+  {
+   "rank": 45,
+   "code": "XIY",
+   "name": "Xi'an Xianyang International Airport",
+   "country": "China",
+   "hint3": "airline|China Eastern Airlines"
+  },
+  {
+   "rank": 46,
+   "code": "SAW",
+   "name": "Istanbul Sabiha Gökçen International Airport",
+   "country": "Turkey",
+   "hint3": "airline|Pegasus Airlines"
+  },
+  {
+   "rank": 47,
+   "code": "IAH",
+   "name": "George Bush Intercontinental Airport",
+   "country": "United States",
+   "hint3": "airline|United Airlines"
+  },
+  {
+   "rank": 48,
+   "code": "TPE",
+   "name": "Taiwan Taoyuan International Airport",
+   "country": "Taiwan",
+   "hint3": "region|Taoyuan City"
+  },
+  {
+   "rank": 49,
+   "code": "YYZ",
+   "name": "Toronto Pearson International Airport",
+   "country": "Canada",
+   "hint3": "airline|Air Canada"
+  },
+  {
+   "rank": 50,
+   "code": "GRU",
+   "name": "São Paulo/Guarulhos–Governor André Franco Montoro International Airport",
+   "country": "Brazil",
+   "hint3": "airline|LATAM Brasil"
+  }
+ ]
+}

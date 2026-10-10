@@ -158,7 +158,7 @@ async function walkthrough(theme) {
   await page.locator('#btn-hint').click();
   await audit(page, 'hint menu', theme);
   await shot(page, `${theme}-hint-menu`);
-  await page.locator('#sheet [data-hint=continent]').click();
+  await page.locator('#sheet [data-hint=country]').click();
   await audit(page, 'hint confirmation', theme);
   await page.locator('#sheet [data-confirm]').click();
   await page.locator('#btn-zoom').click();

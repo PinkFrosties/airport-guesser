@@ -52,7 +52,7 @@ if (built) {
     const page = await ctx.newPage(); const logs = []; page.on('console', (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) logs.push(m.text().slice(0, 160)); });
     await page.goto(`http://localhost:${port}/`); await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 40000 }); await page.waitForTimeout(2500);
     await page.locator('#guess-input').fill('JFK'); await page.waitForSelector('#suggestions li[role=option]'); await page.locator('#suggestions li[role=option]').first().click(); await page.locator('#guess-btn').click();
-    await page.locator('#btn-hint').click(); await page.locator('#sheet [data-hint=continent]').click(); await page.locator('#sheet [data-confirm]').click();
+    await page.locator('#btn-hint').click(); await page.locator('#sheet [data-hint=country]').click(); await page.locator('#sheet [data-confirm]').click();
     for (const b of ['#btn-help', '#btn-about', '#btn-stats']) { await page.locator(b).click(); await page.waitForTimeout(900); await page.keyboard.press('Escape'); }
     await page.locator('#theme-seg button').nth(2).click(); await page.locator('#mode-seg button').nth(1).click(); await page.waitForTimeout(1500);
     assert.deepEqual(await page.evaluate(() => window.__viol || []), []); assert.deepEqual(logs, []);

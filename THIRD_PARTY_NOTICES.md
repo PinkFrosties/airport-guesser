@@ -44,6 +44,9 @@ No framework, no bundler and no fonts are shipped: the app is plain JavaScript, 
 
 ## Development tooling (not distributed with the app)
 
+- @turf/bearing 7.4.0, MIT (https://github.com/Turfjs/turf)
+- @turf/distance 7.4.0, MIT (https://github.com/Turfjs/turf)
+- @turf/helpers 7.4.0, MIT (https://github.com/Turfjs/turf)
 - esbuild 0.28.2, MIT (git+https://github.com/evanw/esbuild.git)
 - playwright 1.63.0, Apache-2.0 (https://playwright.dev)
 - playwright-core 1.63.0, Apache-2.0 (https://playwright.dev)
@@ -54,8 +57,8 @@ Used only for the test scripts and to generate icons.
 
 - **Esri World Imagery** (map tiles; the build also queries the tile availability service). Used under Esri's terms, with the required attribution shown on every image. https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9
 - **OurAirports** airport, runway and country data (airports.csv, runways.csv, countries.csv). Public domain. https://ourairports.com/data/
-- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
-- **OpenFlights** route data (routes.dat), used only at build time to order the Practice "Major hubs" set. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
+- **Wikidata** (CC0 1.0) and the **MediaWiki API**, used only at build time to verify and look up Wikipedia article titles (scripts/wikipedia_links.py) and to read airline-hub relations for the third hint (scripts/hint_data.py). The app stores article titles only and links to wikipedia.org; Wikipedia text is not copied. https://www.wikidata.org/
+- **OpenFlights** route data (routes.dat) and airline records (airlines.dat), used only at build time to order the Practice "Major hubs" set and to choose an airport's main airline for the third hint. Open Database Licence (ODbL). https://github.com/jpatokal/openflights
 
 ## Disclaimer
 

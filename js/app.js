@@ -254,7 +254,11 @@ async function restoreRound(kind, saved, candidates) {
       if (!g) continue;
       r.guessed.set(e.id, g);
       r.results.push(C.evaluateGuess(g, answer));
-    } else if (e.t === 'h' && C.HINTS.some((h) => h.key === e.k)) r.hints.push(e.k);
+    } else if (e.t === 'h') { // hints of older versions (an earlier set of clues) stay a spent attempt: shown as the extra clue, or just counted
+      const key = C.HINTS.some((h) => h.key === e.k) ? e.k : r.hints.includes('extra') ? 'legacy' : 'extra';
+      if (r.hints.includes(key) && key !== 'legacy') continue;
+      r.hints.push(key); r.log.push(e); continue;
+    }
     else if (e.t === 'z') r.zoomed = true;
     else continue;
     r.log.push(e);
@@ -427,16 +431,16 @@ function renderSheet() {
   let html = '';
   if (sheet.type === 'hints') {
     html = `<h4>Need a hint?</h4><p>Each hint costs 1 guess. ${left} left.</p><div class="opts">${C.HINTS.map((h) => {
-      const used = r.hints.includes(h.key);
-      const off = used || !C.hintAvailable(h, r.answer);
-      return `<button type="button" class="opt" data-hint="${h.key}" ${off ? 'disabled' : ''}>${h.label}<small>${used ? 'Already used' : off ? 'Not available' : '−1 guess'}</small></button>`;
+      const st = C.hintStatus(h.key, r.hints, r.answer);
+      const info = C.hintInfo(h.key, r.answer); // only the kind of clue (its menu label), never its content
+      return `<button type="button" class="opt" data-hint="${h.key}" ${st !== 'ok' ? 'disabled' : ''}>${esc(info.menu)}<small>${{ ok: '−1 guess', used: 'Already used', covered: 'Already shown', unavailable: 'Not available' }[st]}</small></button>`;
     }).join('')}</div><button type="button" class="cancel" data-cancel>Cancel</button>`;
   } else if (sheet.what === 'zoom') {
     html = `<h4>Zoom out for 1 guess?</h4><p>Shows a wider view. You can do this once per game. ${after}</p>
       <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Zoom out (−1 guess)</button></div>`;
   } else {
-    const h = C.HINTS.find((x) => x.key === sheet.key);
-    html = `<h4>Reveal: ${h.label.toLowerCase()}?</h4><p>This costs 1 guess. ${after}</p>
+    const h = C.hintInfo(sheet.key, r.answer);
+    html = `<h4>Reveal: ${esc(h.menu.toLowerCase())}?</h4><p>This costs 1 guess. ${after}</p>
       <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Reveal (−1 guess)</button></div>`;
   }
   el.sheet.innerHTML = html;
@@ -491,7 +495,7 @@ function renderAll(animateLast = false) {
 
   // tools
   const canSpend = C.canSpend(used);
-  const anyHint = C.HINTS.some((h) => !r.hints.includes(h.key) && C.hintAvailable(h, r.answer));
+  const anyHint = C.HINTS.some((h) => C.hintStatus(h.key, r.hints, r.answer) === 'ok');
   el.btnHint.disabled = !canSpend || !anyHint;
   el.btnZoom.disabled = !canSpend || r.zoomed;
   el.btnZoom.innerHTML = r.zoomed ? 'Zoomed out' : 'Zoom out <span class="cost">−1 guess</span>';
@@ -501,8 +505,9 @@ function renderAll(animateLast = false) {
   const chips = [];
   if (r.zoomed) chips.push(['View', 'Zoomed out']);
   for (const key of r.hints) {
-    const h = C.HINTS.find((x) => x.key === key);
-    chips.push([h.label, h.value(r.answer)]);
+    if (key === 'legacy') continue; // bought in an older version: its attempt counts, its text is gone
+    const h = C.hintInfo(key, r.answer);
+    chips.push([h.label, h.text()]);
   }
   el.hintsUsed.hidden = chips.length === 0;
   el.hintsList.innerHTML = chips.map(([k, v]) => `<li><span>${esc(k)}</span><b>${esc(v)}</b></li>`).join('');

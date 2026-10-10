@@ -136,7 +136,7 @@
     <h3>Help along the way</h3>
     <ul>
       <li><b>Zoom out</b>: a wider view, once per game, costs 1 attempt.</li>
-      <li><b>Hints</b>: continent, country, first letter or number of runways. Each costs 1 attempt.</li>
+      <li><b>Hints</b>: the country, the first letter of the name, or a third clue (the airport's main airline, or its region). Each costs 1 attempt.</li>
       <li>Guesses, hints and zoom-outs share the same 5 attempts. The image is fixed: no panning or zooming.</li>
     </ul>
     <h3>Modes</h3>
@@ -154,7 +154,7 @@
   </form>
   <div class="dlg-body prose" id="about-body">
     <h3>About</h3>
-    <p>Airport Guesser shows a locked satellite view of an airport. Name it in 5 attempts or fewer: each wrong guess gives the distance and direction to the answer, and you can spend an attempt on a hint (continent, country, first letter, number of runways) or a wider view. The Daily airport is the same for everyone.</p>
+    <p>Airport Guesser shows a locked satellite view of an airport. Name it in 5 attempts or fewer: each wrong guess gives the distance and direction to the answer, and you can spend an attempt on a hint (country, first letter, main airline or region) or a wider view. The Daily airport is the same for everyone.</p>
     <h3>Created by</h3>
     <p><b>Kevin Pahud</b>. Version <span id="about-version"></span>.</p>
     <h3>Imagery</h3>
@@ -162,13 +162,14 @@
     <p><b>Privacy:</b> the map images are loaded straight from Esri's servers (services.arcgisonline.com and server.arcgisonline.com), so Esri receives each tile request together with your IP address and browser details, as with any website. The app has no accounts, analytics or cookies and keeps your progress only in this browser.</p>
     <p><a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">World Imagery and its terms of use</a> &middot; <a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener">Esri Master Agreement</a></p>
     <h3>Airport data</h3>
-    <p><b>OurAirports</b> (open data). Fields used: name, IATA and ICAO codes, latitude and longitude, country, municipality, continent, airport type, and runway count and end coordinates (to size the view). Licence: public domain, no warranty. Data retrieved <span id="about-data-date"></span>.</p>
+    <p><b>OurAirports</b> (open data). Fields used: name, IATA and ICAO codes, latitude and longitude, country, municipality, region, elevation, airport type, and runway end coordinates (to size the view). Licence: public domain, no warranty. Data retrieved <span id="about-data-date"></span>.</p>
     <p><a href="https://ourairports.com/data/" target="_blank" rel="noopener">ourairports.com/data</a></p>
     <h3>Other data</h3>
     <ul>
-      <li>Country names come from the OurAirports countries table; continent codes from the OurAirports airport records. Continent names are the app's own labels.</li>
+      <li>Country and region names come from the OurAirports countries and regions tables.</li>
       <li>The Daily airport is drawn from the 50 busiest airports worldwide by total passengers: ACI World annual figures for <span id="about-rank-year">2025</span>, as compiled on <a href="https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic" target="_blank" rel="noopener">Wikipedia</a> (retrieved <span id="about-rank-date"></span>). The source publishes the top 50 only. <a href="https://aci.aero/resources/busiest-airports-in-the-world/" target="_blank" rel="noopener">ACI World</a></li>
       <li><b>Wikipedia</b> is used as a link target only: after a round ends, the result card offers a link to the airport's Wikipedia article. The app never contacts Wikipedia itself, and nothing is shown or prefetched before the round ends. <b>Opening the link leaves the app</b> and goes to wikipedia.org (new tab, text under CC BY-SA, see Wikipedia). The article titles were looked up at build time from OurAirports' Wikipedia links, falling back to <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> (CC0); airports without a verified article get a Wikipedia search link instead.</li>
+      <li>The third hint (an airport's <b>main airline</b>, or its region) is decided at build time. Main airline: <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> (CC0) airline-hub relations, checked against <a href="https://github.com/jpatokal/openflights" target="_blank" rel="noopener">OpenFlights</a> (ODbL) route counts and airline records; names only, no logos. Region: OurAirports region names. The route data is from 2014, so a few airlines may be out of date.</li>
       <li>The Practice "Major hubs" set is ranked by route counts from <a href="https://github.com/jpatokal/openflights" target="_blank" rel="noopener">OpenFlights</a> (ODbL) routes data, used only to order airports at build time.</li>
     </ul>
     <h3>Open-source software</h3>
