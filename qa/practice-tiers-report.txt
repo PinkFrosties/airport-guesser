@@ -1,9 +1,9 @@
-wrote data/tiers.json: tier 1 100, tier 2 238, tier 3 1257
+wrote data/tiers.json: tier 1 100, tier 2 226, tier 3 1276
 
 == 1. tier sizes
 tier 1: 100  score histogram (by tens): 60s:3 70s:5 80s:48 90s:44
-tier 2: 238  score histogram (by tens): 50s:3 60s:25 70s:100 80s:86 90s:24
-tier 3: 1257  score histogram (by tens): 60s:664 70s:447 80s:137 90s:9
+tier 2: 226  score histogram (by tens): 50s:3 60s:20 70s:97 80s:82 90s:24
+tier 3: 1276  score histogram (by tens): 60s:674 70s:455 80s:138 90s:9
 
 == 2. Major hubs ranks 51-100 (Wikidata passenger counts)
  51 EWR   Newark Liberty International Airport    United States     49.2M 2023  score  93  hint airline
@@ -61,108 +61,108 @@ Wikidata candidates ranked 51..~100 that are NOT in our data (no match / failed 
 countries among 51-100: US:14 JP:4 GB:3 CN:3 MX:2 DE:2 VN:2 ES:2 KR:2 AU:2 RU:1 IN:1 TR:1 CO:1 CH:1 AT:1 FR:1 TH:1 IT:1 EG:1 CA:1 CL:1 AE:1 PE:1
 
 == 3a. 50 random tier-2 (Large)
-KGL   Kigali International Airport          Rwanda         score  73  Main airline: RwandAir
+NBO   Jomo Kenyatta International Airport   Kenya          score  83  Main airline: Kenya Airways
 YTY   Yangzhou Taizhou Airport              China          score  75  Main airline: China Southern Airlines
 OKA   Naha International Airport            Japan          score  83  Main airline: All Nippon Airways
-DAD   Da Nang International Airport         Vietnam        score  81  Main airline: Vietnam Airlines
+BDJ   Syamsudin Noor International Airport  Indonesia      score  74  Main airline: Lion Air
 ILO   Iloilo International Airport          Philippines    score  72  Main airline: Cebu Pacific
-DAR   Julius Nyerere International Airport  Tanzania       score  79  Main airline: Precision Air
+KRT   Khartoum International Airport        Sudan          score  78  Main airline: Sudan Airways
 DVO   Francisco Bangoy International Airpo  Philippines    score  73  Main airline: Cebu Pacific
 YNJ   Yanji Chaoyangchuan Airport           China          score  73  Main airline: China Southern Airlines
-PBM   Johan Adolf Pengel International Air  Suriname       score  69  Main airline: Surinam Airways
-SHJ   Sharjah International Airport         United Arab E  score  87  Main airline: Air Arabia
-HYA   Cape Cod Gateway Airport              United States  score  59  Main airline: Cape Air
+ASU   Silvio Pettirossi International Airp  Paraguay       score  74  Main airline: LATAM Airlines Paraguay
+BEY   Beirut Rafic Hariri International Ai  Lebanon        score  86  Main airline: Middle East Airlines
+CVG   Cincinnati Northern Kentucky Interna  United States  score  83  Main airline: Delta Air Lines
 RUH   King Khalid International Airport     Saudi Arabia   score  98  Main airline: Saudia
-SDR   Seve Ballesteros-Santander Airport    Spain          score  77  Main airline: Ryanair
-MST   Maastricht Aachen Airport             Netherlands    score  68  Main airline: Ryanair
-ULH   Al-Ula International Airport          Saudi Arabia   score  65  Main airline: Saudia
-YKS   Platon Oyunsky Yakutsk International  Russia         score  80  Main airline: Yakutia Airlines
-SNN   Shannon Airport                       Ireland        score  78  Main airline: Ryanair
-BGY   Il Caravaggio International Airport   Italy          score  92  Main airline: Ryanair
-GDN   Gdańsk Lech Wałęsa Airport            Poland         score  88  Main airline: Wizz Air
-NSK   Alykel International Airport          Russia         score  75  Main airline: Taimyr Air
-RBA   Rabat-Salé Airport                    Morocco        score  73  Main airline: Ryanair
-ZAG   Zagreb Franjo Tuđman International A  Croatia        score  83  Main airline: Croatia Airlines
-RIX   Riga International Airport            Latvia         score  87  Main airline: AirBaltic
+VLC   Valencia Airport                      Spain          score  86  Main airline: Ryanair
+PIK   Glasgow Prestwick Airport             United Kingdo  score  81  Main airline: Ryanair
+KNO   Kualanamu International Airport       Indonesia      score  65  Main airline: Garuda Indonesia
+ARH   Talagi Airport                        Russia         score  70  Main airline: Smartavia
+NOC   Ireland West Airport Knock            Ireland        score  72  Main airline: Ryanair
+TPS   Vincenzo Florio Airport Trapani-Birg  Italy          score  79  Main airline: Ryanair
+TOS   Tromsø Airport                        Norway         score  80  Main airline: Widerøe
+PGD   Punta Gorda Airport                   United States  score  79  Main airline: Allegiant Air
+FEZ   Fes Saïss International Airport       Morocco        score  76  Main airline: Ryanair
+SPU   Split Saint Jerome Airport            Croatia        score  83  Main airline: Croatia Airlines
+MMX   Malmö Sturup Airport                  Sweden         score  81  Main airline: Wizz Air
 ADD   Addis Ababa Bole International Airpo  Ethiopia       score  91  Main airline: Ethiopian Airlines
-PSA   Pisa International Airport            Italy          score  88  Main airline: Ryanair
-HEL   Helsinki Vantaa Airport               Finland        score  96  Main airline: Finnair
+TSF   Treviso Airport                       Italy          score  80  Main airline: Ryanair
+FKB   Karlsruhe Baden-Baden Airport         Germany        score  80  Main airline: Ryanair
 TNA   Jinan Yaoqiang International Airport  China          score  88  Main airline: Shandong Airlines
 HIR   Honiara International Airport         Solomon Islan  score  80  Main airline: Solomon Airlines
-VTE   Wattay International Airport          Laos           score  78  Main airline: Lao Airlines
+PKR   Pokhara Domestic Airport              Nepal          score  59  Main airline: Simrik Airlines
 PPT   Fa'a'ā International Airport          French Polyne  score  74  Main airline: Air Tahiti
 AMM   Queen Alia International Airport      Jordan         score  88  Main airline: Royal Jordanian
-CUR   Hato International Airport            Curaçao        score  80  Main airline: Insel Air
-KUN   Kaunas International Airport          Lithuania      score  79  Main airline: Ryanair
-FEZ   Fes Saïss International Airport       Morocco        score  76  Main airline: Ryanair
-LHE   Allama Iqbal International Airport    Pakistan       score  87  Main airline: Pakistan International Airlines
-TAS   Tashkent International Airport        Uzbekistan     score  89  Main airline: Uzbekistan Airways
-HAV   José Martí International Airport      Cuba           score  83  Main airline: Cubana de Aviación
-DZA   Dzaoudzi Pamandzi International Airp  Mayotte        score  69  Main airline: Ewa Air
-GUW   Atyrau International Airport          Kazakhstan     score  70  Main airline: Air Astana
-TUN   Tunis Carthage International Airport  Tunisia        score  90  Main airline: Tunisair
-LED   Pulkovo Airport                       Russia         score  90  Main airline: Aeroflot
+CIT   Shymkent International Airport        Kazakhstan     score  76  Main airline: SCAT Airlines
+OER   Örnsköldsvik Airport                  Sweden         score  67  Main airline: Höga Kusten Flyg
+MPM   Maputo Airport                        Mozambique     score  73  Main airline: LAM Mozambique Airlines
+KHI   Jinnah International Airport          Pakistan       score  89  Main airline: Pakistan International Airlines
+GOJ   Nizhny Novgorod / Strigino Internati  Russia         score  78  Main airline: Ural Airlines
+PTY   Tocumen International Airport         Panama         score  94  Main airline: Copa Airlines
+GBE   Sir Seretse Khama International Airp  Botswana       score  74  Main airline: Air Botswana
+YKS   Platon Oyunsky Yakutsk International  Russia         score  80  Main airline: Yakutia Airlines
+MIR   Monastir Habib Bourguiba Internation  Tunisia        score  77  Main airline: Tunisair
+KJA   Krasnoyarsk International Airport     Russia         score  75  Main airline: NordStar Airlines
 MUX   Multan International Airport          Pakistan       score  75  Main airline: Pakistan International Airlines
 XUZ   Xuzhou Guanyin International Airport  China          score  76  Main airline: Sichuan Airlines
-MVD   Carrasco General Cesáreo L. Berisso   Uruguay        score  80  Main airline: BQB Lineas Aereas
+PBM   Johan Adolf Pengel International Air  Suriname       score  69  Main airline: Surinam Airways
 MCT   Muscat International Airport          Oman           score  94  Main airline: Oman Air
 YTZ   Billy Bishop Toronto City Airport     Canada         score  78  Main airline: Porter Airlines
-KKJ   Kitakyushu Airport                    Japan          score  60  Main airline: StarFlyer
-CVG   Cincinnati Northern Kentucky Interna  United States  score  83  Main airline: Delta Air Lines
+UKB   Kobe Airport                          Japan          score  72  Main airline: Skymark Airlines
+JRO   Kilimanjaro International Airport     Tanzania       score  70  Main airline: Precision Air
 ISB   Islamabad International Airport       Pakistan       score  88  Main airline: Pakistan International Airlines
-HHN   Frankfurt-Hahn Airport                Germany        score  88  Main airline: Ryanair
+CRL   Brussels South Charleroi Airport      Belgium        score  86  Main airline: Ryanair
 
 == 3b. 50 random tier-3 (Mid-size)
-ABJ   Félix-Houphouët-Boigny International  Côte d'Ivoire  score  70  Part of the country: South-east of Côte d'Ivoire
-WLG   Wellington International Airport      New Zealand    score  73  Part of the country: East of New Zealand
+ABV   Nnamdi Azikiwe International Airport  Nigeria        score  68  Part of the country: Central part of Nigeria
+URY   Gurayat Domestic Airport              Saudi Arabia   score  64  Region: Al Jawf Region, Saudi Arabia
 GZP   Gazipaşa-Alanya Airport               Turkey         score  74  Region: Antalya Province, Turkey
-HAK   Haikou Meilan International Airport   China          score  88  Region: Hainan Province, China
+SYX   Sanya Phoenix International Airport   China          score  83  Region: Hainan Province, China
 YQG   Windsor International Airport         Canada         score  67  Region: Ontario, Canada
-TMS   São Tomé International Airport        São Tomé and   score  70  Region: Água Grande District, São Tomé and Principe
-TUU   Prince Sultan bin Abdulaziz Internat  Saudi Arabia   score  68  Part of the country: North-west of Saudi Arabia
-PAP   Toussaint Louverture International A  Haiti          score  74  Region: Ouest Department, Haiti
-HDY   Hat Yai International Airport         Thailand       score  69  Region: Songkhla Province, Thailand
-THS   Sukhothai Airport                     Thailand       score  65  Region: Sukhothai Province, Thailand
+APL   Nampula Airport                       Mozambique     score  66  Part of the country: North-east of Mozambique
+BUZ   Bushehr Airport                       Iran           score  69  Part of the country: South of Iran
+CYB   Charles Kirkconnell International Ai  Cayman Island  score  65  Region: Cayman Brac, Cayman Islands
+LOE   Loei Airport                          Thailand       score  64  Region: Loei Province, Thailand
+PHS   Phitsanulok Airport                   Thailand       score  67  Part of the country: North of Thailand
 NPT   Newport State Airport                 United States  score  64  Region: Rhode Island, United States
-LOS   Murtala Muhammed International Airpo  Nigeria        score  81  Part of the country: South-west of Nigeria
-JOE   Joensuu Airport                       Finland        score  68  Region: North Karelia Region, Finland
-VXE   Cesaria Evora International Airport   Cape Verde     score  68  Region: Barlavento Islands, Cape Verde
+PHC   Port Harcourt International Airport   Nigeria        score  67  Region: Rivers State, Nigeria
+KOK   Kokkola-Pietarsaari Airport           Finland        score  74  Region: Central Ostrobothnia Region, Finland
+JIM   Jimma Airport                         Ethiopia       score  64  Region: Oromia Region, Ethiopia
 GLK   Galcaio Airport                       Somalia        score  65  Region: Mudug, Somalia
-BUD   Budapest Liszt Ferenc International   Hungary        score  87  Part of the country: North of Hungary
+OLB   Olbia Costa Smeralda Airport          Italy          score  80  Region: Sardinia, Italy
 YQF   Red Deer Regional Airport             Canada         score  64  Region: Alberta, Canada
 CZX   Changzhou Benniu International Airpo  China          score  77  Region: Jiangsu Province, China
-VSA   Carlos Rovirosa Pérez International   Mexico         score  73  Region: Tabasco, Mexico
-YYJ   Victoria International Airport        Canada         score  68  Region: British Columbia, Canada
-BTR   Baton Rouge Metropolitan Airport      United States  score  71  Region: Louisiana, United States
+SJO   Juan Santamaría International Airpor  Costa Rica     score  74  Part of the country: North of Costa Rica
+YYQ   Churchill Airport                     Canada         score  68  Region: Manitoba, Canada
+BZN   Bozeman Yellowstone International Ai  United States  score  69  Region: Montana, United States
 NJF   Al Najaf International Airport        Iraq           score  68  Part of the country: South of Iraq
-REC   Recife/Guararapes - Gilberto Freyre   Brazil         score  76  Region: Pernambuco, Brazil
-NAP   Naples International Airport          Italy          score  76  Region: Campania, Italy
-KOA   Ellison Onizuka Kona International A  United States  score  72  Region: Hawaii, United States
-LBV   Libreville Leon M'ba International A  Gabon          score  75  Region: Estuaire Province, Gabon
-IVL   Ivalo Airport                         Finland        score  66  Region: Lapland Region, Finland
+RAO   Leite Lopes Airport                   Brazil         score  73  Region: São Paulo, Brazil
+BRQ   Brno-Tuřany Airport                   Czech Republi  score  68  Region: South Moravian Region, Czech Republic
+ROR   Roman Tmetuchl International Airport  Palau          score  64  Region: Airai, Palau
+VXC   Lichinga Airport                      Mozambique     score  67  Region: Niassa Province, Mozambique
+JOE   Joensuu Airport                       Finland        score  68  Region: North Karelia Region, Finland
 YPR   Prince Rupert Airport                 Canada         score  68  Region: British Columbia, Canada
 YBG   Saguenay-Bagotville Airport           Canada         score  70  Region: Quebec, Canada
-BTU   Bintulu Airport                       Malaysia       score  65  Region: Sarawak, Malaysia
-KDU   Skardu International Airport          Pakistan       score  66  Region: Gilgit-Baltistan, Pakistan
-OMH   Urmia Airport                         Iran           score  65  Region: West Azerbaijan Province, Iran
+KCH   Kuching International Airport         Malaysia       score  75  Region: Sarawak, Malaysia
+ISU   Jalal Talabani International Airport  Iraq           score  70  Region: As-Sulaymaniyyah Governorate, Iraq
+SLL   Salalah International Airport         Oman           score  73  Region: Dhofar Governorate, Oman
 YRT   Rankin Inlet Airport                  Canada         score  71  Region: Nunavut, Canada
-MQM   Mardin Airport                        Turkey         score  67  Part of the country: South-east of Turkey
-OIT   Oita Airport                          Japan          score  66  Part of the country: West of Japan
-PIS   Poitiers-Biard Airport                France         score  64  Region: Nouvelle-Aquitaine, France
+TIV   Tivat Airport                         Montenegro     score  73  Elevation: below 100 m above sea level
+KMQ   Komatsu Airport / JASDF Komatsu Air   Japan          score  70  Region: Ishikawa Prefecture, Japan
+DLE   Dole Tavaux Airport                   France         score  72  Region: Bourgogne-Franche-Comté, France
 IQQ   Diego Aracena International Airport   Chile          score  70  Region: Tarapacá Region, Chile
 MCW   Mason City Municipal Airport          United States  score  64  Region: Iowa, United States
-INV   Inverness Airport                     United Kingdo  score  70  Region: Scotland, United Kingdom
-AVP   Wilkes-Barre/Scranton International   United States  score  72  Region: Pennsylvania, United States
+EDI   Edinburgh Airport                     United Kingdo  score  81  Region: Scotland, United Kingdom
+BFI   King County International Airport -   United States  score  68  Region: Washington, United States
 GYN   Santa Genoveva International Airport  Brazil         score  77  Region: Goiás, Brazil
-KAN   Mallam Aminu Kano International Airp  Nigeria        score  69  Part of the country: North-east of Nigeria
-UBJ   Yamaguchi Ube Airport                 Japan          score  64  Region: Yamaguchi Prefecture, Japan
+NIM   Diori Hamani International Airport    Niger          score  72  Part of the country: South-west of Niger
+NGS   Nagasaki Airport                      Japan          score  76  Part of the country: West of Japan
 EGS   Egilsstaðir Airport                   Iceland        score  65  Region: Eastern Region, Iceland
-LDE   Tarbes-Lourdes-Pyrénées Airport       France         score  68  Region: Occitanie, France
-EGX   Egegik Airport                        United States  score  66  Region: Alaska, United States
+BIA   Bastia-Poretta International airport  France         score  76  Region: Corsica, France
+UNK   Unalakleet Airport                    United States  score  68  Region: Alaska, United States
 BON   Flamingo International Airport        Caribbean Net  score  70  Region: Bonaire, Caribbean Netherlands
-HPN   Westchester County Airport            United States  score  72  Region: New York, United States
-TET   Tete Airport                          Mozambique     score  67  Part of the country: North-west of Mozambique
-ABQ   Albuquerque International Sunport     United States  score  74  Region: New Mexico, United States
+IAG   Niagara Falls International Airport   United States  score  70  Region: New York, United States
+BUQ   Joshua Mqabuko Nkomo International A  Zimbabwe       score  65  Part of the country: South-west of Zimbabwe
+VOG   Volgograd International Airport       Russia         score  68  Part of the country: South-west of Russia
 
 specific cases:
 GVA tier 2 score 92 Main airline: easyJet
@@ -179,17 +179,14 @@ RKE   Copenhagen Roskilde Airport           Denmark        score  57  Main airli
 HYA   Cape Cod Gateway Airport              United States  score  59  Main airline: Cape Air
 PKR   Pokhara Domestic Airport              Nepal          score  59  Main airline: Simrik Airlines
 KKJ   Kitakyushu Airport                    Japan          score  60  Main airline: StarFlyer
-SLU   George F. L. Charles Airport          Saint Lucia    score  62  Main airline: LIAT
 HUY   Humberside Airport                    United Kingdo  score  63  Main airline: Eastern Airways
 HGU   Mount Hagen Kagamuga Airport          Papua New Gui  score  65  Main airline: Airlines PNG
-MHG   Mannheim-City Airport                 Germany        score  65  Main airline: Arcus Air
 DUD   Dunedin International Airport         New Zealand    score  65  Main airline: Mainland Air
 ULH   Al-Ula International Airport          Saudi Arabia   score  65  Main airline: Saudia
 KNO   Kualanamu International Airport       Indonesia      score  65  Main airline: Garuda Indonesia
 CCF   Carcassonne Salvaza Airport           France         score  66  Main airline: Ryanair
 GSE   Säve Airport                          Sweden         score  67  Main airline: Ryanair
 OER   Örnsköldsvik Airport                  Sweden         score  67  Main airline: Höga Kusten Flyg
-FRS   Mundo Maya International Airport      Guatemala      score  67  Main airline: Transportes Aéreos Guatemaltecos
 NOU   La Tontouta International Airport     New Caledonia  score  67  Main airline: Aircalin
 IJK   Izhevsk Airport                       Russia         score  67  Main airline: Izhavia
 YIW   Yiwu Airport                          China          score  67  Main airline: China Southern Airlines
@@ -197,24 +194,27 @@ INU   Nauru International Airport           Nauru          score  68  Main airli
 YTH   Thompson Airport                      Canada         score  68  Main airline: Calm Air
 MST   Maastricht Aachen Airport             Netherlands    score  68  Main airline: Ryanair
 FPO   Grand Bahama International Airport    Bahamas        score  68  Main airline: Bahamasair
-USN   Ulsan Airport                         South Korea    score  68  Main airline: Hi Air
-DZA   Dzaoudzi Pamandzi International Airp  Mayotte        score  69  Main airline: Ewa Air
 ADA   Adana Şakirpaşa Airport               Turkey         score  69  Main airline: Pegasus Airlines
 PBM   Johan Adolf Pengel International Air  Suriname       score  69  Main airline: Surinam Airways
 NTG   Nantong Xingdong International Airpo  China          score  69  Main airline: Shenzhen Airlines
 WUS   Nanping Wuyishan Airport              China          score  69  Main airline: Shandong Airlines
 JRO   Kilimanjaro International Airport     Tanzania       score  70  Main airline: Precision Air
 SON   Santo Pekoa International Airport     Vanuatu        score  70  Main airline: Air Vanuatu
-ELQ   Prince Naif bin Abdulaziz Internatio  Saudi Arabia   score  70  Main airline: Saudi Arabian Airlines
+ELQ   Prince Naif bin Abdulaziz Internatio  Saudi Arabia   score  70  Main airline: Saudia
 GUW   Atyrau International Airport          Kazakhstan     score  70  Main airline: Air Astana
 ARH   Talagi Airport                        Russia         score  70  Main airline: Smartavia
 LST   Launceston Airport                    Australia      score  70  Main airline: Airlines of Tasmania
-DSN   Ordos Ejin Horo International Airpor  China          score  70  Main airline: Air Foyle
 ALF   Alta Airport                          Norway         score  71  Main airline: Widerøe
 REU   Reus Airport                          Spain          score  71  Main airline: Ryanair
 FSP   Saint-Pierre Pointe-Blanche Airport   Saint Pierre   score  71  Main airline: Air Saint-Pierre
-SCO   Aktau International Airport           Kazakhstan     score  71  Main airline: Scat Air
+SCO   Aktau International Airport           Kazakhstan     score  71  Main airline: SCAT Airlines
 TGO   Tongliao Airport                      China          score  71  Main airline: China Eastern Airlines
+LAE   Nadzab Tomodachi International Airpo  Papua New Gui  score  72  Main airline: Airlines PNG
+NOC   Ireland West Airport Knock            Ireland        score  72  Main airline: Ryanair
+UKB   Kobe Airport                          Japan          score  72  Main airline: Skymark Airlines
+ILO   Iloilo International Airport          Philippines    score  72  Main airline: Cebu Pacific
+FSZ   Mount Fuji Shizuoka Airport           Japan          score  72  Main airline: Fuji Dream Airlines
+NKC   Nouakchott–Oumtounsy International A  Mauritania     score  72  Main airline: Mauritania Airlines
 -- tier 2 highest left out (airline hint, below the threshold)
 -- tier 3 lowest kept
 YAG   Fort Frances Municipal Airport        Canada         score  64  Region: Ontario, Canada
@@ -299,9 +299,9 @@ CHO   Charlottesville Albemarle Airport     United States  score  63  Region: Vi
 CIU   Chippewa County International Airpor  United States  score  63  Region: Michigan, United States
 CNM   Cavern City Air Terminal              United States  score  63  Region: New Mexico, United States
 
-airports with an airline clue left in no tier: 0 (below T2=55); excluded by name (military, heliport, glider...): 46 scheduled/airline ones
+airports with an airline clue left in no tier: 0 (below T2=55); excluded by name (military, heliport, glider...): 30 scheduled/airline ones
 
 == 5. moved vs v1.3.5 (old Practice sets were drawn from the 3,222 airports of airports.json)
 old Major hubs (100) -> {"tier 3":18,"tier 1":77,"tier 2":5}
-old Large (1147) -> {"tier 2":188,"none":236,"tier 3":623,"tier 1":100}
-old Mid-size (2075) -> {"none":1440,"tier 2":46,"tier 3":589}
+old Large (1147) -> {"tier 2":180,"none":230,"tier 3":637,"tier 1":100}
+old Mid-size (2075) -> {"none":1439,"tier 2":42,"tier 3":594}

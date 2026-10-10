@@ -1,15 +1,16 @@
 {
  "airports": 12725,
  "why": {
-  "airline: openflights routes (clear leader)": 238,
-  "region": 11121,
-  "airline: wikidata (only hub airline, little route data)": 30,
-  "grid": 1255,
+  "airline: openflights routes (clear leader)": 231,
+  "region": 11126,
+  "airline: wikidata (only hub airline, little route data)": 25,
+  "grid": 1259,
   "airline: no dominant carrier (close race)": 254,
   "airline: several hub airlines, little route data": 232,
   "airline: the biggest carrier in the route data no longer exists": 236,
-  "airline: blocked after review": 11,
-  "elev": 80,
+  "airline: blocked after review": 20,
+  "elev": 83,
+  "airline: rejected by the stale / home-country check": 3,
   "airline: cargo / charter operator, not offered": 8,
   "none": 1
  },
@@ -19,29 +20,29 @@
   "region": 23
  },
  "hard_pool": {
-  "airline": 254,
-  "region": 11098,
-  "grid": 1242,
-  "elev": 80,
+  "airline": 242,
+  "region": 11103,
+  "grid": 1246,
+  "elev": 83,
   "none": 1
  },
  "practice": {
   "major_hubs": {
    "region": 45,
-   "airline": 31,
-   "grid": 24
+   "airline": 29,
+   "grid": 26
   },
   "large": {
-   "airline": 218,
-   "region": 657,
-   "grid": 264,
-   "elev": 30
+   "airline": 210,
+   "region": 660,
+   "grid": 267,
+   "elev": 32
   },
   "mid_size": {
-   "region": 3223,
-   "airline": 49,
-   "grid": 475,
-   "elev": 37
+   "region": 3225,
+   "airline": 45,
+   "grid": 476,
+   "elev": 38
   }
  },
  "top50_list": [

@@ -1,0 +1,17 @@
+{
+  "_comment": "One airline, one name. alias (how a source spells it) -> the name the app shows. hint_data.py also merges every spelling that shares an airline code, picking the most common one unless this file says otherwise.",
+  "Saudi Arabian Airlines": "Saudia",
+  "Scat Air": "SCAT Airlines",
+  "Fly Dubai": "flydubai",
+  "Taimyr Air": "NordStar Airlines",
+  "Taimyr Air Company": "NordStar Airlines",
+  "Egyptair": "EgyptAir",
+  "AirBaltic": "airBaltic",
+  "Middle East Airlines - Air Liban": "Middle East Airlines",
+  "Air Algerie": "Air Algérie",
+  "Aerolineas Argentinas": "Aerolíneas Argentinas",
+  "KLM Royal Dutch Airlines": "KLM",
+  "Pakistan International Airlines": "Pakistan International Airlines",
+  "Aeroflot Russian Airlines": "Aeroflot",
+  "Lufthansa Regional": "Lufthansa"
+}

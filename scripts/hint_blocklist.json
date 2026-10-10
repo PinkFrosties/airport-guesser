@@ -1,0 +1,26 @@
+{
+  "_comment": "Airlines that must never be offered as a Main airline hint (read by scripts/hint_data.py; tests/unit.game.mjs checks none appears in the data). Each entry says why. Add to it when a review finds a stale, wrong or doubtful carrier.",
+  "airlines": {
+    "Baikotovitchestrian Airlines": "not a real carrier at Kinshasa (bad Wikidata hub entry)",
+    "Volotea Costa Rica": "not a carrier at Anzoategui (bad data)",
+    "Interjet": "ceased operations in 2020",
+    "Lesotho Airways": "ceased operations around 2000",
+    "Metro Batavia": "Indonesian carrier that ceased in 2013 (not at Panama)",
+    "Caucasus Airlines": "no longer operating",
+    "Trinity Airways": "doubtful: not a real scheduled network at Daegu (v1.4.0 review)",
+    "Parata Air": "doubtful: not operating at Yangyang (v1.4.0 review)",
+    "Arik Air": "doubtful: suspended and restructured, no longer dominant at Lagos (v1.4.0 review)",
+    "Regional Air Iceland": "wrong: a domestic Icelandic carrier offered at Belize City (BZE)",
+    "Air Foyle": "wrong: a cargo operator offered at Ordos (DSN)",
+    "Aero4M": "wrong at Ljubljana (LJU)",
+    "Insel Air": "ceased operations in 2020 (CUR)",
+    "LIAT": "ceased operations (SLU)",
+    "TACV": "now Cabo Verde Airlines, TACV no longer exists (RAI)",
+    "Hi Air": "doubtful: tiny regional carrier at Ulsan (USN)",
+    "BQB Lineas Aereas": "doubtful: tiny carrier at Montevideo (MVD)",
+    "Arcus Air": "Wikidata lists it as active but it has no scheduled service (not in OpenFlights routes); charter and ambulance flights at Mannheim (MHG)"
+  },
+  "at": [
+    { "airport": "LFW", "airline": "Ethiopian Airlines", "why": "a stake in ASKY, not the main carrier at Lome (v1.4.0 review)" }
+  ]
+}

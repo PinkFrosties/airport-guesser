@@ -39,7 +39,12 @@ export function scoreFeatures(f) {
   const hint = { airline: 10, region: 7, grid: 4, elev: 2 }[f.hint] ?? 0;                    // a clue that exists and does not give it away; elevation-only is penalised
   return Math.round(Math.min(100, fame + service + imagery + distinct + hint));
 }
-export const EXCLUDE = /\b(air base|air force|afb|army|aaf|naval|navy|marine corps|military|raf|usaf|air station|heliport|helipad|seaplane|water aerodrome|floatplane|glider|ultralight|balloon)\b/i;
+// Military records stay out of the Practice tiers (they remain in Hard) UNLESS the name says "International", or the airport has at least 5 OpenFlights
+// routes plus scheduled service (joint civil-military airports: Komatsu, Misawa, Clark, Cam Ranh ...). Heliports, seaplane bases and gliders always stay out.
+export const MILITARY = /\b(air base|air force|afb|army|aaf|naval|navy|marine corps|military|raf|usaf|air station)\b/i;
+export const NON_AIRPORT = /\b(heliport|helipad|seaplane|water aerodrome|floatplane|glider|ultralight|balloon)\b/i;
+export const EXCLUDE = new RegExp(MILITARY.source + '|' + NON_AIRPORT.source, 'i');
+export const isExcluded = (name, f) => NON_AIRPORT.test(name) || (MILITARY.test(name) && !/international/i.test(name) && !(f && f.sched && f.routes >= 5));
 
 // ---------------- helpers ----------------
 function csv(txt) {
@@ -140,7 +145,7 @@ export async function build({ refresh = false } = {}) {
     };
   }
   const score = {}; for (const a of all) score[a.id] = scoreFeatures(feat[a.id]);
-  const excluded = (a) => EXCLUDE.test(a.name);
+  const excluded = (a) => isExcluded(a.name, feat[a.id]);
 
   // ---- tier 1: the Daily 50 + the next 50 by Wikidata passenger count
   const tier = new Map(), year = new Map(), paxOf = new Map();

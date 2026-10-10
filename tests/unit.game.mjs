@@ -101,7 +101,7 @@ test('UTC date helpers', () => {
 test('practice sets', () => {
   const n = (d) => C.practiceOrder(airports, d).length;
   assert.equal(n('easy'), 100);
-  assert.ok(n('medium') >= 200 && n('medium') <= 700 && n('hard') >= 800 && n('hard') <= 1500, `tier sizes ${n('easy')} / ${n('medium')} / ${n('hard')}`);
+  assert.ok(n('medium') >= 200 && n('medium') <= 700 && n('hard') >= 1000 && n('hard') <= 1500, `tier sizes ${n('easy')} / ${n('medium')} / ${n('hard')}`);
   assert.ok(C.practiceOrder(airports, 'hard').every((a) => a.tier === 3));
   assert.equal(C.practiceOrder(hard, null).length, hard.length);
 });
@@ -361,14 +361,14 @@ test('Practice set is called "Major hubs" and still holds 100 airports', () => {
 
 console.log('Practice tiers (v1.4.0)');
 const tiersFile = JSON.parse(readFileSync(new URL('../data/tiers.json', import.meta.url), 'utf8'));
-const { scoreFeatures, T2, T3, PAX_YEARS } = await import('../scripts/practice_tiers.mjs');
+const { scoreFeatures, T2, T3, PAX_YEARS, isExcluded } = await import('../scripts/practice_tiers.mjs');
 const allAirports = [...airports, ...hard];
 const inTier = (n) => allAirports.filter((a) => a.tier === n);
 test('tiers are disjoint, every airport is in at most one, the Hard file holds only tier-4 airports; sizes: 100 / 300-ish / 800-1500', () => {
   assert.equal(new Set(allAirports.map((a) => a.id)).size, allAirports.length, 'no airport in both files');
   for (const a of allAirports) assert.ok([1, 2, 3, 4].includes(a.tier), a.name + ' tier ' + a.tier);
   for (const a of hard) assert.equal(a.tier, 4, 'the Hard file only holds airports in no Practice tier');
-  assert.equal(inTier(1).length, 100); assert.ok(inTier(2).length >= 200 && inTier(2).length <= 700, 'tier 2: ' + inTier(2).length); assert.ok(inTier(3).length >= 800 && inTier(3).length <= 1500, 'tier 3: ' + inTier(3).length);
+  assert.equal(inTier(1).length, 100); assert.ok(inTier(2).length >= 200 && inTier(2).length <= 700, 'tier 2: ' + inTier(2).length); assert.ok(inTier(3).length >= 1000 && inTier(3).length <= 1500, 'tier 3: ' + inTier(3).length);
   for (const t of [1, 2, 3]) assert.equal(C.practiceOrder(airports, ['easy', 'medium', 'hard'][t - 1]).length, inTier(t).length, 'tab ' + t + ' draws from exactly its tier');
 });
 test('Major hubs: ranks 1-50 are exactly the Daily list (data/top50.json), the other 50 carry a passenger-count year 2019-2025', () => {
@@ -410,6 +410,28 @@ test('hint costs in every tier: Main airline 2 (needs 3 attempts left), Region /
     if (t === 2) assert.equal(cost, 2); if (t === 3) assert.equal(cost, 1);
     assert.equal(C.canAfford(2, cost), true, '3 attempts left'); assert.equal(C.canAfford(3, 2), false, '2 left: no airline hint'); assert.equal(C.canAfford(3, 1), true);
   }
+});
+test('airline quality (v1.4.1): nothing in the permanent block list is offered anywhere, and nothing is spelled two ways', () => {
+  const bl = JSON.parse(readFileSync(new URL('../scripts/hint_blocklist.json', import.meta.url), 'utf8')), nm = (s) => C.normalize(s).replace(/ /g, '');
+  const blocked = new Set(Object.keys(bl.airlines).map(nm)); const shown = allAirports.filter((a) => C.hint3Of(a)?.type === 'airline').map((a) => [a, C.hint3Of(a).v]);
+  assert.deepEqual(shown.filter(([, v]) => blocked.has(nm(v))).map(([a, v]) => a.iata + ' ' + v), []);
+  for (const b of bl.at) assert.ok(!shown.some(([a, v]) => (a.iata === b.airport) && nm(v) === nm(b.airline)), b.airport + ' ' + b.airline);
+  for (const code of ['BZE', 'DSN', 'LJU', 'CUR', 'SLU', 'RAI', 'USN', 'MVD', 'MHG']) assert.notEqual(C.hint3Of(allAirports.find((a) => a.iata === code))?.type, 'airline', code);
+  const alias = JSON.parse(readFileSync(new URL('../scripts/airline_names.json', import.meta.url), 'utf8')); const names = [...new Set(shown.map(([, v]) => v))];
+  for (const [k, target] of Object.entries(alias)) if (!k.startsWith('_') && k !== target) assert.ok(!names.includes(k), k + ' must be shown as ' + target);
+  const stem = (s) => nm(s).replace(/(airlines|airline|airways|air|aviation|lineas|aereas)/g, ''); const seen = new Map();
+  for (const n of names) { const k = stem(n); assert.ok(!seen.has(k) || seen.get(k) === n, 'two spellings of one airline: ' + seen.get(k) + ' / ' + n); seen.set(k, n); }
+  assert.ok(names.includes('Saudia') && !names.includes('Saudi Arabian Airlines'));
+});
+test('military-name exclusion is narrow: International, or 5+ routes with scheduled service, keeps an airport; heliports and gliders never', () => {
+  assert.equal(isExcluded('Misawa Airport / Misawa Air Base', { sched: 0, routes: 0 }), true);
+  assert.equal(isExcluded('Misawa Airport / Misawa Air Base', { sched: 1, routes: 4 }), true, 'not enough routes');
+  assert.equal(isExcluded('Misawa Airport / Misawa Air Base', { sched: 1, routes: 5 }), false, 'joint civil-military with scheduled service');
+  assert.equal(isExcluded('Clark International Airport / Clark Air Base', { sched: 0, routes: 0 }), false, 'International');
+  assert.equal(isExcluded('Soewondo Air Force Base', { sched: 1, routes: 2 }), true);
+  for (const n of ['Sigiriya Air Force Base', 'Bucholz Army Air Field', 'RAF Ascension Island', 'Sea-Airport Nordholz / Naval Air Base', 'Nikolski Air Station', 'King Khaled Military City Airport', 'Scott AFB/Midamerica Airport', 'Marine Corps Air Station']) assert.equal(isExcluded(n, { sched: 0, routes: 0 }), true, n);
+  for (const n of ['Newark Heliport', 'Lake Seaplane Base', 'Mount X International Glider Field']) assert.equal(isExcluded(n, { sched: 1, routes: 50 }), true, n + ' stays out whatever its routes');
+  assert.equal(isExcluded('Zurich Airport', { sched: 1, routes: 100 }), false);
 });
 test('the Practice tab subtitles', () => {
   assert.equal(C.DIFFICULTIES.easy.sub, "100 of the world's busiest airports"); assert.equal(C.DIFFICULTIES.medium.sub, 'Airline hubs and bases, with an airline hint'); assert.equal(C.DIFFICULTIES.hard.sub, 'Regional airports, region hint');

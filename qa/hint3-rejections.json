@@ -1,0 +1,17 @@
+[
+ {
+  "airport": "DZA",
+  "airline": "Ewa Air",
+  "reason": "no scheduled service: 0 routes in OpenFlights"
+ },
+ {
+  "airport": "FRS",
+  "airline": "Transportes Aéreos Guatemaltecos",
+  "reason": "no scheduled service: 0 routes in OpenFlights"
+ },
+ {
+  "airport": "KIN",
+  "airline": "Caribbean Airlines",
+  "reason": "home country TT differs from the airport's JM and the network is small (19 airports)"
+ }
+]

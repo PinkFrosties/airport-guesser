@@ -142,24 +142,29 @@ def words(s):
     return {w for w in re.findall(r"[a-z0-9]+", s) if w not in GENERIC and len(w) > 2}
 
 
-# carriers the sources list but that are wrong for the airport or no longer fly (found when reviewing the Practice tiers); never offered
-BLOCK_AIRLINES = {norm(x): why for x, why in {
-    "Baikotovitchestrian Airlines": "not a real carrier at Kinshasa (bad Wikidata hub entry)",
-    "Volotea Costa Rica": "not a carrier at Barcelona/Anzoategui (bad data)",
-    "Interjet": "ceased operations in 2020",
-    "Lesotho Airways": "ceased operations around 2000",
-    "Metro Batavia": "Indonesian carrier that ceased in 2013 (not at Panama)",
-    "Caucasus Airlines": "no longer operating",
-    "Trinity Airways": "doubtful: not a real scheduled network at Daegu (reviewed v1.4.0)",
-    "Parata Air": "doubtful: not operating at Yangyang (reviewed v1.4.0)",
-    "Arik Air": "doubtful: suspended and restructured, no longer dominant at Lagos (reviewed v1.4.0)",
-}.items()}
+# carriers the sources list but that must never be offered: scripts/hint_blocklist.json (tests/unit.game.mjs checks none appears in the data)
+with open(os.path.join(ROOT, "scripts", "hint_blocklist.json"), encoding="utf-8") as _f:
+    _bl = json.load(_f)
+BLOCK_AIRLINES = {norm(x): why for x, why in _bl["airlines"].items()}
+BLOCK_AT = {(b["airport"], norm(b["airline"])): b["why"] for b in _bl["at"]}
+# one airline, one name: scripts/airline_names.json (alias -> shown name)
+with open(os.path.join(ROOT, "scripts", "airline_names.json"), encoding="utf-8") as _f:
+    ALIASES = {norm(k): v for k, v in json.load(_f).items() if not k.startswith("_")}
 
-
-# carrier / airport pairs that are wrong although the carrier is fine elsewhere
-BLOCK_AT = {(code, norm(x)): why for (code, x), why in {
-    ("LFW", "Ethiopian Airlines"): "a stake in ASKY, not the main carrier at Lome (reviewed v1.4.0)",
-}.items()}
+# countries that are part of another country for the "home country" check (Air Austral is French, Réunion is a French department ...)
+SOVEREIGN = {"RE": "FR", "GP": "FR", "MQ": "FR", "GF": "FR", "YT": "FR", "PM": "FR", "NC": "FR", "PF": "FR", "WF": "FR", "BL": "FR", "MF": "FR",
+             "PR": "US", "GU": "US", "VI": "US", "AS": "US", "MP": "US", "AW": "NL", "CW": "NL", "SX": "NL", "BQ": "NL",
+             "KY": "GB", "BM": "GB", "TC": "GB", "VG": "GB", "AI": "GB", "MS": "GB", "FK": "GB", "GI": "GB", "SH": "GB", "IM": "GB", "JE": "GB", "GG": "GB",
+             "CK": "NZ", "NU": "NZ", "TK": "NZ", "FO": "DK", "GL": "DK", "SJ": "NO", "AX": "FI"}
+COUNTRY_ALIASES = {"russianfederation": "RU", "russia": "RU", "korearepublicof": "KR", "southkorea": "KR", "korea": "KR", "koreademocraticpeoplesrepublicof": "KP", "northkorea": "KP",
+                   "unitedstatesofamerica": "US", "usa": "US", "ivorycoast": "CI", "cotedivoire": "CI", "burma": "MM", "swaziland": "SZ", "eswatini": "SZ", "capeverde": "CV", "caboverde": "CV",
+                   "czechrepublic": "CZ", "czechia": "CZ", "macedonia": "MK", "northmacedonia": "MK", "congokinshasa": "CD", "congobrazzaville": "CG", "democraticrepublicofthecongo": "CD",
+                   "republicofthecongo": "CG", "laos": "LA", "vietnam": "VN", "syria": "SY", "iran": "IR", "taiwan": "TW", "hongkong": "HK", "macau": "MO", "moldova": "MD", "tanzania": "TZ",
+                   "bolivia": "BO", "venezuela": "VE", "brunei": "BN", "palestine": "PS", "turkey": "TR", "turkiye": "TR", "unitedkingdom": "GB", "greatbritain": "GB", "england": "GB",
+                   "saintkittsandnevis": "KN", "saintvincentandthegrenadines": "VC", "trinidadandtobago": "TT", "micronesiafederatedstatesof": "FM", "gambia": "GM", "bahamas": "BS"}
+AIRLINE_GENERIC = {"air", "airlines", "airline", "airways", "aviation", "international", "the", "aero", "flight", "lines", "linhas", "aereas", "aerolineas", "airlinesco", "group"}
+NETWORK_OK = 40         # an airline that serves at least this many airports network-wide may fly anywhere (Ryanair, easyJet, Wizz Air, Turkish, Qatar ...)
+MIN_SCHEDULED = 5       # fewer scheduled routes than this in OpenFlights: no scheduled service to speak of
 
 
 # regions that ARE one city (city-states, capital municipalities): the name of the region names the airport's city
@@ -316,6 +321,89 @@ SELECT ?airlineLabel ?aiata WHERE {
             return None
         return name  # the app shows "<region>, <country>"
 
+    # ---------- v1.4.1: vetting of every Main-airline hint ----------
+    # Wikidata: all airlines with their status (dissolved P576, end time P582, discontinued P2669) and country (P17 -> ISO 3166-1 alpha-2)
+    qa = """
+SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
+  ?airline wdt:P31 wd:Q46970 .
+  OPTIONAL { ?airline wdt:P229 ?aiata } OPTIONAL { ?airline wdt:P230 ?aicao }
+  OPTIONAL { ?airline wdt:P576 ?diss } OPTIONAL { ?airline wdt:P582 ?end } OPTIONAL { ?airline wdt:P2669 ?disc }
+  OPTIONAL { ?airline wdt:P17 ?c . ?c wdt:P297 ?cc }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . }
+}"""
+    today = time.strftime("%Y-%m-%d")
+    wd_air = {}
+    for r in sparql("wd_airlines_all.json", qa):
+        v = lambda k: r.get(k, {}).get("value", "")
+        qid = v("airline").rsplit("/", 1)[-1]
+        item = wd_air.setdefault(qid, {"qid": qid, "name": v("airlineLabel"), "iata": v("aiata"), "icao": v("aicao"), "ended": False, "cc": set()})
+        for k in ("diss", "end", "disc"):
+            if v(k) and v(k)[:10] <= today:
+                item["ended"] = True
+        if v("cc"):
+            item["cc"].add(v("cc"))
+    wd_by_code, wd_by_name = defaultdict(list), defaultdict(list)
+    for item in wd_air.values():
+        if re.fullmatch(r"Q\d+", item["name"] or ""):
+            continue
+        for k in (item["iata"], item["icao"]):
+            if k:
+                wd_by_code[k].append(item)
+        wd_by_name[norm(item["name"])].append(item)
+    print("wikidata: %d airlines with status (%d ended)" % (len(wd_air), sum(1 for i in wd_air.values() if i["ended"])))
+
+    name_to_cc = {norm(n): c for c, n in countries.items()}
+    name_to_cc.update(COUNTRY_ALIASES)
+    of_country = {}
+    for row in csv.reader(io.StringIO(fetch(OPENFLIGHTS + "airlines.dat", "airlines.dat"))):
+        if len(row) >= 8:
+            of_country[row[0]] = name_to_cc.get(norm(row[6]), "")
+    airline_airports = defaultdict(set)  # OpenFlights airline id -> airports it serves (network size)
+    for row in csv.reader(io.StringIO(fetch(OPENFLIGHTS + "routes.dat", "routes.dat"))):
+        if len(row) >= 8 and row[1] not in ("", "\\N"):
+            airline_airports[row[1]].update(x for x in (row[2], row[4]) if x and x != "\\N")
+
+    def same_airline(a, b):
+        wa = {w for w in re.findall(r"[a-z0-9]+", fold(a).lower()) if w not in AIRLINE_GENERIC and len(w) > 2}
+        wb = {w for w in re.findall(r"[a-z0-9]+", fold(b).lower()) if w not in AIRLINE_GENERIC and len(w) > 2}
+        return norm(a) == norm(b) or bool(wa & wb)
+
+    def wd_matches(name, codes):
+        found = {}
+        for k in codes:
+            for item in wd_by_code.get(k, []):
+                if same_airline(name, item["name"]):
+                    found[item["qid"]] = item
+        for item in wd_by_name.get(norm(name), []):
+            found[item["qid"]] = item
+        return list(found.values())
+
+    sov = lambda cc: SOVEREIGN.get(cc, cc)
+
+    def vet(name, of, item, airport_cc):
+        """None if the airline may be offered, else the reason it is rejected (stale check, v1.4.1)."""
+        if of and not of["active"]:
+            return "OpenFlights marks it defunct"
+        codes = [c for c in ((of or {}).get("iata", ""), (of or {}).get("icao", ""), (item or {}).get("iata", ""), (item or {}).get("icao", "")) if c]
+        m = wd_matches(name, codes)
+        if m and all(i["ended"] for i in m):
+            return "Wikidata: dissolved / ceased operations (" + ", ".join(i["qid"] for i in m) + ")"
+        net = len(airline_airports.get(of["id"], ())) if of else 0
+        sched = airline_routes.get(of["id"], 0) if of else 0
+        if sched < MIN_SCHEDULED:
+            return "no scheduled service: %d routes in OpenFlights" % sched
+        home = {cc for i in m if not i["ended"] for cc in i["cc"]} or ({of_country.get(of["id"])} if of and of_country.get(of["id"]) else set())
+        if net >= NETWORK_OK:
+            return None
+        if not home:
+            return "home country unknown and the network is small (%d airports)" % net
+        if sov(airport_cc) not in {sov(h) for h in home}:
+            return "home country %s differs from the airport's %s and the network is small (%d airports)" % ("/".join(sorted(home)), airport_cc, net)
+        return None
+
+    rejected = []   # (airport, airline, reason)
+    chosen = {}     # airport id -> (name, airline code) before the one-name pass
+
     # ---------- decide ----------
     out, why, report_rows = {}, Counter(), []
     for aid, a in data.items():
@@ -351,7 +439,7 @@ SELECT ?airlineLabel ?aiata WHERE {
             elif (not runner or leader[0] >= MARGIN * runner) and leader[0] >= MIN_SHARE * total:
                 names = hub_by_id.get(leader[1]["id"], [])
                 exact = [x for x in names if norm(x) == norm(leader[1]["name"])]
-                choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"])}, "openflights routes (clear leader)"
+                choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"]), "of": leader[1], "item": None}, "openflights routes (clear leader)"
             else:
                 why["airline: no dominant carrier (close race)"] += 1
         elif cand:
@@ -359,7 +447,8 @@ SELECT ?airlineLabel ?aiata WHERE {
             groups = {(of_airline(i) or {}).get("id") or "n:" + norm(i["name"]) for i in cand.values()}
             real = [i for i in cand.values() if i.get('iata') and (not of_airline(i) or (still_flying(of_airline(i)) and airline_routes[of_airline(i)['id']] >= MIN_AIRLINE_ROUTES))]
             if len(groups) == 1 and real:  # a hub link alone is not enough: the carrier must be a real scheduled airline (not a stale or one-plane entry)
-                choice, source = {"name": min((i["name"] for i in cand.values()), key=len)}, "wikidata (only hub airline, little route data)"
+                it = min(real, key=lambda i: len(i["name"]))
+                choice, source = {"name": it["name"], "of": of_airline(it), "item": it}, "wikidata (only hub airline, little route data)"
             else:
                 why["airline: several hub airlines, little route data"] += 1
         if choice and iata in SUPPRESS_AIRLINE and a.get("top"):
@@ -373,7 +462,15 @@ SELECT ?airlineLabel ?aiata WHERE {
             elif NOT_SCHEDULED.search(name):  # cargo, charter, air-taxi and flying-service operators are not the airline of an airport
                 why["airline: cargo / charter operator, not offered"] += 1
                 name = ""
+            if name:
+                bad = vet(name, choice.get("of"), choice.get("item"), a["countryCode"])
+                if bad:
+                    rejected.append((iata or icao, name, bad))
+                    why["airline: rejected by the stale / home-country check"] += 1
+                    name = ""
             if name and len(name) <= 40:
+                code = (choice.get("of") or {}).get("iata") or (choice.get("item") or {}).get("iata") or ""
+                chosen[aid] = (name, code)
                 out[aid] = "airline|" + name
                 why["airline: " + source] += 1
                 continue
@@ -394,6 +491,31 @@ SELECT ?airlineLabel ?aiata WHERE {
             continue
         why["none"] += 1
 
+    # one airline, one name: the alias file first, then every spelling that shares an airline code collapses to its most common one
+    by_code = defaultdict(Counter)
+    for aid, (name, code) in chosen.items():
+        by_code[code][ALIASES.get(norm(name), name)] += 1
+    targets = set(ALIASES.values())
+    pick = {}
+    for code, names in by_code.items():
+        if code:
+            aliased = [n for n in names if n in targets]
+            pick[code] = aliased[0] if aliased else sorted(names.items(), key=lambda kv: (-kv[1], len(kv[0]), kv[0]))[0][0]
+    renamed = 0
+    for aid, (name, code) in chosen.items():
+        n2 = ALIASES.get(norm(name), name)
+        if code and pick.get(code) and same_airline(n2, pick[code]):
+            n2 = pick[code]
+        if n2 != name:
+            renamed += 1
+        out[aid] = "airline|" + n2
+    print("airline names unified: %d hints renamed" % renamed)
+    os.makedirs(os.path.dirname(REPORT), exist_ok=True)
+    with open(os.path.join(ROOT, "qa", "hint3-rejections.json"), "w", encoding="utf-8") as f:
+        json.dump([{"airport": a, "airline": b, "reason": c} for a, b, c in sorted(rejected)], f, indent=1, ensure_ascii=False)
+    print("airline hints rejected by the stale / home-country check: %d" % len(rejected))
+    for a, b, c in sorted(rejected):
+        print("  REJECT %-6s %-34s %s" % (a, b, c))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump({str(k): v for k, v in out.items()}, f, ensure_ascii=False)
