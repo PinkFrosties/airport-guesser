@@ -34,7 +34,6 @@ REPORT = os.path.join(ROOT, "qa", "hint3-report.json")
 UA = "airport-guesser-build/1.0 (https://github.com/PinkFrosties/airport-guesser)"
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 OPENFLIGHTS = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/"
-MIN_SHARE = 0.3        # ... and at least this share of all routes departing the airport
 MIN_AIRLINE_ROUTES = 5   # a Wikidata-only carrier that OpenFlights knows must have at least this many routes (and an IATA airline code)
 MARGIN = float(os.environ.get("HINT_MARGIN", "2.0"))          # the main airline needs this many times the routes of the runner-up (v1.3.6: was 1.5)
 MIN_ROUTES = 10       # OpenFlights fallback: the airport needs at least this many routes
@@ -298,6 +297,15 @@ SELECT ?airlineLabel ?aiata WHERE {
             return None
         return "below 100 m" if m < 100 else "100-500 m" if m < 500 else "500-1,500 m" if m < 1500 else "above 1,500 m"
 
+    def zone(a):
+        """Always available: where the airport is on the globe (used only when region, position and elevation all fail)."""
+        lat = a["lat"]
+        if abs(lat) >= 66.5:
+            return "polar region, " + ("north" if lat > 0 else "south")
+        if abs(lat) <= 23.5:
+            return "tropics, " + ("north of the equator" if lat >= 0 else "south of the equator")
+        return "temperate zone, " + ("northern hemisphere" if lat > 0 else "southern hemisphere")
+
     def region(a, src):
         code = src["iso_region"]
         name = regions.get(code, "")
@@ -436,19 +444,20 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
         if total >= MIN_ROUTES and leader and leader[0] >= 3:
             if gone and gone[0] * 2 >= leader[0]:
                 why["airline: the biggest carrier in the route data no longer exists"] += 1
-            elif (not runner or leader[0] >= MARGIN * runner) and leader[0] >= MIN_SHARE * total:
+            else:
+                # a clear leader (at least MARGIN x the runner-up) is "Main airline"; in a close race (less than MARGIN x, down to an almost exact
+                # tie) the one with more routes is shown as "A main airline here". Both cost 2 attempts in the app.
+                clear = not runner or leader[0] >= MARGIN * runner
                 names = hub_by_id.get(leader[1]["id"], [])
                 exact = [x for x in names if norm(x) == norm(leader[1]["name"])]
-                choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"]), "of": leader[1], "item": None}, "openflights routes (clear leader)"
-            else:
-                why["airline: no dominant carrier (close race)"] += 1
+                choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"]), "of": leader[1], "item": None, "kind": "airline" if clear else "airlinec"}, "openflights routes (clear leader)" if clear else "openflights routes (close race, 'a main airline here')"
         elif cand:
             names = {norm(i["name"]) for i in cand.values()}
             groups = {(of_airline(i) or {}).get("id") or "n:" + norm(i["name"]) for i in cand.values()}
             real = [i for i in cand.values() if i.get('iata') and (not of_airline(i) or (still_flying(of_airline(i)) and airline_routes[of_airline(i)['id']] >= MIN_AIRLINE_ROUTES))]
             if len(groups) == 1 and real:  # a hub link alone is not enough: the carrier must be a real scheduled airline (not a stale or one-plane entry)
                 it = min(real, key=lambda i: len(i["name"]))
-                choice, source = {"name": it["name"], "of": of_airline(it), "item": it}, "wikidata (only hub airline, little route data)"
+                choice, source = {"name": it["name"], "of": of_airline(it), "item": it, "kind": "airline"}, "wikidata (only hub airline, little route data)"
             else:
                 why["airline: several hub airlines, little route data"] += 1
         if choice and iata in SUPPRESS_AIRLINE and a.get("top"):
@@ -470,8 +479,8 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
                     name = ""
             if name and len(name) <= 40:
                 code = (choice.get("of") or {}).get("iata") or (choice.get("item") or {}).get("iata") or ""
-                chosen[aid] = (name, code)
-                out[aid] = "airline|" + name
+                chosen[aid] = (name, code, choice.get("kind", "airline"))
+                out[aid] = choice.get("kind", "airline") + "|" + name
                 why["airline: " + source] += 1
                 continue
         reg = region(a, src) if src else None
@@ -489,11 +498,18 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
             out[aid] = "elev|" + e
             why["elev"] += 1
             continue
-        why["none"] += 1
+        z = zone(a)
+        out[aid] = "zone|" + z
+        why["zone (last resort)"] += 1
+
+    # every airport must have a third clue: the build fails loudly otherwise (the app never shows an empty hint item)
+    missing = [(a.get("iata") or a.get("icao"), a["name"]) for aid, a in data.items() if aid not in out]
+    if missing:
+        sys.exit("BUILD FAILED: %d airports have no third clue: %s" % (len(missing), missing[:10]))
 
     # one airline, one name: the alias file first, then every spelling that shares an airline code collapses to its most common one
     by_code = defaultdict(Counter)
-    for aid, (name, code) in chosen.items():
+    for aid, (name, code, _kind) in chosen.items():
         by_code[code][ALIASES.get(norm(name), name)] += 1
     targets = set(ALIASES.values())
     pick = {}
@@ -502,13 +518,13 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
             aliased = [n for n in names if n in targets]
             pick[code] = aliased[0] if aliased else sorted(names.items(), key=lambda kv: (-kv[1], len(kv[0]), kv[0]))[0][0]
     renamed = 0
-    for aid, (name, code) in chosen.items():
+    for aid, (name, code, kind) in chosen.items():
         n2 = ALIASES.get(norm(name), name)
         if code and pick.get(code) and same_airline(n2, pick[code]):
             n2 = pick[code]
         if n2 != name:
             renamed += 1
-        out[aid] = "airline|" + n2
+        out[aid] = kind + "|" + n2
     print("airline names unified: %d hints renamed" % renamed)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(os.path.join(ROOT, "qa", "hint3-rejections.json"), "w", encoding="utf-8") as f:

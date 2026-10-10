@@ -377,6 +377,8 @@ export function hint3Of(a) {
 }
 const HINT3 = {
   airline: { menu: 'Main airline', label: 'Main airline', text: (v) => v },
+  airlinec: { menu: 'A main airline here', label: 'A main airline here', text: (v) => v }, // a close race between carriers: the one with more routes
+  zone: { menu: 'Where in the world', label: 'Where in the world', text: (v) => cap(v) }, // last resort (no region, position or elevation)
   // once the country was bought, the clue does not repeat it
   region: { menu: 'Region', label: 'Region', text: (v, a, used) => (used.includes('country') ? v : `${v}, ${a.country}`) },
   grid: { menu: 'Part of the country', label: 'Part of the country', text: (v, a, used) => (used.includes('country') ? `${v === 'centre' ? 'Central' : cap(v)} part of the country` : v === 'centre' ? `Central part of ${the(a.country)}` : `${cap(v)} of ${the(a.country)}`) },
@@ -385,7 +387,8 @@ const HINT3 = {
 export const HINTS = [{ key: 'country' }, { key: 'letter' }, { key: 'extra' }];
 /** The main-airline clue is worth more, so it costs 2 attempts; every other hint costs 1. */
 export const AIRLINE_HINT_COST = 2;
-export const hintCost = (key, a) => (key === 'extra' && hint3Of(a)?.type === 'airline' ? AIRLINE_HINT_COST : 1);
+export const isAirlineType = (type) => type === 'airline' || type === 'airlinec';
+export const hintCost = (key, a) => (key === 'extra' && isAirlineType(hint3Of(a)?.type) ? AIRLINE_HINT_COST : 1);
 /** Menu label (what it is), chip label + text (the answer, only ever built after the hint was bought) and availability. */
 export function hintInfo(key, a, used = []) {
   if (key === 'country') return { key, menu: 'Country', label: 'Country', available: !!a.country, cost: 1, text: () => a.country };

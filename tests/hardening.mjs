@@ -26,7 +26,7 @@ if (browserName === 'chromium') await test('debug hook window.__ag exists on loc
   await page.locator('#guess-input').fill('JFK'); await page.waitForSelector('#suggestions li[role=option]');
   await page.locator('#suggestions li[role=option]').first().click(); await page.locator('#guess-btn').click(); await page.waitForTimeout(500);
   assert.equal(await page.locator('#guesses li').count(), 1, 'a guess works without the hook');
-  const leak = await page.evaluate(() => Object.keys(window).filter((k) => /^__ag|answer|round|game$/i.test(k)));
+  const leak = await page.evaluate(() => Object.keys(window).filter((k) => k !== '__AG_DATA' && /^__ag|answer|round|game$/i.test(k)));
   assert.deepEqual(leak, []);
   await ctx.close();
 });

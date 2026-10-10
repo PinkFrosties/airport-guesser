@@ -380,8 +380,8 @@ test('Major hubs: ranks 1-50 are exactly the Daily list (data/top50.json), the o
   assert.deepEqual(extra.filter((a) => daily.has(a.iata)), []);
 });
 test('every Large (tier 2) airport has the Main airline clue and no Mid-size (tier 3) airport has it; tier 3 has a clue that does not repeat the country or the city', () => {
-  assert.deepEqual(inTier(2).filter((a) => C.hint3Of(a)?.type !== 'airline').map((a) => a.name), []);
-  assert.deepEqual(inTier(3).filter((a) => !C.hint3Of(a) || C.hint3Of(a).type === 'airline').map((a) => a.name), []);
+  assert.deepEqual(inTier(2).filter((a) => !C.isAirlineType(C.hint3Of(a)?.type)).map((a) => a.name), []);
+  assert.deepEqual(inTier(3).filter((a) => !C.hint3Of(a) || C.isAirlineType(C.hint3Of(a).type)).map((a) => a.name), []);
   const seqOf = (s) => C.normalize(s).split(' ').filter((w) => w && !['city', 'province', 'state', 'region', 'prefecture', 'county', 'district', 'municipality', 'metropolitan', 'governorate', 'autonomous', 'capital', 'territory', 'department', 'community', 'of', 'the', 'de'].includes(w));
   const has = (big, small) => small.length > 0 && big.some((_, i) => small.every((w, j) => big[i + j] === w));
   for (const a of inTier(3)) { const h = C.hint3Of(a); if (h.type === 'region') { assert.notEqual(C.normalize(h.v), C.normalize(a.country)); assert.ok(!has(seqOf(h.v), seqOf(a.city || '')) && !has(seqOf(a.city || ''), seqOf(h.v)), a.name + ': ' + h.v + ' repeats ' + a.city); } }
@@ -406,21 +406,22 @@ test('Major hubs are drawn with weights 2 : 1 (the 50 ACI airports twice as ofte
 test('hint costs in every tier: Main airline 2 (needs 3 attempts left), Region / position / elevation / country / letter 1', () => {
   for (const t of [1, 2, 3]) for (const a of inTier(t).slice(0, 300)) {
     const h = C.hint3Of(a), cost = C.hintCost('extra', a);
-    assert.equal(cost, h.type === 'airline' ? 2 : 1, a.name); assert.equal(C.hintCost('country', a), 1); assert.equal(C.hintCost('letter', a), 1);
+    assert.equal(cost, C.isAirlineType(h.type) ? 2 : 1, a.name); assert.equal(C.hintCost('country', a), 1); assert.equal(C.hintCost('letter', a), 1);
     if (t === 2) assert.equal(cost, 2); if (t === 3) assert.equal(cost, 1);
     assert.equal(C.canAfford(2, cost), true, '3 attempts left'); assert.equal(C.canAfford(3, 2), false, '2 left: no airline hint'); assert.equal(C.canAfford(3, 1), true);
   }
 });
 test('airline quality (v1.4.1): nothing in the permanent block list is offered anywhere, and nothing is spelled two ways', () => {
   const bl = JSON.parse(readFileSync(new URL('../scripts/hint_blocklist.json', import.meta.url), 'utf8')), nm = (s) => C.normalize(s).replace(/ /g, '');
-  const blocked = new Set(Object.keys(bl.airlines).map(nm)); const shown = allAirports.filter((a) => C.hint3Of(a)?.type === 'airline').map((a) => [a, C.hint3Of(a).v]);
+  const blocked = new Set(Object.keys(bl.airlines).map(nm)); const shown = allAirports.filter((a) => C.isAirlineType(C.hint3Of(a)?.type)).map((a) => [a, C.hint3Of(a).v]);
   assert.deepEqual(shown.filter(([, v]) => blocked.has(nm(v))).map(([a, v]) => a.iata + ' ' + v), []);
   for (const b of bl.at) assert.ok(!shown.some(([a, v]) => (a.iata === b.airport) && nm(v) === nm(b.airline)), b.airport + ' ' + b.airline);
-  for (const code of ['BZE', 'DSN', 'LJU', 'CUR', 'SLU', 'RAI', 'USN', 'MVD', 'MHG']) assert.notEqual(C.hint3Of(allAirports.find((a) => a.iata === code))?.type, 'airline', code);
+  for (const code of ['BZE', 'DSN', 'LJU', 'CUR', 'SLU', 'RAI', 'USN', 'MVD', 'MHG']) assert.ok(!C.isAirlineType(C.hint3Of(allAirports.find((a) => a.iata === code))?.type) || !['Regional Air Iceland','Air Foyle','Aero4M','Insel Air','LIAT','TACV','Hi Air','BQB Lineas Aereas','Arcus Air'].includes(C.hint3Of(allAirports.find((a) => a.iata === code)).v), code);
   const alias = JSON.parse(readFileSync(new URL('../scripts/airline_names.json', import.meta.url), 'utf8')); const names = [...new Set(shown.map(([, v]) => v))];
   for (const [k, target] of Object.entries(alias)) if (!k.startsWith('_') && k !== target) assert.ok(!names.includes(k), k + ' must be shown as ' + target);
+  const DISTINCT = new Set(['Air North/Airnorth', 'Air China/China Airlines']); // different companies with look-alike names
   const stem = (s) => nm(s).replace(/(airlines|airline|airways|air|aviation|lineas|aereas)/g, ''); const seen = new Map();
-  for (const n of names) { const k = stem(n); assert.ok(!seen.has(k) || seen.get(k) === n, 'two spellings of one airline: ' + seen.get(k) + ' / ' + n); seen.set(k, n); }
+  for (const n of names) { const k = stem(n); assert.ok(!seen.has(k) || seen.get(k) === n || DISTINCT.has([seen.get(k), n].sort().join('/')), 'two spellings of one airline: ' + seen.get(k) + ' / ' + n); seen.set(k, n); }
   assert.ok(names.includes('Saudia') && !names.includes('Saudi Arabian Airlines'));
 });
 test('military-name exclusion is narrow: International, or 5+ routes with scheduled service, keeps an airport; heliports and gliders never', () => {
@@ -476,7 +477,7 @@ test('fallback order: region, then part of the country (countries with 5+ airpor
   const per = new Map(); for (const a of [...airports, ...hard]) per.set(a.countryCode, (per.get(a.countryCode) || 0) + 1);
   for (const a of [...airports, ...hard]) { const h = C.hint3Of(a); if (h && h.type === 'grid') assert.ok(per.get(a.countryCode) >= 5, a.name + ' grid in a small country'); }
   const by = (i) => airports.find((a) => a.iata === i);
-  for (const code of ['MAD', 'PKX', 'CKG']) assert.equal(C.hint3Of(by(code)).type, 'grid', code + ' falls back to the position in the country');
+  for (const code of ['PKX', 'DCA', 'AYT']) assert.equal(C.hint3Of(by(code)).type, 'grid', code + ' falls back to the position in the country');
 });
 test('no double information: after the country was bought the region / position clue does not repeat it', () => {
   const reg = { country: 'United States', name: 'X', hint3: 'region|Texas' }, grid = { country: 'United States', name: 'X', hint3: 'grid|north-west' };
@@ -501,11 +502,11 @@ test('the menu never shows information twice: the country clue is "already shown
   assert.equal(C.hintStatus('letter', ['letter'], reg), 'used'); assert.equal(C.hintStatus('extra', [], { country: 'B', name: 'N' }), 'unavailable');
 });
 test('data: every airport has a valid hint3 (type|value), the Top 50 included; values are clean', () => {
-  const all = [...airports, ...hard]; const types = { airline: 0, region: 0, grid: 0, elev: 0 }; const bad = [];
+  const all = [...airports, ...hard]; const types = { airline: 0, airlinec: 0, region: 0, grid: 0, elev: 0, zone: 0 }; const bad = [];
   for (const a of all) {
     const h = C.hint3Of(a); if (!h || !(h.type in types) || !h.v.trim()) { bad.push(a.name + ' ' + a.hint3); continue; }
     types[h.type]++;
-    if (h.type === 'airline' && (h.v.length > 40 || /[()\/]|\s{2,}/.test(h.v))) bad.push('airline ' + h.v);
+    if (C.isAirlineType(h.type) && (h.v.length > 40 || /[()\/]|\s{2,}/.test(h.v))) bad.push('airline ' + h.v);
     if (h.type === 'region' && (h.v === a.country || /unassigned|unknown/i.test(h.v))) bad.push('region ' + h.v);
     if (h.type === 'grid' && !/^(north|south)?-?(west|east)?$|^centre$/.test(h.v)) bad.push('grid ' + h.v);
     if (h.type === 'elev' && !['below 100 m', '100-500 m', '500-1,500 m', 'above 1,500 m'].includes(h.v)) bad.push('elev ' + h.v);
@@ -618,5 +619,36 @@ test('Hard pool integrity: small/regional/remote, disjoint from Daily, runway da
   }
   assert.ok(hard.filter((a) => a.type === 'small').length > 5000);
 });
+
+console.log('\nthird clue (v1.4.2)');
+const { checkAirports, DATA_SCHEMA, dataUrl } = await import('../js/data.js');
+test('close race: "A main airline here" when the leader is not clearly ahead, "Main airline" when it is; both cost 2', () => {
+  const clear = { country: 'X', name: 'N', hint3: 'airline|Emirates' }, close = { country: 'X', name: 'N', hint3: 'airlinec|Iberia' };
+  assert.equal(C.hintInfo('extra', clear).label, 'Main airline'); assert.equal(C.hintInfo('extra', close).label, 'A main airline here');
+  assert.equal(C.hintInfo('extra', close).text(), 'Iberia'); assert.equal(C.hintInfo('extra', close).cost, 2); assert.equal(C.hintCost('extra', close), 2);
+  assert.ok(C.isAirlineType('airline') && C.isAirlineType('airlinec') && !C.isAirlineType('region') && !C.isAirlineType('zone'));
+});
+test('last-resort clue: "Where in the world" exists and is a plain 1-attempt clue', () => {
+  const z = { country: 'X', name: 'N', hint3: 'zone|Antarctica' };
+  assert.equal(C.hintInfo('extra', z).available, true); assert.equal(C.hintInfo('extra', z).cost, 1); assert.equal(C.hintInfo('extra', z).label, 'Where in the world');
+});
+test('no airport anywhere is without a third clue; every Large airport has an airline clue; Large >= 200, Mid-size >= 1,000, Major hubs exactly 100', () => {
+  const all = [...airports, ...hard]; const ids = new Set(all.map((a) => a.id)); assert.equal(ids.size, all.length, 'each airport once');
+  const none = all.filter((a) => !C.hint3Of(a)).map((a) => a.iata || a.icao); assert.deepEqual(none, []);
+  const t = (n) => all.filter((a) => a.tier === n);
+  assert.equal(t(1).length, 100); assert.ok(t(2).length >= 200, 'Large ' + t(2).length); assert.ok(t(3).length >= 1000, 'Mid-size ' + t(3).length);
+  assert.deepEqual(t(2).filter((a) => !C.isAirlineType(C.hint3Of(a).type)).map((a) => a.iata), [], 'Large without an airline clue');
+  for (const a of all) assert.ok([1, 2, 3, 4].includes(a.tier), a.id + ' tier');
+});
+test('the data loader checks what it got: schema number, size and third clues', () => {
+  const full = JSON.parse(readFileSync(new URL('../data/airports.json', import.meta.url), 'utf8'));
+  assert.equal(full.meta.schema, DATA_SCHEMA); assert.equal(checkAirports(full, 'full').ok, true);
+  const old = { meta: { ourairports_retrieved: 'x' }, airports: full.airports.map(({ hint3, ...a }) => a) };
+  assert.equal(checkAirports(old, 'full').ok, false, 'an old file without the schema marker is stale');
+  assert.equal(checkAirports({ meta: { schema: DATA_SCHEMA }, airports: full.airports.map(({ hint3, ...a }) => a) }, 'full').ok, false, 'no third clues');
+  assert.equal(checkAirports({ meta: { schema: DATA_SCHEMA }, airports: [] }, 'full').ok, false);
+  assert.equal(dataUrl('full'), 'data/airports.json', 'plain name in the source tree');
+});
+
 
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));

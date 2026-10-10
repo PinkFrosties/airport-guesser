@@ -926,7 +926,7 @@ await test('PWA: manifest valid, icons load, service worker registers, shell+bot
   await page.waitForFunction(() => window.__ag.hardLoaded, null, { timeout: 60000 });
   await page.waitForTimeout(500);
   const later = await page.evaluate(async () => { const keys = await caches.keys(); const c = await caches.open(keys.filter((k) => /^airport-guesser-v\d/.test(k)).sort().pop()); return (await c.keys()).map((r) => new URL(r.url).pathname); });
-  for (const p of ['/data/airports.json', '/data/airports-hard.json']) assert.ok(later.includes(p), 'runtime-cached ' + p);
+  for (const n of ['airports', 'airports-hard']) assert.ok(later.some((p) => new RegExp('^/data/' + n + '(\\.[0-9a-f]{8})?\\.json$').test(p)), 'runtime-cached data/' + n + ' (content-hashed name on the built site): ' + later.join(' '));
   const a = await answerOf(page);
   await guess(page, wrongPick(a, 1)[0].iata);
   await page.reload();

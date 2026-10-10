@@ -49,10 +49,22 @@ const daily = buildDaily({ root, now });
 writeFileSync(join(dist, 'data/daily.json'), JSON.stringify(daily));
 const inline = JSON.stringify(inlineSubset(daily, now));
 
+// ---- data files: named by content hash (data/airports.3fa9c1d2.json), announced to the page in window.__AG_DATA. A new build = new URLs, so no service
+// worker or HTTP cache can hand the new page an old data file. The plain names stay for older pages that are still open (and the schedule file).
+const dataKeys = { full: 'airports.json', hard: 'airports-hard.json', top50: 'top50.json', credits: 'credits.json', changelog: 'changelog.json' };
+const dataNames = {};
+for (const [k, f] of Object.entries(dataKeys)) {
+  const buf = readFileSync(join(root, 'data', f));
+  const name = f.replace(/.json$/, `.${hash(buf).slice(0, 8)}.json`);
+  writeFileSync(join(dist, 'data', name), buf); writeFileSync(join(dist, 'data', f), buf);
+  dataNames[k] = 'data/' + name;
+}
+const dataBuild = hash(Buffer.from(JSON.stringify(dataNames))).slice(0, 8);
+
 // ---- HTML
 let html = read('index.html');
 const sub = (re, to, label) => { if (!re.test(html)) throw new Error('index.html: no match for ' + label); html = html.replace(re, to); };
-sub(/<!--@DAILY@-->/, () => `<script>window.__DAILY=${inline}</script>`, 'daily placeholder');
+sub(/<!--@DAILY@-->/, () => `<script>window.__DAILY=${inline};window.__AG_DATA=${JSON.stringify(dataNames)}</script>`, 'daily placeholder');
 sub(/<link rel="stylesheet" href="vendor\/leaflet\/leaflet\.css">\s*/, () => `<style>${css}</style>\n`, 'leaflet stylesheet');
 sub(/<link rel="stylesheet" href="css\/style\.css">\s*/, '', 'app stylesheet');
 sub(/<link rel="modulepreload" href="js\/app\.js">\s*/, () => `<link rel="modulepreload" href="${appFile}">\n`, 'app modulepreload');
@@ -77,7 +89,6 @@ writeFileSync(join(dist, 'index.html'), html);
 // ---- static files
 for (const dir of ['icons']) cpSync(join(root, dir), join(dist, dir), { recursive: true });
 for (const f of ['manifest.webmanifest', '.nojekyll']) cpSync(join(root, f), join(dist, f));
-for (const f of ['airports.json', 'airports-hard.json', 'credits.json', 'top50.json', 'changelog.json']) cpSync(join(root, 'data', f), join(dist, 'data', f));
 writeFileSync(join(dist, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Page not found - Airport Guesser</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;text-align:center;background:#f5f5f7;color:#1d1d1f}a{color:#0066cc}@media(prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}a{color:#64b0ff}}</style></head><body><main><h1>Page not found</h1><p><a href="./">Back to Airport Guesser</a></p></main></body></html>\n`);
 
 // ---- service worker with the real shell list
@@ -85,6 +96,8 @@ const shell = ['./', 'index.html', 'manifest.webmanifest', 'data/daily.json', le
 let sw = read('sw.js');
 if (!/\/\*SHELL\*\/[\s\S]*?\/\*END\*\//.test(sw)) throw new Error('sw.js: SHELL markers missing');
 sw = sw.replace(/\/\*SHELL\*\/[\s\S]*?\/\*END\*\//, `/*SHELL*/\n${shell.map((s) => `  '${s}',`).join('\n')}\n/*END*/`);
+if (!/const DATA_BUILD = '[^']*';/.test(sw)) throw new Error('sw.js: DATA_BUILD constant missing');
+sw = sw.replace(/const DATA_BUILD = '[^']*';/, `const DATA_BUILD = '${dataBuild}';`); // sw.js changes whenever the data does, so the browser installs the new worker
 writeFileSync(join(dist, 'sw.js'), sw);
 
 // ---- report

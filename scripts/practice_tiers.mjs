@@ -36,7 +36,7 @@ export function scoreFeatures(f) {
   const service = (f.sched ? 6 : 0) + 12 * lg(f.routes, 120) + 12 * lg(f.dests, 80);         // scheduled service (6) + OpenFlights routes (12) + destinations (12)
   const imagery = 10 * clamp01((f.contrast ?? 12) / 30) + 8 * clamp01((f.fill - 0.45) / 0.33) + 7 * clamp01(f.head / 3); // runway contrast (10), airfield fill of the frame (8), levels of real imagery to zoom into (7)
   const distinct = f.rw >= 2 ? 10 : f.rw === 1 ? (f.len >= 1800 ? (f.paved ? 8 : 4) : f.len >= 1200 ? (f.paved ? 4 : 2) : f.paved ? 1 : 0) : 0; // two runways, or a long paved one
-  const hint = { airline: 10, region: 7, grid: 4, elev: 2 }[f.hint] ?? 0;                    // a clue that exists and does not give it away; elevation-only is penalised
+  const hint = { airline: 10, airlinec: 9, region: 7, grid: 4, elev: 2, zone: 1 }[f.hint] ?? 0;                    // a clue that exists and does not give it away; elevation-only is penalised
   return Math.round(Math.min(100, fame + service + imagery + distinct + hint));
 }
 // Military records stay out of the Practice tiers (they remain in Hard) UNLESS the name says "International", or the airport has at least 5 OpenFlights
@@ -157,13 +157,13 @@ export async function build({ refresh = false } = {}) {
   for (const a of all) {
     if (tier.has(a.id) || excluded(a)) continue;
     const t = C.hint3Of(a)?.type;
-    if (t === 'airline') { if (score[a.id] >= T2) tier.set(a.id, 2); }
+    if (C.isAirlineType(t)) { if (score[a.id] >= T2) tier.set(a.id, 2); }
     else if (sched(a) && score[a.id] >= T3) tier.set(a.id, 3);
   }
   const out = {
     meta: { generated: new Date().toISOString().slice(0, 10), formula: 'fame 25 + service 30 + imagery 25 + distinctiveness 10 + hint quality 10', weights: WEIGHTS, thresholds: { tier2: T2, tier3: T3 }, paxYears: PAX_YEARS, features: ['article', 'sites', 'sched', 'routes', 'dests', 'contrast', 'fill', 'head', 'rw', 'len', 'paved', 'hint'] },
     tiers: Object.fromEntries([...tier].map(([id, t]) => [id, [t, score[id], year.get(id) || 0]])),
-    features: Object.fromEntries(all.filter((a) => feat[a.id].sched || feat[a.id].routes || tier.has(a.id) || C.hint3Of(a)?.type === 'airline').map((a) => [a.id, Object.values(feat[a.id])])),
+    features: Object.fromEntries(all.filter((a) => feat[a.id].sched || feat[a.id].routes || tier.has(a.id) || C.isAirlineType(C.hint3Of(a)?.type)).map((a) => [a.id, Object.values(feat[a.id])])),
   };
   writeFileSync(P('data/tiers.json'), JSON.stringify(out) + '\n');
   return { out, all, main, hard, feat, score, tier, extra, ranked, paxOf, excluded, top50, paxAirports, rawPax, topIdsSet: topIds };
@@ -201,17 +201,17 @@ function report2(R) {
   console.log('\n== 3a. 50 random tier-2 (Large)'); pick(t2, 50).forEach((a) => console.log(line(a)));
   console.log('\n== 3b. 50 random tier-3 (Mid-size)'); pick(t3, 50).forEach((a) => console.log(line(a)));
   console.log('\nspecific cases:'); for (const c of ['GVA', 'BSL', 'LUG', 'ZRH', 'BRN', 'SZG', 'TRN']) { const a = all.find((x) => x.iata === c); console.log(c, a ? `tier ${tier.get(a.id) || 'none'} score ${score[a.id]} ${hintTxt(a)}` : 'not in the data'); }
-  const eligible2 = all.filter((a) => !tier.has(a.id) && !excluded(a) && C.hint3Of(a)?.type === 'airline');
+  const eligible2 = all.filter((a) => !tier.has(a.id) && !excluded(a) && C.isAirlineType(C.hint3Of(a)?.type));
   const sched = (a) => feat[a.id].sched || (a.iata && feat[a.id].routes >= 1);
-  const eligible3 = all.filter((a) => !tier.has(a.id) && !excluded(a) && C.hint3Of(a)?.type !== 'airline' && sched(a));
+  const eligible3 = all.filter((a) => !tier.has(a.id) && !excluded(a) && !C.isAirlineType(C.hint3Of(a)?.type) && sched(a));
   const asc = (l) => [...l].sort((x, y) => score[x.id] - score[y.id]), desc = (l) => [...l].sort((x, y) => score[y.id] - score[x.id]);
   console.log('\n== 4. 40 lowest KEPT / 40 highest LEFT OUT'); 
   console.log('-- tier 2 lowest kept'); asc(t2).slice(0, 40).forEach((a) => console.log(line(a)));
   console.log('-- tier 2 highest left out (airline hint, below the threshold)'); desc(eligible2).slice(0, 40).forEach((a) => console.log(line(a)));
   console.log('-- tier 3 lowest kept'); asc(t3).slice(0, 40).forEach((a) => console.log(line(a)));
   console.log('-- tier 3 highest left out (scheduled, below the threshold)'); desc(eligible3).slice(0, 40).forEach((a) => console.log(line(a)));
-  const outAirline = all.filter((a) => !tier.has(a.id) && !excluded(a) && C.hint3Of(a)?.type === 'airline').length;
-  console.log(`\nairports with an airline clue left in no tier: ${outAirline} (below T2=${T2}); excluded by name (military, heliport, glider...): ${all.filter((a) => excluded(a) && (sched(a) || C.hint3Of(a)?.type === 'airline')).length} scheduled/airline ones`);
+  const outAirline = all.filter((a) => !tier.has(a.id) && !excluded(a) && C.isAirlineType(C.hint3Of(a)?.type)).length;
+  console.log(`\nairports with an airline clue left in no tier: ${outAirline} (below T2=${T2}); excluded by name (military, heliport, glider...): ${all.filter((a) => excluded(a) && (sched(a) || C.isAirlineType(C.hint3Of(a)?.type))).length} scheduled/airline ones`);
   // ---- 5. moved vs v1.3.5
   const old = JSON.parse(execFileSync('git', ['show', 'd39cf11:data/airports.json'], { cwd: root, maxBuffer: 1 << 28 }).toString()).airports;
   const cls = (id) => (tier.get(id) ? 'tier ' + tier.get(id) : 'none');

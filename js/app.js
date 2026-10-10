@@ -2,6 +2,7 @@ import * as C from './core.js';
 import * as S from './store.js';
 import { IMAGERY, GAME, APP_VERSION } from './config.js';
 import { createSatView } from './satview.js';
+import { loadData, dataUrl } from './data.js';
 import { initTheme, setPref } from './theme.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -221,7 +222,7 @@ async function ensureFull(loud = true) {
   if (loud) showVeil('Loading airports', false, true);
   fullPromise ||= (async () => {
     try {
-      const data = await fetchJson('data/airports.json', !loud);
+      const data = await loadData('full', { low: !loud });
       game.main = data.airports;
       game.meta = data.meta || game.meta;
     } catch { return false; }
@@ -243,7 +244,7 @@ async function ensureHard(loud = true) {
   if (!(await ensureFull(loud))) return false;
   if (loud) showVeil('Loading airports', false, true);
   hardPromise ||= (async () => {
-    try { game.hardList = (await fetchJson('data/airports-hard.json', !loud)).airports; } catch { return false; }
+    try { game.hardList = (await loadData('hard', { low: !loud })).airports; } catch { return false; }
     for (const a of game.hardList) game.byId.set(a.id, a);
     game.fullIndex = C.prepareIndex([...game.main, ...game.hardList]);
     game.hardPool = [...game.main.filter((a) => !a.top), ...game.hardList]; // Hard pool = every airport outside the Daily top list
@@ -255,7 +256,7 @@ async function ensureHard(loud = true) {
   if (!ok) hardPromise = null;
   return ok;
 }
-const warmData = () => ensureFull(false).then((ok) => ok && ensureHard(false)).then((ok) => { if (ok) tellServiceWorker({ type: 'cache-data', urls: ['data/airports.json', 'data/airports-hard.json'] }); return ok; });
+const warmData = () => ensureFull(false).then((ok) => ok && ensureHard(false)).then((ok) => { if (ok) tellServiceWorker({ type: 'cache-data', urls: [dataUrl('full'), dataUrl('hard')] }); return ok; });
 
 function newRound(kind, date, answer) {
   return { kind, date, answer, log: [], results: [], hints: [], zoomed: false, done: false, won: false, guessed: new Map() };
@@ -452,7 +453,10 @@ function renderSheet() {
   const after = (cost = 1) => `You'll have ${left - cost} left.`;
   let html = '';
   if (sheet.type === 'hints') {
-    html = `<h4>Need a hint?</h4><p>Hints cost 1 guess (the main airline costs 2). ${left} left.</p><div class="opts">${C.HINTS.map((h) => {
+    const third = C.hintInfo('extra', r.answer);
+    if (!third.available) console.error('[airport-guesser] the hint menu was opened for an airport without a third clue:', r.answer && (r.answer.iata || r.answer.icao || r.answer.id), r.answer && r.answer.hint3); // must never happen: the build fails without one
+    const pricey = third.available && third.cost > 1; // the airline clue is offered here, and it costs 2
+    html = `<h4>Need a hint?</h4><p>${pricey ? 'Hints cost 1 guess (the main airline costs 2).' : 'Each hint costs 1 guess.'} ${left} left.</p><div class="opts">${C.HINTS.filter((h) => C.hintInfo(h.key, r.answer).available).map((h) => { // an item that cannot exist is not shown at all
       const st = C.hintStatus(h.key, r.hints, r.answer);
       const info = C.hintInfo(h.key, r.answer); // only the kind of clue (its menu label), never its content
       const dear = st === 'ok' && info.available && !C.canAfford(spent(r), info.cost); // would use the last attempt
@@ -872,7 +876,7 @@ function cacheTilesInServiceWorker() {
   if (!r) return;
   const { center, zMain } = viewParams(r.answer);
   tellServiceWorker({ type: 'cache-tiles', urls: views.main.tilesFor(center, zMain) });
-  if (game.hardLoaded) tellServiceWorker({ type: 'cache-data', urls: ['data/airports.json', 'data/airports-hard.json'] });
+  if (game.hardLoaded) tellServiceWorker({ type: 'cache-data', urls: [dataUrl('full'), dataUrl('hard')] });
 }
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !/^https?:/.test(location.protocol)) return;

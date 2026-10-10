@@ -37,6 +37,9 @@ import urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
+if hasattr(sys.stdout, "reconfigure"):  # airport names are not ASCII; a Windows console would otherwise crash the build
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Records that the source itself marks as closed, disused, duplicated or superseded: never offered as an answer.
 JUNK_NAME = re.compile(r"\[(in-?active|closed|duplicate)\]|\((old|disused|former[^)]*)\)|^\(\*\)", re.I)
 
@@ -278,7 +281,18 @@ def apply_tiers(kept, hard):
             moved += 1
         else:
             keep_hard.append(a)
+    midsize_airline = 0
+    # Large guarantee: every Large airport has the airline clue; one that does not is demoted (Mid-size if it has a region or position clue, else no tier)
+    for a in kept + hard:
+        typ = (a.get("hint3") or "").split("|")[0]
+        if a["tier"] == 2 and typ not in ("airline", "airlinec"):
+            a["tier"] = 3 if typ in ("region", "grid") else 4
+            a.pop("ps", None) if a["tier"] == 4 else None
+            print("  DEMOTED from Large (no airline clue): %s %s -> tier %d" % (a.get("iata") or a.get("icao"), a["name"], a["tier"]))
+        if a["tier"] == 3 and typ in ("airline", "airlinec"):
+            midsize_airline += 1
     kept.sort(key=lambda a: a["id"])
+    print("  %d Mid-size airports also have an airline clue (their playability score is below the Large bar)" % midsize_airline)
     print("tiers applied (%d airports moved from the Hard file to the main file)" % moved)
     return kept, keep_hard
 
@@ -446,7 +460,9 @@ def main():
         ts = os.path.getmtime(os.path.join(CACHE, name))
         return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%d")
 
-    meta = {"ourairports_retrieved": source_date("airports.csv"), "built": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")}
+    with open(os.path.join(ROOT, "js", "data.js"), encoding="utf-8") as _f:
+        schema = int(re.search(r"DATA_SCHEMA = (\d+)", _f.read()).group(1))  # the app refuses data files with another schema
+    meta = {"ourairports_retrieved": source_date("airports.csv"), "built": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "schema": schema}
 
     def dump(path, items, source):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -477,7 +493,7 @@ def main():
                 n_h3[v.split("|")[0]] += 1
         print("third hint attached: %s of %d airports" % (dict(n_h3), len(kept) + len(hard)))
     else:
-        print("WARNING: scripts/.cache/hint3.json missing (run scripts/hint_data.py); airports have no third hint")
+        raise SystemExit("BUILD FAILED: scripts/.cache/hint3.json is missing (run scripts/hint_data.py): airports would have no third clue")
     # ---- Wikipedia article titles (scripts/wikipedia_links.py: validated at build time; the app builds the URL itself)
     wp_path = os.path.join(CACHE, "wp_links.json")
     if os.path.exists(wp_path):
@@ -498,6 +514,9 @@ def main():
         raise SystemExit("top airports without a verified Wikipedia article: %s" % missing_wp)
     kept, n_daily_before, daily_dropped = quality_filter(kept, "Daily")
     hard, n_hard_before, hard_dropped = quality_filter(hard, "Hard")
+    no_clue = [a.get("iata") or a.get("icao") for a in kept + hard if not a.get("hint3")]
+    if no_clue:  # the menu must never offer an empty clue: a record without one stops the build
+        raise SystemExit("BUILD FAILED: %d airports have no third clue (run scripts/hint_data.py after changing the data): %s" % (len(no_clue), no_clue[:15]))
     kept, hard = apply_tiers(kept, hard)
 
     dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts; nz = native Esri imagery level")

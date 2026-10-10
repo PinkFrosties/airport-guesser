@@ -1,8 +1,23 @@
 [
  {
+  "airport": "ADQ",
+  "airline": "Air Salone",
+  "reason": "home country SL differs from the airport's US and the network is small (11 airports)"
+ },
+ {
+  "airport": "AJA",
+  "airline": "VOLOTEA Airways",
+  "reason": "home country ES differs from the airport's FR and the network is small (38 airports)"
+ },
+ {
   "airport": "DZA",
   "airline": "Ewa Air",
   "reason": "no scheduled service: 0 routes in OpenFlights"
+ },
+ {
+  "airport": "EBB",
+  "airline": "Northern Dene Airways",
+  "reason": "home country CA differs from the airport's UG and the network is small (8 airports)"
  },
  {
   "airport": "FRS",
@@ -10,8 +25,38 @@
   "reason": "no scheduled service: 0 routes in OpenFlights"
  },
  {
+  "airport": "GND",
+  "airline": "Caribbean Airlines",
+  "reason": "home country TT differs from the airport's GD and the network is small (19 airports)"
+ },
+ {
   "airport": "KIN",
   "airline": "Caribbean Airlines",
   "reason": "home country TT differs from the airport's JM and the network is small (19 airports)"
+ },
+ {
+  "airport": "LBD",
+  "airline": "Salzburg arrows",
+  "reason": "home country AT differs from the airport's TJ and the network is small (20 airports)"
+ },
+ {
+  "airport": "MFM",
+  "airline": "Air Macau",
+  "reason": "home country CN differs from the airport's MO and the network is small (29 airports)"
+ },
+ {
+  "airport": "RTB",
+  "airline": "Air Atlanta Icelandic",
+  "reason": "home country IS differs from the airport's HN and the network is small (5 airports)"
+ },
+ {
+  "airport": "SFA",
+  "airline": "Libyan Arab Airlines",
+  "reason": "home country LY differs from the airport's TN and the network is small (22 airports)"
+ },
+ {
+  "airport": "TGU",
+  "airline": "Air Atlanta Icelandic",
+  "reason": "home country IS differs from the airport's HN and the network is small (5 airports)"
  }
 ]

@@ -178,7 +178,7 @@ for (const [scheme, profile, name] of [['light', PHONE, 'phone'], ['dark', PHONE
 
 await test('nothing is credited that the code does not use; everything that is used is credited', async () => {
   const about = read('index.html').match(/<dialog id="dlg-about"[\s\S]*?<\/dialog>/)[0];
-  const code = read('js/app.js') + read('js/extras.js') + read('js/config.js') + read('js/satview.js') + read('css/style.css') + read('index.html');
+  const code = read('js/app.js') + read('js/extras.js') + read('js/data.js') + read('js/config.js') + read('js/satview.js') + read('css/style.css') + read('index.html');
   // used -> credited
   assert.ok(/arcgisonline\.com/.test(code) && /Esri/.test(about), 'imagery');
   assert.ok(/data\/airports\.json/.test(code) && /OurAirports/.test(about), 'airport data');

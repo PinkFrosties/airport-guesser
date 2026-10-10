@@ -6,7 +6,7 @@ const args = process.argv.slice(2);
 const env = { ...process.env };
 if (args.includes('--dist')) env.AG_ROOT = 'dist';
 if (args.includes('--webkit')) env.AG_BROWSER = 'webkit';
-const scripts = ['unit', 'unit.game', 'changelog', 'credits', 'theme', 'zoomfit', 'targets', 'textscale', 'hardening', 'typing', 'direction', 'hints', 'zoominteract', 'wikipedia', 'e2e'];
+const scripts = ['unit', 'unit.game', 'changelog', 'credits', 'theme', 'zoomfit', 'targets', 'textscale', 'hardening', 'typing', 'direction', 'hints', 'thirdhint', 'zoominteract', 'wikipedia', 'e2e'];
 let bad = 0;
 for (const s of scripts) {
   const file = new URL(`./${s}.mjs`, import.meta.url);

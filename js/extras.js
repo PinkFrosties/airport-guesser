@@ -1,5 +1,6 @@
 // Non-critical UI, loaded after the first image: Statistics, How to play and About & credits.
 // Kept out of the critical path (see js/app.js: loadExtras) so the Daily's image is not delayed by code the player has not asked for.
+import { loadData } from './data.js';
 export function init({ game, S, C, $, esc, kindOf, todayKey, APP_VERSION }) {
   const dlgHelp = $('#dlg-help'), dlgStats = $('#dlg-stats'), dlgAbout = $('#dlg-about');
   const statsBody = $('#stats-body'), statsSeg = $('#stats-seg');
@@ -38,12 +39,12 @@ export function init({ game, S, C, $, esc, kindOf, todayKey, APP_VERSION }) {
     $('#about-data-date').textContent = date || 'unknown';
     if (aboutFilled) return;
     try {
-      const rank = await (await fetch('data/top50.json')).json();
+      const rank = await loadData('top50');
       $('#about-rank-year').textContent = rank.year;
       $('#about-rank-date').textContent = rank.retrieved;
     } catch { /* the static text stays */ }
     try {
-      const c = await (await fetch('data/credits.json')).json();
+      const c = await loadData('credits');
       $('#oss-list').innerHTML = c.software.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${esc(p.version)}, ${esc(p.license)} licence. ${esc(p.purpose)}</li>`).join('');
       aboutFilled = true;
     } catch { $('#oss-list').innerHTML = '<li>Open-source software list unavailable offline. See THIRD_PARTY_NOTICES.md in the repository.</li>'; }
@@ -55,7 +56,7 @@ export function init({ game, S, C, $, esc, kindOf, todayKey, APP_VERSION }) {
     const box = $('#changelog-list');
     if (!box) return;
     try {
-      const { versions } = await (await fetch('data/changelog.json')).json();
+      const { versions } = await loadData('changelog');
       box.innerHTML = versions.map((v, i) => `<details class="ver"${i === 0 ? ' open' : ''}><summary><b>v${esc(v.version)}</b>${v.name ? ` <span>${esc(v.name)}</span>` : ''}${v.date ? ` <time datetime="${esc(v.date)}">${esc(v.date)}</time>` : ''}${i === 0 ? ' <em>current</em>' : ''}</summary><ul>${v.items.map((t) => `<li>${md(t)}</li>`).join('')}</ul></details>`).join('');
     } catch { box.innerHTML = '<p>The version history is unavailable offline.</p>'; }
   }

@@ -5,7 +5,8 @@
 //    causes a blank wait. Hashed files under /assets/ are immutable: cache first. Map tiles: cache first.
 // VERSION is written by scripts/sync_version.mjs from js/version.js (the single source of truth). The deploy build
 // (scripts/build_site.mjs) replaces the SHELL list with the hashed files it produced.
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
+const DATA_BUILD = 'dev'; // written by the site build: a hash of the data file names, so sw.js is different whenever the data is
 const CACHE = `airport-guesser-v${VERSION}`;
 const TILE_CACHE = 'airport-guesser-tiles-v1'; // survives app updates: tiles never change with the app version
 const TILE_LIMIT = 500; // roughly 10 MB
@@ -55,6 +56,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// data files are named by content hash in the deployed site (data/airports.3fa9c1d2.json): cache first, forever
+const HASHED_DATA = /\/data\/[\w-]+\.[0-9a-f]{8}\.json$/;
 const TILE_RE = /\/World_Imagery\/MapServer\/tile\//;
 /** Source-tree code (development server): prefer the network so edits show up, but never wait more than 700 ms. */
 const isDevCode = (url) => /\/(js|css)\/[^/]+$/.test(url.pathname); // the built site has no /js/ or /css/ folders
@@ -65,7 +68,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (TILE_RE.test(url.pathname) && /arcgisonline\.com$/.test(url.hostname)) { event.respondWith(tileResponse(req)); return; }
   if (url.origin !== self.location.origin) return;
-  if (/\/assets\//.test(url.pathname)) { event.respondWith(cacheFirst(req)); return; }
+  if (req.cache === 'reload' || req.cache === 'no-store') { event.respondWith(networkRefresh(req)); return; } // the page asked for a fresh copy (it found a stale one)
+  if (/\/assets\//.test(url.pathname) || HASHED_DATA.test(url.pathname)) { event.respondWith(cacheFirst(req)); return; } // content-hashed files never change
   if (isDevCode(url)) { event.respondWith(networkFirst(req)); return; }
   event.respondWith(staleWhileRevalidate(req));
 });
@@ -73,6 +77,12 @@ self.addEventListener('fetch', (event) => {
 async function cacheFirst(req) {
   const hit = await caches.match(req);
   if (hit) return hit;
+  const res = await fetch(req);
+  if (res && res.ok) (await caches.open(CACHE)).put(req, res.clone());
+  return res;
+}
+
+async function networkRefresh(req) {
   const res = await fetch(req);
   if (res && res.ok) (await caches.open(CACHE)).put(req, res.clone());
   return res;
@@ -131,7 +141,7 @@ self.addEventListener('message', (event) => {
     event.waitUntil((async () => {
       const cache = await caches.open(CACHE);
       for (const u of msg.urls.slice(0, 4)) {
-        if (!/^data\/[\w-]+\.json$/.test(u) || (await cache.match(u))) continue;
+        if (!/^data\/[\w.-]+\.json$/.test(u) || (await cache.match(u))) continue;
         try { const res = await fetch(u); if (res.ok) await cache.put(u, res); } catch { /* offline: skip */ }
       }
     })());
