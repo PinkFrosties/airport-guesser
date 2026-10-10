@@ -381,13 +381,16 @@ const HINT3 = {
   elev: { menu: 'Elevation', label: 'Elevation', text: (v) => `${v} above sea level` },
 };
 export const HINTS = [{ key: 'country' }, { key: 'letter' }, { key: 'extra' }];
+/** The main-airline clue is worth more, so it costs 2 attempts; every other hint costs 1. */
+export const AIRLINE_HINT_COST = 2;
+export const hintCost = (key, a) => (key === 'extra' && hint3Of(a)?.type === 'airline' ? AIRLINE_HINT_COST : 1);
 /** Menu label (what it is), chip label + text (the answer, only ever built after the hint was bought) and availability. */
 export function hintInfo(key, a) {
-  if (key === 'country') return { key, menu: 'Country', label: 'Country', available: !!a.country, text: () => a.country };
-  if (key === 'letter') return { key, menu: 'First letter of the name', label: 'Name starts with', available: !!firstChar(a.name), text: () => firstChar(a.name) };
+  if (key === 'country') return { key, menu: 'Country', label: 'Country', available: !!a.country, cost: 1, text: () => a.country };
+  if (key === 'letter') return { key, menu: 'First letter of the name', label: 'Name starts with', available: !!firstChar(a.name), cost: 1, text: () => firstChar(a.name) };
   const h = hint3Of(a), d = h && HINT3[h.type];
-  if (!d) return { key, menu: 'Extra clue', label: 'Extra clue', available: false, text: () => '' };
-  return { key, menu: d.menu, label: d.label, available: true, type: h.type, text: () => d.text(h.v, a) };
+  if (!d) return { key, menu: 'Extra clue', label: 'Extra clue', available: false, cost: 1, text: () => '' };
+  return { key, menu: d.menu, label: d.label, available: true, type: h.type, cost: hintCost(key, a), text: () => d.text(h.v, a) };
 }
 export const hintAvailable = (h, a) => hintInfo(h.key, a).available;
 /** 'ok' | 'used' | 'covered' (its information is already in a hint bought: the region and part-of-country clues contain the country) | 'unavailable'. */
@@ -403,6 +406,8 @@ export function hintStatus(key, used, a) {
 export const attemptsLeft = (spent) => MAX_GUESSES - spent;
 /** Hints and zoom-out are only offered while at least 2 attempts remain (spending the last one would just end the game). */
 export const canSpend = (spent) => attemptsLeft(spent) >= 2;
+/** A purchase of `cost` attempts must leave at least one attempt to guess with. */
+export const canAfford = (spent, cost) => attemptsLeft(spent) - cost >= 1;
 
 // ---------- share ----------
 export function bandSquare(r) {

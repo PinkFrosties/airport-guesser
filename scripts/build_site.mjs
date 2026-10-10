@@ -77,7 +77,7 @@ writeFileSync(join(dist, 'index.html'), html);
 // ---- static files
 for (const dir of ['icons']) cpSync(join(root, dir), join(dist, dir), { recursive: true });
 for (const f of ['manifest.webmanifest', '.nojekyll']) cpSync(join(root, f), join(dist, f));
-for (const f of ['airports.json', 'airports-hard.json', 'credits.json', 'top50.json']) cpSync(join(root, 'data', f), join(dist, 'data', f));
+for (const f of ['airports.json', 'airports-hard.json', 'credits.json', 'top50.json', 'changelog.json']) cpSync(join(root, 'data', f), join(dist, 'data', f));
 writeFileSync(join(dist, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Page not found - Airport Guesser</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;text-align:center;background:#f5f5f7;color:#1d1d1f}a{color:#0066cc}@media(prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}a{color:#64b0ff}}</style></head><body><main><h1>Page not found</h1><p><a href="./">Back to Airport Guesser</a></p></main></body></html>\n`);
 
 // ---- service worker with the real shell list

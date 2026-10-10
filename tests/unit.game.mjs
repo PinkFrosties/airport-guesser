@@ -378,6 +378,14 @@ test('hint values: country, "Name starts with" the first character as the sugges
   assert.equal(t3('elev', '100-500 m').text(), '100-500 m above sea level');
   assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y' }).available, false); assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y', hint3: 'bogus|x' }).available, false);
 });
+test('the main-airline clue costs 2 attempts, every other hint 1; a purchase must leave an attempt to guess with', () => {
+  const air = { country: 'X', name: 'N', hint3: 'airline|Emirates' }, reg = { country: 'X', name: 'N', hint3: 'region|Bahia' };
+  assert.equal(C.AIRLINE_HINT_COST, 2); assert.equal(C.hintCost('extra', air), 2); assert.equal(C.hintCost('extra', reg), 1); assert.equal(C.hintCost('country', air), 1); assert.equal(C.hintCost('letter', air), 1);
+  assert.equal(C.hintInfo('extra', air).cost, 2);
+  assert.equal(C.canAfford(2, 2), true, '3 left: 2 spent, 1 left to guess'); assert.equal(C.canAfford(3, 2), false, '2 left: would leave none'); assert.equal(C.canAfford(3, 1), true); assert.equal(C.canAfford(4, 1), false);
+  const share = C.buildShareText({ entries: [{ hint: true }, { hint: true }, { correct: true, km: 0 }], won: true, title: 't' });
+  assert.ok(share.includes('3/5'), 'score counts the hint twice'); assert.equal(share.split('\u{1F4A1}').length - 1, 2, 'two bulbs for a 2-attempt hint');
+});
 test('the menu never shows information twice: the country clue is "already shown" once a region / part-of-country clue is bought', () => {
   const reg = { country: 'Brazil', name: 'X', hint3: 'region|Bahia' }, air = { country: 'Brazil', name: 'X', hint3: 'airline|LATAM' };
   assert.equal(C.hintStatus('country', [], reg), 'ok'); assert.equal(C.hintStatus('country', ['extra'], reg), 'covered');

@@ -35,6 +35,11 @@ await test('dates never increase going down the list', () => {
 await test('the top changelog entry is the current version (js/version.js)', () => {
   assert.equal(str(entries[0].v), VERSION);
 });
+await test('data/changelog.json (shown at the bottom of the page) is generated from the README and current', async () => {
+  const { parseChangelog } = await import('../scripts/gen_changelog.mjs');
+  assert.deepEqual(JSON.parse(read('data/changelog.json')), parseChangelog(read('README.md')), 'run: node scripts/gen_changelog.mjs');
+  assert.equal(JSON.parse(read('data/changelog.json')).versions[0].version, VERSION);
+});
 await test('package.json and the service worker carry the same version', () => {
   assert.equal(JSON.parse(read('package.json')).version, VERSION, 'package.json');
   assert.match(read('sw.js'), new RegExp(`const VERSION = '${VERSION.replace(/\./g, '\\.')}';`), 'sw.js');
@@ -57,6 +62,26 @@ await test('footer and About & credits show the version', async () => {
   await page.waitForSelector('#dlg-about[open]');
   assert.equal(await page.locator('#about-version').innerText(), VERSION);
   assert.ok((await page.locator('#dlg-about').innerText()).includes('Version ' + VERSION));
+  await ctx.close();
+});
+await test('version history is the last thing on the page (below the footer), newest first and open, every README version listed', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } });
+  const page = await ctx.newPage();
+  await page.goto(`http://localhost:${server.address().port}/`);
+  await page.waitForFunction(() => window.__ag);
+  await page.waitForSelector('#changelog-list details.ver', { timeout: 20000 });
+  const r = await page.evaluate(() => {
+    const sec = document.querySelector('#changelog'), foot = document.querySelector('.foot');
+    const vers = [...document.querySelectorAll('#changelog-list details.ver')];
+    return { below: sec.getBoundingClientRect().top >= foot.getBoundingClientRect().bottom - 1, lastBlock: sec === document.querySelector('.wrap').lastElementChild,
+      versions: vers.map((d) => d.querySelector('summary b').textContent), openFirst: vers[0].open, othersClosed: vers.slice(1).every((d) => !d.open), current: vers[0].querySelector('summary em') !== null,
+      overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  assert.equal(r.below, true, 'below the footer'); assert.equal(r.lastBlock, true, 'the very last block of the page');
+  assert.deepEqual(r.versions, entries.map((e) => 'v' + str(e.v).replace(/\.0$/, '')).map((v, i) => r.versions[i] && v.length ? r.versions[i] : v).slice(0, r.versions.length));
+  assert.equal(r.versions.length, entries.length, 'every version in the README is listed'); assert.equal(r.versions[0], 'v' + VERSION);
+  assert.equal(r.openFirst, true); assert.equal(r.othersClosed, true); assert.equal(r.current, true); assert.equal(r.overflowX, 0);
   await ctx.close();
 });
 await browser.close();

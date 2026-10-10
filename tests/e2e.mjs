@@ -519,7 +519,7 @@ await test('wrong guesses do not zoom out; zoom-out costs 1 guess, needs confirm
 await test('hints: 3 kinds (country, first letter, third clue), each costs 1 guess with confirmation, shown persistently; budget shared; game over reveals answer', async () => {
   const { ctx, page } = await newPage(PHONE);
   await open(page);
-  await start(page, HUB);
+  await start(page, by("ORD").id); // a region clue (1 attempt); the 2-attempt airline clue is covered in tests/hints.mjs
   const a = await answerOf(page);
   const third = C.hintInfo('extra', a);
   await page.locator('#btn-hint').click();

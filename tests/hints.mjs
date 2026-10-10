@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as C from '../js/core.js';
-import { launchBrowser } from './browser.mjs';
+import { launchBrowser, browserName } from './browser.mjs';
+const chromiumNow = browserName === 'chromium';
 import { createServer } from '../scripts/serve.mjs';
 const path = (u) => new URL(u, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const rd = (f) => JSON.parse(readFileSync(path('../data/' + f), 'utf8')).airports;
@@ -26,12 +27,13 @@ const open = async (storage) => {
   return { ctx, page };
 };
 const start = async (page, id) => { await page.evaluate((i) => window.__ag.debugStart(i), id); await page.waitForTimeout(1200); };
-const spent = (page) => page.evaluate(() => { const r = window.__ag.round; return r.results.length + r.hints.length + (r.zoomed ? 1 : 0); });
+/** Attempts used (what the app counts): guesses and zoom-outs 1 each, hints what they are worth. */
+const spent = async (page) => { const r = await page.evaluate(() => ({ log: window.__ag.round.log, answer: window.__ag.round.answer })); return r.log.reduce((s, e) => s + (e.t === 'h' ? C.hintCost(e.k, r.answer) : 1), 0); };
 const buy = async (page, key) => { await page.locator('#btn-hint').click(); await page.locator(`#sheet [data-hint=${key}]`).click(); await page.locator('#sheet [data-confirm]').click(); await page.waitForTimeout(250); };
 const guess = async (page, q) => { await page.locator('#guess-input').fill(q); await page.waitForSelector('#suggestions li[role=option]'); await page.locator('#suggestions li[role=option]').first().click(); await page.locator('#guess-btn').click(); await page.waitForTimeout(300); };
 /** All the text, attribute values and accessible names of the page outside <script>/<style> and closed dialogs. */
 const pageText = (page) => page.evaluate(() => {
-  const c = document.documentElement.cloneNode(true); c.querySelectorAll('script,style,dialog').forEach((n) => n.remove());
+  const c = document.documentElement.cloneNode(true); c.querySelectorAll('script,style,dialog,#changelog').forEach((n) => n.remove()); // the version history is static release notes
   const attrs = []; c.querySelectorAll('*').forEach((e) => { for (const n of e.getAttributeNames()) attrs.push(e.getAttribute(n)); });
   return (c.querySelector('body').textContent + ' ' + attrs.join(' ')).replace(/\s+/g, ' ');
 });
@@ -52,7 +54,7 @@ for (const type of ['airline', 'region', 'grid', 'elev']) {
     const confirmText = await page.locator('#sheet').innerText(); assert.ok(confirmText.toLowerCase().includes(`reveal: ${info.menu.toLowerCase()}?`) && !confirmText.includes(h.v), 'confirmation names the kind only');
     assert.equal(await spent(page), 0, 'nothing spent before the confirmation');
     await page.locator('#sheet [data-confirm]').click(); await page.waitForTimeout(250);
-    assert.equal(await spent(page), 1);
+    assert.equal(await spent(page), info.cost, `the ${type} clue costs ${info.cost}`);
     const chip = await page.locator('#hints-list').innerText(); assert.ok(chip.toLowerCase().includes(info.label.toLowerCase()) && chip.includes(info.text()), chip);
     if (type === 'region') assert.ok(chip.includes(', ' + a.country), 'region is shown as "<region>, <country>"');
     await ctx.close();
@@ -81,6 +83,42 @@ await test('airline clue does not reveal the country: the country hint stays ava
   await buy(page, 'extra'); await page.locator('#btn-hint').click();
   assert.equal(await page.locator('#sheet [data-hint=country]').isDisabled(), false); await ctx.close();
 });
+await test('the main-airline clue is a 2-attempt penalty: menu says so, two pips fill, only offered with 3+ attempts left, share shows two bulbs', async () => {
+  const a = ofType('airline').find((x) => x.iata);
+  const { ctx, page } = await open(); await start(page, a.id);
+  await page.locator('#btn-hint').click();
+  assert.match(await page.locator('#sheet [data-hint=extra]').innerText(), /2 guesses/); assert.match(await page.locator('#sheet').innerText(), /main airline costs 2/i);
+  await page.locator('#sheet [data-hint=extra]').click();
+  const confirm = await page.locator('#sheet').innerText(); assert.match(confirm, /costs 2 guesses/i); assert.match(confirm, /have 3 left/i); assert.match(confirm, /Reveal [(].2 guesses[)]/);
+  await page.locator('#sheet [data-confirm]').click(); await page.waitForTimeout(300);
+  assert.equal(await spent(page), 2); assert.equal(await page.locator('#pips .pip.aid').count(), 2, 'two pips for the hint');
+  assert.match(await page.locator('#left').innerText(), /3 *of 5/i); assert.equal(await page.locator('#hints-list li').count(), 1);
+  await ctx.close();
+  // with 2 attempts left it is not offered (it would use the last one); with 3 left it is
+  const b = await open(); await start(b.page, a.id);
+  await guess(b.page, 'JFK'); await guess(b.page, 'LHR'); // 2 spent, 3 left
+  await b.page.locator('#btn-hint').click(); assert.equal(await b.page.locator('#sheet [data-hint=extra]').isDisabled(), false, 'affordable with 3 left');
+  await b.page.locator('#sheet [data-cancel]').click(); await guess(b.page, 'SIN'); // 3 spent, 2 left
+  await b.page.locator('#btn-hint').click();
+  assert.equal(await b.page.locator('#sheet [data-hint=extra]').isDisabled(), true, 'not offered with 2 left'); assert.match(await b.page.locator('#sheet [data-hint=extra]').innerText(), /Needs 3 attempts left/);
+  assert.equal(await b.page.locator('#sheet [data-hint=letter]').isDisabled(), false, 'a 1-attempt hint still is');
+  await b.ctx.close();
+});
+await test('a solved game with the airline clue: "Solved in 3 of 5", the share text counts it twice (two bulbs, 3/5) and never names the airline', async () => {
+  const a = ofType('airline').find((x) => x.iata);
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, serviceWorkers: 'block', ...(chromiumNow ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
+  await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* */ } });
+  const page = await ctx.newPage(); await page.goto(BASE); await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 40000 });
+  await page.waitForTimeout(1500); await start(page, a.id); await buy(page, 'extra');
+  await guess(page, a.iata); await page.waitForSelector('#result:not([hidden])');
+  assert.match(await page.locator('#result').innerText(), /Solved in 3 of 5/i);
+  if (chromiumNow) {
+    await page.locator('#btn-share').click(); await page.waitForTimeout(300);
+    const text = await page.evaluate(() => navigator.clipboard.readText());
+    assert.ok(text.includes('3/5')); assert.equal(text.split('💡').length - 1, 2, 'two bulbs'); assert.ok(!text.includes(C.hint3Of(a).v), 'the airline is not in the share text');
+  }
+  await ctx.close();
+});
 await test('last attempt: a hint needs 2 attempts left (the game would end), the button is disabled with 1 left; 2 left allows it and leaves 1', async () => {
   const a = ofType('region').find((x) => x.iata);
   const { ctx, page } = await open(); await start(page, a.id);
@@ -93,11 +131,11 @@ await test('last attempt: a hint needs 2 attempts left (the game would end), the
 await test('reload keeps the bought hints and the spent attempts (Daily); the clue text comes back', async () => {
   const { ctx, page } = await open();
   const a = await page.evaluate(() => window.__ag.round.answer); const info = C.hintInfo('extra', a);
-  await buy(page, 'letter'); await buy(page, 'extra'); assert.equal(await spent(page), 2);
+  await buy(page, 'letter'); await buy(page, 'extra'); assert.equal(await spent(page), 1 + C.hintCost('extra', a));
   await page.reload(); await page.waitForFunction(() => window.__ag && window.__ag.round && window.__ag.round.hints.length === 2, null, { timeout: 40000 }); await page.waitForTimeout(600);
-  assert.equal(await spent(page), 2); const chips = await page.locator('#hints-list').innerText();
+  assert.equal(await spent(page), 1 + C.hintCost('extra', a)); const chips = await page.locator('#hints-list').innerText();
   assert.ok(chips.includes(C.firstChar(a.name)) && chips.includes(info.text()), chips);
-  assert.match(await page.locator('#left').innerText(), /3\s*of 5/i);
+  assert.match(await page.locator('#left').innerText(), new RegExp(String(5 - (1 + C.hintCost('extra', a))) + ' *of 5', 'i'));
   await ctx.close();
 });
 await test('a game saved by the previous version (continent + runways hints) keeps its 2 spent attempts and does not crash', async () => {

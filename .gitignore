@@ -8,3 +8,14 @@ dist
 # private audit notes and evidence (kept local)
 AUDIT.md
 qa/audit/
+
+# scratch / temp files (never commit)
+_*.cjs
+_*.mjs
+_*.py
+_*.js
+scratch/
+tmp/
+*.tmp
+*.bak
+*.orig

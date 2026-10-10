@@ -125,6 +125,11 @@
       <button type="button" data-theme-pref="dark" aria-pressed="false">Dark</button>
     </div>
   </footer>
+
+  <section class="history" id="changelog" aria-labelledby="changelog-title">
+    <h2 id="changelog-title">Version history</h2>
+    <div id="changelog-list"><p>Loading&hellip;</p></div>
+  </section>
 </div>
 
 <dialog id="dlg-help" aria-labelledby="help-title">
@@ -139,7 +144,7 @@
     <ul>
       <li><b>Zooming in is free</b>: pinch, scroll the mouse wheel over the image, double-tap or double-click, or press + and -. Drag to look around while zoomed in; 0, Esc or the Reset view button return to the start view. You can never zoom out past the start view or in past the real imagery.</li>
       <li><b>Zoom out</b>: a wider view, once per game, costs 1 attempt (zooming in then starts from that wider view).</li>
-      <li><b>Hints</b>: the country, the first letter of the name, or a third clue (the airport's main airline, or its region). Each costs 1 attempt.</li>
+      <li><b>Hints</b>: the country, the first letter of the name, or a third clue: the airport's main airline (this one costs <b>2 attempts</b>) where it is known with confidence, otherwise its region. The other hints cost 1 attempt.
       <li>Guesses, hints and zoom-outs share the same 5 attempts. Zooming in never costs an attempt.</li>
     </ul>
     <h3>Modes</h3>

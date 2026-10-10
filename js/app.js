@@ -40,7 +40,9 @@ Object.defineProperty(game, 'view', {
 });
 
 const kindOf = () => (game.mode === 'practice' ? 'practice' : game.hard ? 'hard' : 'daily');
-const spent = (r) => r.log.length;
+/** Attempts used: a guess or the zoom-out costs 1, a hint costs what it is worth (the main-airline clue 2). */
+const costOf = (r, e) => (e.t === 'h' ? C.hintCost(e.k, r.answer) : 1);
+const spent = (r) => r.log.reduce((s, e) => s + costOf(r, e), 0);
 
 // ---------- prefs ----------
 const PREFS_KEY = 'airportGuesser.prefs.v2';
@@ -424,7 +426,7 @@ function submitGuess() {
 
 function useHint(key) {
   const r = game.round;
-  if (!r || r.done || !C.canSpend(spent(r)) || r.hints.includes(key)) return;
+  if (!r || r.done || r.hints.includes(key) || !C.canAfford(spent(r), C.hintCost(key, r.answer))) return;
   r.hints.push(key);
   r.log.push({ t: 'h', k: key });
   afterSpend();
@@ -447,21 +449,23 @@ function renderSheet() {
   const r = game.round;
   if (!sheet || !r || r.done) { el.sheet.hidden = true; el.sheet.innerHTML = ''; return; }
   const left = C.attemptsLeft(spent(r));
-  const after = `You'll have ${left - 1} left.`;
+  const after = (cost = 1) => `You'll have ${left - cost} left.`;
   let html = '';
   if (sheet.type === 'hints') {
-    html = `<h4>Need a hint?</h4><p>Each hint costs 1 guess. ${left} left.</p><div class="opts">${C.HINTS.map((h) => {
+    html = `<h4>Need a hint?</h4><p>Hints cost 1 guess (the main airline costs 2). ${left} left.</p><div class="opts">${C.HINTS.map((h) => {
       const st = C.hintStatus(h.key, r.hints, r.answer);
       const info = C.hintInfo(h.key, r.answer); // only the kind of clue (its menu label), never its content
-      return `<button type="button" class="opt" data-hint="${h.key}" ${st !== 'ok' ? 'disabled' : ''}>${esc(info.menu)}<small>${{ ok: '−1 guess', used: 'Already used', covered: 'Already shown', unavailable: 'Not available' }[st]}</small></button>`;
+      const dear = st === 'ok' && info.available && !C.canAfford(spent(r), info.cost); // would use the last attempt
+      const note = dear ? `Needs ${info.cost + 1} attempts left` : { ok: `−${info.cost} guess${info.cost > 1 ? 'es' : ''}`, used: 'Already used', covered: 'Already shown', unavailable: 'Not available' }[st];
+      return `<button type="button" class="opt" data-hint="${h.key}" ${st !== 'ok' || dear ? 'disabled' : ''}>${esc(info.menu)}<small>${note}</small></button>`;
     }).join('')}</div><button type="button" class="cancel" data-cancel>Cancel</button>`;
   } else if (sheet.what === 'zoom') {
-    html = `<h4>Zoom out for 1 guess?</h4><p>Shows a wider view. You can do this once per game. ${after}</p>
+    html = `<h4>Zoom out for 1 guess?</h4><p>Shows a wider view. You can do this once per game. ${after()}</p>
       <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Zoom out (−1 guess)</button></div>`;
   } else {
     const h = C.hintInfo(sheet.key, r.answer);
-    html = `<h4>Reveal: ${esc(h.menu.toLowerCase())}?</h4><p>This costs 1 guess. ${after}</p>
-      <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Reveal (−1 guess)</button></div>`;
+    html = `<h4>Reveal: ${esc(h.menu.toLowerCase())}?</h4><p>This costs ${h.cost} guess${h.cost > 1 ? 'es' : ''}. ${after(h.cost)}</p>
+      <div class="row-btns"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-confirm>Reveal (−${h.cost} guess${h.cost > 1 ? 'es' : ''})</button></div>`;
   }
   el.sheet.innerHTML = html;
   el.sheet.hidden = false;
@@ -497,10 +501,11 @@ function renderAll(animateLast = false) {
   if (!r) return;
   const used = spent(r);
 
-  // pips: one per attempt spent, in order
+  // pips: one per attempt spent, in order (a 2-attempt hint fills two)
   el.pips.innerHTML = '';
+  const units = r.log.flatMap((e) => (e.t === 'g' ? [e] : Array.from({ length: costOf(r, e) }, () => e)));
   for (let i = 0; i < C.MAX_GUESSES; i++) {
-    const e = r.log[i];
+    const e = units[i];
     const p = document.createElement('i');
     let cls = '';
     if (e) {
@@ -515,7 +520,7 @@ function renderAll(animateLast = false) {
 
   // tools
   const canSpend = C.canSpend(used);
-  const anyHint = C.HINTS.some((h) => C.hintStatus(h.key, r.hints, r.answer) === 'ok');
+  const anyHint = C.HINTS.some((h) => C.hintStatus(h.key, r.hints, r.answer) === 'ok' && C.canAfford(used, C.hintCost(h.key, r.answer)));
   el.btnHint.disabled = !canSpend || !anyHint;
   el.btnZoom.disabled = !canSpend || r.zoomed;
   el.btnZoom.innerHTML = r.zoomed ? 'Zoomed out' : 'Zoom out <span class="cost">−1 guess</span>';
@@ -616,7 +621,7 @@ function shareTitle(r) {
 }
 function shareEntries(r) {
   const byId = new Map(r.results.map((x) => [x.id, x]));
-  return r.log.map((e) => (e.t === 'g' ? byId.get(e.id) : e.t === 'h' ? { hint: true } : { zoom: true }));
+  return r.log.flatMap((e) => (e.t === 'g' ? [byId.get(e.id)] : e.t === 'h' ? Array.from({ length: costOf(r, e) }, () => ({ hint: true })) : [{ zoom: true }])); // one line per attempt used
 }
 async function share() {
   const r = game.round;

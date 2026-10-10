@@ -2,7 +2,7 @@
 """Build the third hint ("hint3") of every airport. Build time only: the app never contacts any of these sources.
 
 hint3 is one of (chosen per airport, first that applies):
-  airline  the airport's MAIN AIRLINE, accepted only when confident:
+  airline  the airport's MAIN AIRLINE (the app charges 2 attempts for it), accepted only when confident:
              1. Wikidata (CC0) airline-hub relations (property P113, current hubs of airlines that still exist);
                 the only hub airline of the airport is accepted; with several, the one with at least 1.5x the OpenFlights
                 routes of the second is accepted, a tie is not
