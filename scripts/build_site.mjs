@@ -51,7 +51,7 @@ const inline = JSON.stringify(inlineSubset(daily, now));
 
 // ---- data files: named by content hash (data/airports.3fa9c1d2.json), announced to the page in window.__AG_DATA. A new build = new URLs, so no service
 // worker or HTTP cache can hand the new page an old data file. The plain names stay for older pages that are still open (and the schedule file).
-const dataKeys = { full: 'airports.json', hard: 'airports-hard.json', top50: 'top50.json', credits: 'credits.json', changelog: 'changelog.json' };
+const dataKeys = { full: 'airports.json', hard: 'airports-hard.json', top50: 'top50.json', credits: 'credits.json' };
 const dataNames = {};
 for (const [k, f] of Object.entries(dataKeys)) {
   const buf = readFileSync(join(root, 'data', f));

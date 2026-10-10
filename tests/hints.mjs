@@ -33,7 +33,7 @@ const buy = async (page, key) => { await page.locator('#btn-hint').click(); awai
 const guess = async (page, q) => { await page.locator('#guess-input').fill(q); await page.waitForSelector('#suggestions li[role=option]'); await page.locator('#suggestions li[role=option]').first().click(); await page.locator('#guess-btn').click(); await page.waitForTimeout(300); };
 /** All the text, attribute values and accessible names of the page outside <script>/<style> and closed dialogs. */
 const pageText = (page) => page.evaluate(() => {
-  const c = document.documentElement.cloneNode(true); c.querySelectorAll('script,style,dialog,#changelog').forEach((n) => n.remove()); // the version history is static release notes
+  const c = document.documentElement.cloneNode(true); c.querySelectorAll('script,style,dialog').forEach((n) => n.remove());
   const attrs = []; c.querySelectorAll('*').forEach((e) => { for (const n of e.getAttributeNames()) attrs.push(e.getAttribute(n)); });
   return (c.querySelector('body').textContent + ' ' + attrs.join(' ')).replace(/\s+/g, ' ');
 });

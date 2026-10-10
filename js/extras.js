@@ -50,18 +50,6 @@ export function init({ game, S, C, $, esc, kindOf, todayKey, APP_VERSION }) {
     } catch { $('#oss-list').innerHTML = '<li>Open-source software list unavailable offline. See THIRD_PARTY_NOTICES.md in the repository.</li>'; }
   }
 
-  // ---- version history (very bottom of the page): the README changelog, built into data/changelog.json
-  const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-  async function fillHistory() {
-    const box = $('#changelog-list');
-    if (!box) return;
-    try {
-      const { versions } = await loadData('changelog');
-      box.innerHTML = versions.map((v, i) => `<details class="ver"${i === 0 ? ' open' : ''}><summary><b>v${esc(v.version)}</b>${v.name ? ` <span>${esc(v.name)}</span>` : ''}${v.date ? ` <time datetime="${esc(v.date)}">${esc(v.date)}</time>` : ''}${i === 0 ? ' <em>current</em>' : ''}</summary><ul>${v.items.map((t) => `<li>${md(t)}</li>`).join('')}</ul></details>`).join('');
-    } catch { box.innerHTML = '<p>The version history is unavailable offline.</p>'; }
-  }
-  fillHistory();
-
   return {
     openStats() { statsTab = kindOf(); renderStats(); dlgStats.showModal(); },
     openHelp() { dlgHelp.showModal(); },

@@ -236,16 +236,6 @@ dialog[open]{animation:rise .3s var(--ease)}
 .foot .seg-sm button{min-height:34px;font-size:0.875rem;padding:0 14px}
 .diff-sub{flex-basis:100%;margin:-4px 0 0;color:var(--muted);font-size:0.8125rem}
 .foot-line{margin:0}
-.history{margin:36px auto 8px;max-width:640px;color:var(--text-2)}
-.history h2{margin:0 0 10px;font-size:0.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
-.ver{background:var(--card);border-radius:14px;box-shadow:var(--shadow),0 0 0 1px var(--card-ring);margin:0 0 8px;padding:0 16px}
-.ver summary{cursor:pointer;min-height:44px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:0.9375rem;color:var(--text)}
-.ver summary span{color:var(--text-2)}
-.ver summary time{color:var(--muted);font-size:0.8125rem;font-variant-numeric:tabular-nums}
-.ver summary em{font-style:normal;font-size:0.6875rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-text)}
-.ver ul{margin:0 0 12px;padding-left:18px;font-size:0.875rem;line-height:1.45;overflow-wrap:anywhere}
-.ver li{margin:0 0 5px}
-.ver code{font-family:var(--mono);font-size:0.8125rem;background:var(--fill);border-radius:5px;padding:1px 4px}
 .link-inline{background:none;border:0;padding:12px 6px;margin:-12px 0;min-height:44px;color:var(--accent-text);font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 .prose a{color:var(--accent-text);text-underline-offset:2px}
 .prose i{color:var(--text)}

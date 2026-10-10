@@ -17,5 +17,3 @@ if (!/const VERSION = '[^']+';/.test(sw)) throw new Error('sw.js has no VERSION 
 writeFileSync(file('sw.js'), sw.replace(/const VERSION = '[^']+';/, `const VERSION = '${version}';`));
 
 console.log('version', version, '-> package.json, sw.js');
-const { writeChangelog } = await import('./gen_changelog.mjs');
-console.log('changelog ->', writeChangelog().versions.length, 'versions in data/changelog.json');

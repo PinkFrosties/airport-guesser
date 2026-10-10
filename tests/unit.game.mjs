@@ -477,7 +477,8 @@ test('fallback order: region, then part of the country (countries with 5+ airpor
   const per = new Map(); for (const a of [...airports, ...hard]) per.set(a.countryCode, (per.get(a.countryCode) || 0) + 1);
   for (const a of [...airports, ...hard]) { const h = C.hint3Of(a); if (h && h.type === 'grid') assert.ok(per.get(a.countryCode) >= 5, a.name + ' grid in a small country'); }
   const by = (i) => airports.find((a) => a.iata === i);
-  for (const code of ['PKX', 'DCA', 'AYT']) assert.equal(C.hint3Of(by(code)).type, 'grid', code + ' falls back to the position in the country');
+  const grid = [...airports, ...hard].filter((x) => C.hint3Of(x)?.type === 'grid'); assert.ok(grid.length > 500, 'position clues exist: ' + grid.length); assert.ok(grid.every((x) => x.tier >= 3 || ['HGH', 'AYT', 'CUN', 'TAO'].includes(x.iata)), 'only Mid-size / Hard airports and the low-confidence hubs use the position clue');
+  for (const code of ['HGH', 'AYT', 'CUN', 'TAO']) assert.ok(['region', 'grid', 'elev'].includes(C.hint3Of(by(code)).type), code + ' (low-confidence hub) falls back to the region chain');
 });
 test('no double information: after the country was bought the region / position clue does not repeat it', () => {
   const reg = { country: 'United States', name: 'X', hint3: 'region|Texas' }, grid = { country: 'United States', name: 'X', hint3: 'grid|north-west' };
@@ -648,6 +649,38 @@ test('the data loader checks what it got: schema number, size and third clues', 
   assert.equal(checkAirports({ meta: { schema: DATA_SCHEMA }, airports: full.airports.map(({ hint3, ...a }) => a) }, 'full').ok, false, 'no third clues');
   assert.equal(checkAirports({ meta: { schema: DATA_SCHEMA }, airports: [] }, 'full').ok, false);
   assert.equal(dataUrl('full'), 'data/airports.json', 'plain name in the source tree');
+});
+
+
+console.log('\ncurated Major hub airlines (v1.4.3)');
+const hubFile = JSON.parse(readFileSync(new URL('../data/hub_airlines.json', import.meta.url), 'utf8')).hubs;
+const majorHubs = [...airports, ...hard].filter((a) => a.tier === 1);
+const DEFUNCT = ['Jet Airways', 'Alitalia', 'Air Berlin', 'Kingfisher Airlines', 'Go First', 'GoAir', 'Vistara', 'Monarch', 'Thomas Cook Airlines', 'Flybe', 'Germanwings', 'Skymark', 'Indian Airlines', 'US Airways', 'Continental Airlines', 'Northwest Airlines', 'Malév', 'Swissair', 'Sabena', 'Spanair', 'Transaero', 'Air Deccan', 'Wow Air', 'Cobalt Air', 'Aigle Azur', 'XL Airways', 'Joon', 'Norwegian Long Haul'];
+test('data/hub_airlines.json: every Major hub has an entry with a source URL; at most 10 are low confidence', () => {
+  assert.equal(majorHubs.length, 100); assert.equal(Object.keys(hubFile).length, 100);
+  for (const a of majorHubs) {
+    const e = Object.values(hubFile).find((h) => h.icao === a.icao); assert.ok(e, (a.iata || a.icao) + ' has an entry'); assert.equal(e.iata, a.iata);
+    assert.match(e.source, /^https:\/\/en\.wikipedia\.org\/wiki\//, e.iata + ' source'); assert.match(e.wikidata, /^https:\/\/www\.wikidata\.org\/wiki\/Q\d+$/, e.iata + ' Wikidata item');
+    assert.ok(['high', 'medium', 'low'].includes(e.confidence), e.iata + ' confidence'); assert.equal(typeof e.dominant, 'boolean');
+    if (e.confidence !== 'low') { assert.ok(e.airline && e.airline.length <= 40, e.iata + ' airline'); assert.match(e.airlineWikidata, /^https:\/\/www\.wikidata\.org\/wiki\/Q\d+$/, e.iata + ' airline item'); assert.ok(e.support.length >= 1, e.iata + ' support'); }
+  }
+  assert.ok(Object.values(hubFile).filter((h) => h.confidence === 'low').length <= 10);
+});
+test('Major hubs show the curated airline in every mode: "Main airline" when dominant, "A main airline here" otherwise; Region / position only for low confidence', () => {
+  const block = JSON.parse(readFileSync(new URL('../scripts/hint_blocklist.json', import.meta.url), 'utf8')); const nm = (s) => C.normalize(s).replace(/ /g, '');
+  const blocked = new Set(Object.keys(block.airlines).map(nm)); const defunct = new Set(DEFUNCT.map(nm));
+  for (const a of majorHubs) {
+    const e = Object.values(hubFile).find((h) => h.icao === a.icao); const h = C.hint3Of(a);
+    if (e.confidence === 'low') { assert.ok(['region', 'grid', 'elev'].includes(h.type), e.iata + ' low confidence uses the region chain, not ' + h.type); continue; }
+    assert.equal(h.type, e.dominant ? 'airline' : 'airlinec', e.iata); assert.equal(h.v, e.airline, e.iata);
+    const info = C.hintInfo('extra', a, []); assert.equal(info.label, e.dominant ? 'Main airline' : 'A main airline here'); assert.equal(info.cost, 2); assert.equal(info.text(), e.airline);
+    assert.ok(!blocked.has(nm(e.airline)) && !defunct.has(nm(e.airline)), e.iata + ': ' + e.airline + ' is blocked or defunct');
+  }
+});
+test('the Daily top 50 are Major hubs and use the same hint as Practice (one field per airport); the Daily list is unchanged', () => {
+  const top = JSON.parse(readFileSync(new URL('../data/top50.json', import.meta.url), 'utf8')).airports; assert.equal(top.length, 50);
+  const ids = new Set(majorHubs.map((a) => a.id)); for (const t of topList) assert.ok(ids.has(t.id), t.iata + ' is a Major hub');
+  for (const t of topList) assert.equal(t.tier, 1);
 });
 
 

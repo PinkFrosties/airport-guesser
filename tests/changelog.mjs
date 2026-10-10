@@ -3,7 +3,7 @@
 // top entry equals the constant, and the footer, About screen, package.json and service worker all show it.
 import { launchBrowser } from './browser.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { createServer } from '../scripts/serve.mjs';
 
 const path = (u) => new URL(u, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -35,11 +35,6 @@ await test('dates never increase going down the list', () => {
 await test('the top changelog entry is the current version (js/version.js)', () => {
   assert.equal(str(entries[0].v), VERSION);
 });
-await test('data/changelog.json (shown at the bottom of the page) is generated from the README and current', async () => {
-  const { parseChangelog } = await import('../scripts/gen_changelog.mjs');
-  assert.deepEqual(JSON.parse(read('data/changelog.json')), parseChangelog(read('README.md')), 'run: node scripts/gen_changelog.mjs');
-  assert.equal(JSON.parse(read('data/changelog.json')).versions[0].version, VERSION);
-});
 await test('package.json and the service worker carry the same version', () => {
   assert.equal(JSON.parse(read('package.json')).version, VERSION, 'package.json');
   assert.match(read('sw.js'), new RegExp(`const VERSION = '${VERSION.replace(/\./g, '\\.')}';`), 'sw.js');
@@ -64,24 +59,21 @@ await test('footer and About & credits show the version', async () => {
   assert.ok((await page.locator('#dlg-about').innerText()).includes('Version ' + VERSION));
   await ctx.close();
 });
-await test('version history is the last thing on the page (below the footer), newest first and open, every README version listed', async () => {
+await test('there is no in-app version history: no "Version history" text in the page or its code, no changelog data file, no request for one', async () => {
+  const root = process.env.AG_ROOT === 'dist' ? 'dist' : '.';
+  const files = ['index.html', 'sw.js', ...(root === 'dist' ? readdirSync(path('../dist/assets')).map((f) => 'assets/' + f) : ['js/app.js', 'js/extras.js', 'js/data.js', 'js/core.js', 'js/store.js', 'css/style.css'])];
+  for (const f of files) { const t = readFileSync(path(`../${root}/${f}`), 'utf8'); assert.ok(!/version history/i.test(t), f + ' mentions "Version history"'); assert.ok(!/changelog\.json|changelog-list|id="changelog"/.test(t), f + ' refers to a changelog data file or section'); }
+  assert.ok(!existsSync(path('../data/changelog.json')) && !existsSync(path('../' + root + '/data/changelog.json')), 'no data/changelog.json');
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   await ctx.addInitScript(() => { try { localStorage.setItem('airportGuesser.seenHelp.v2', 'true'); } catch { /* blocked */ } });
-  const page = await ctx.newPage();
+  const page = await ctx.newPage(); const urls = [];
+  page.on('request', (r) => urls.push(r.url()));
   await page.goto(`http://localhost:${server.address().port}/`);
-  await page.waitForFunction(() => window.__ag);
-  await page.waitForSelector('#changelog-list details.ver', { timeout: 20000 });
-  const r = await page.evaluate(() => {
-    const sec = document.querySelector('#changelog'), foot = document.querySelector('.foot');
-    const vers = [...document.querySelectorAll('#changelog-list details.ver')];
-    return { below: sec.getBoundingClientRect().top >= foot.getBoundingClientRect().bottom - 1, lastBlock: sec === document.querySelector('.wrap').lastElementChild,
-      versions: vers.map((d) => d.querySelector('summary b').textContent), openFirst: vers[0].open, othersClosed: vers.slice(1).every((d) => !d.open), current: vers[0].querySelector('summary em') !== null,
-      overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-  });
-  assert.equal(r.below, true, 'below the footer'); assert.equal(r.lastBlock, true, 'the very last block of the page');
-  assert.deepEqual(r.versions, entries.map((e) => 'v' + str(e.v).replace(/\.0$/, '')).map((v, i) => r.versions[i] && v.length ? r.versions[i] : v).slice(0, r.versions.length));
-  assert.equal(r.versions.length, entries.length, 'every version in the README is listed'); assert.equal(r.versions[0], 'v' + VERSION);
-  assert.equal(r.openFirst, true); assert.equal(r.othersClosed, true); assert.equal(r.current, true); assert.equal(r.overflowX, 0);
+  await page.waitForFunction(() => window.__ag && window.__ag.round, null, { timeout: 40000 });
+  await page.locator('#btn-about').click(); await page.waitForSelector('#dlg-about[open]'); await page.waitForTimeout(500);
+  assert.ok(!/version history/i.test(await page.evaluate(() => document.documentElement.innerText + document.documentElement.innerHTML)), 'the rendered page has no "Version history"');
+  assert.equal(await page.locator('#changelog, #changelog-list, .ver').count(), 0);
+  assert.deepEqual(urls.filter((u) => /changelog/i.test(u)), [], 'nothing requests a changelog');
   await ctx.close();
 });
 await browser.close();

@@ -8,7 +8,7 @@
 /** Bump when the shape or meaning of the data files changes (scripts/build_data.py writes it into meta.schema). */
 export const DATA_SCHEMA = 3;
 
-const PLAIN = { full: 'data/airports.json', hard: 'data/airports-hard.json', top50: 'data/top50.json', credits: 'data/credits.json', changelog: 'data/changelog.json' };
+const PLAIN = { full: 'data/airports.json', hard: 'data/airports-hard.json', top50: 'data/top50.json', credits: 'data/credits.json' };
 export const dataUrl = (key) => (globalThis.__AG_DATA && globalThis.__AG_DATA[key]) || PLAIN[key];
 
 const THIRD_CLUE = /^(airline|airlinec|region|grid|elev|zone)\|.+/;

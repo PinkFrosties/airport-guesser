@@ -1,46 +1,46 @@
 {
  "airports": 12725,
  "why": {
-  "airline: openflights routes (clear leader)": 270,
-  "region": 10965,
+  "airline: openflights routes (clear leader)": 233,
+  "region": 10943,
   "airline: wikidata (only hub airline, little route data)": 25,
-  "grid": 1198,
-  "airline: openflights routes (close race, 'a main airline here')": 187,
-  "airline: several hub airlines, little route data": 232,
-  "airline: the biggest carrier in the route data no longer exists": 236,
+  "grid": 1187,
+  "airline: openflights routes (close race, 'a main airline here')": 161,
+  "airline: several hub airlines, little route data": 230,
+  "airline: the biggest carrier in the route data no longer exists": 207,
+  "airline: curated Major hub": 96,
   "airline: blocked after review": 32,
   "airline: rejected by the stale / home-country check": 12,
   "elev": 79,
   "airline: cargo / charter operator, not offered": 10,
-  "airline suppressed by review (top 50)": 3,
+  "airline: curated Major hub with low confidence (region / position instead)": 4,
   "zone (last resort)": 1
  },
  "top50": {
-  "airline": 17,
-  "airlinec": 13,
-  "region": 15,
-  "grid": 5
+  "airline": 23,
+  "airlinec": 26,
+  "region": 1
  },
  "hard_pool": {
-  "airline": 278,
-  "region": 10950,
-  "grid": 1193,
-  "airlinec": 174,
+  "airline": 280,
+  "region": 10942,
+  "grid": 1187,
+  "airlinec": 186,
   "elev": 79,
   "zone": 1
  },
  "practice": {
   "major_hubs": {
-   "airlinec": 26,
-   "airline": 37,
-   "region": 25,
-   "grid": 12
+   "airlinec": 51,
+   "airline": 45,
+   "grid": 1,
+   "region": 3
   },
   "large": {
-   "airline": 247,
-   "region": 517,
-   "airlinec": 169,
-   "grid": 208,
+   "airline": 255,
+   "region": 495,
+   "airlinec": 194,
+   "grid": 197,
    "elev": 28
   },
   "mid_size": {
@@ -78,7 +78,7 @@
    "code": "DFW",
    "name": "Dallas Fort Worth International Airport",
    "country": "United States",
-   "hint3": "region|Texas"
+   "hint3": "airline|American Airlines"
   },
   {
    "rank": 5,
@@ -92,7 +92,7 @@
    "code": "ORD",
    "name": "Chicago O'Hare International Airport",
    "country": "United States",
-   "hint3": "region|Illinois"
+   "hint3": "airlinec|United Airlines"
   },
   {
    "rank": 7,
@@ -120,28 +120,28 @@
    "code": "DEN",
    "name": "Denver International Airport",
    "country": "United States",
-   "hint3": "region|Colorado"
+   "hint3": "airlinec|United Airlines"
   },
   {
    "rank": 11,
    "code": "DEL",
    "name": "Indira Gandhi International Airport",
    "country": "India",
-   "hint3": "grid|north-west"
+   "hint3": "airlinec|IndiGo"
   },
   {
    "rank": 12,
    "code": "ICN",
    "name": "Incheon International Airport",
    "country": "South Korea",
-   "hint3": "grid|north-west"
+   "hint3": "airlinec|Korean Air"
   },
   {
    "rank": 13,
    "code": "LAX",
    "name": "Los Angeles International Airport",
    "country": "United States",
-   "hint3": "region|California"
+   "hint3": "airlinec|Delta Air Lines"
   },
   {
    "rank": 14,
@@ -162,21 +162,21 @@
    "code": "SIN",
    "name": "Singapore Changi Airport",
    "country": "Singapore",
-   "hint3": "region|South East"
+   "hint3": "airlinec|Singapore Airlines"
   },
   {
    "rank": 17,
    "code": "AMS",
    "name": "Amsterdam Airport Schiphol",
    "country": "Netherlands",
-   "hint3": "airlinec|KLM"
+   "hint3": "airline|KLM"
   },
   {
    "rank": 18,
    "code": "MAD",
    "name": "Adolfo Suárez Madrid–Barajas Airport",
    "country": "Spain",
-   "hint3": "airlinec|Iberia"
+   "hint3": "airline|Iberia"
   },
   {
    "rank": 19,
@@ -190,7 +190,7 @@
    "code": "KUL",
    "name": "Kuala Lumpur International Airport",
    "country": "Malaysia",
-   "hint3": "airlinec|Malaysia Airlines"
+   "hint3": "airlinec|AirAsia"
   },
   {
    "rank": 21,
@@ -204,70 +204,70 @@
    "code": "BKK",
    "name": "Suvarnabhumi Airport",
    "country": "Thailand",
-   "hint3": "airline|Thai Airways"
+   "hint3": "airlinec|Thai Airways"
   },
   {
    "rank": 23,
    "code": "JFK",
    "name": "John F. Kennedy International Airport",
    "country": "United States",
-   "hint3": "grid|east"
+   "hint3": "airlinec|Delta Air Lines"
   },
   {
    "rank": 24,
    "code": "HKG",
    "name": "Hong Kong International Airport",
    "country": "Hong Kong",
-   "hint3": "airlinec|Cathay Pacific"
+   "hint3": "airline|Cathay Pacific"
   },
   {
    "rank": 25,
    "code": "MCO",
    "name": "Orlando International Airport",
    "country": "United States",
-   "hint3": "region|Florida"
+   "hint3": "airlinec|Southwest Airlines"
   },
   {
    "rank": 26,
    "code": "BCN",
    "name": "Josep Tarradellas Barcelona-El Prat Airport",
    "country": "Spain",
-   "hint3": "region|Catalonia"
+   "hint3": "airlinec|Vueling"
   },
   {
    "rank": 27,
    "code": "TFU",
    "name": "Chengdu Tianfu International Airport",
    "country": "China",
-   "hint3": "region|Sichuan Province"
+   "hint3": "airlinec|Air China"
   },
   {
    "rank": 28,
    "code": "BOM",
    "name": "Chhatrapati Shivaji Maharaj International Airport",
    "country": "India",
-   "hint3": "region|Maharashtra"
+   "hint3": "airlinec|Air India"
   },
   {
    "rank": 29,
    "code": "MIA",
    "name": "Miami International Airport",
    "country": "United States",
-   "hint3": "region|Florida"
+   "hint3": "airline|American Airlines"
   },
   {
    "rank": 30,
    "code": "LAS",
    "name": "Harry Reid International Airport",
    "country": "United States",
-   "hint3": "region|Nevada"
+   "hint3": "airline|Southwest Airlines"
   },
   {
    "rank": 31,
    "code": "CGK",
    "name": "Soekarno-Hatta International Airport",
    "country": "Indonesia",
-   "hint3": "region|Banten"
+   "hint3": "airlinec|Garuda Indonesia"
   },
   {
    "rank": 32,
@@ -288,14 +288,14 @@
    "code": "PKX",
    "name": "Beijing Daxing International Airport",
    "country": "China",
-   "hint3": "grid|north-east"
+   "hint3": "airlinec|China Southern Airlines"
   },
   {
    "rank": 35,
    "code": "CLT",
    "name": "Charlotte Douglas International Airport",
    "country": "United States",
-   "hint3": "region|North Carolina"
+   "hint3": "airline|American Airlines"
   },
   {
    "rank": 36,
@@ -323,42 +323,42 @@
    "code": "PHX",
    "name": "Phoenix Sky Harbor International Airport",
    "country": "United States",
-   "hint3": "region|Arizona"
+   "hint3": "airlinec|American Airlines"
   },
   {
    "rank": 40,
    "code": "FCO",
    "name": "Rome–Fiumicino Leonardo da Vinci International Airport",
    "country": "Italy",
-   "hint3": "region|Lazio"
+   "hint3": "airlinec|ITA Airways"
   },
   {
    "rank": 41,
    "code": "HGH",
    "name": "Hangzhou Xiaoshan International Airport",
    "country": "China",
-   "hint3": "airlinec|Xiamen Airlines"
+   "hint3": "region|Zhejiang Province"
   },
   {
    "rank": 42,
    "code": "SHA",
    "name": "Shanghai Hongqiao International Airport",
    "country": "China",
-   "hint3": "airlinec|China Eastern Airlines"
+   "hint3": "airline|China Eastern Airlines"
   },
   {
    "rank": 43,
    "code": "CKG",
    "name": "Chongqing Jiangbei International Airport",
    "country": "China",
-   "hint3": "airlinec|Sichuan Airlines"
+   "hint3": "airlinec|China Southern Airlines"
   },
   {
    "rank": 44,
    "code": "KMG",
    "name": "Kunming Changshui International Airport",
    "country": "China",
-   "hint3": "airline|China Eastern Airlines"
+   "hint3": "airlinec|China Eastern Airlines"
   },
   {
    "rank": 45,
@@ -372,7 +372,7 @@
    "code": "SAW",
    "name": "Istanbul Sabiha Gökçen International Airport",
    "country": "Turkey",
-   "hint3": "airline|Pegasus Airlines"
+   "hint3": "airlinec|Pegasus Airlines"
   },
   {
    "rank": 47,
@@ -393,14 +393,14 @@
    "code": "YYZ",
    "name": "Toronto Pearson International Airport",
    "country": "Canada",
-   "hint3": "airlinec|Air Canada"
+   "hint3": "airline|Air Canada"
   },
   {
    "rank": 50,
    "code": "GRU",
    "name": "São Paulo/Guarulhos–Governor André Franco Montoro International Airport",
    "country": "Brazil",
-   "hint3": "grid|south"
+   "hint3": "airlinec|LATAM Airlines Brasil"
   }
  ]
 }

@@ -5,7 +5,7 @@
 //    causes a blank wait. Hashed files under /assets/ are immutable: cache first. Map tiles: cache first.
 // VERSION is written by scripts/sync_version.mjs from js/version.js (the single source of truth). The deploy build
 // (scripts/build_site.mjs) replaces the SHELL list with the hashed files it produced.
-const VERSION = '1.4.2';
+const VERSION = '1.4.3';
 const DATA_BUILD = 'dev'; // written by the site build: a hash of the data file names, so sw.js is different whenever the data is
 const CACHE = `airport-guesser-v${VERSION}`;
 const TILE_CACHE = 'airport-guesser-tiles-v1'; // survives app updates: tiles never change with the app version

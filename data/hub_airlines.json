@@ -1,0 +1,1916 @@
+{
+ "_about": "Curated main airline of each of the 100 Major hubs (the Daily top 50 plus ranks 51-100). Read by scripts/hint_data.py at build time; the app never fetches Wikipedia or Wikidata. 'dominant' true -> hint 'Main airline: X', false -> 'A main airline here: X'; confidence 'low' -> no airline hint, the region / position chain is used. Every entry has a source URL. Evidence was fetched with scripts/hub_evidence.py. 'support' says which sources name the airline for this airport.",
+ "retrieved": "2026-10-10",
+ "hubs": {
+  "ATL": {
+   "iata": "ATL",
+   "icao": "KATL",
+   "airport": "Hartsfield Jackson Atlanta International Airport",
+   "airline": "Delta Air Lines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Hartsfield%E2%80%93Jackson_Atlanta_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q214861",
+   "note": "Delta runs the world's largest hub here",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DXB": {
+   "iata": "DXB",
+   "icao": "OMDB",
+   "airport": "Dubai International Airport",
+   "airline": "Emirates",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Dubai_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q193439",
+   "note": "Wikipedia: Emirates handles 51% of passenger traffic",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q180432",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "HND": {
+   "iata": "HND",
+   "icao": "RJTT",
+   "airport": "Tokyo Haneda International Airport",
+   "airline": "All Nippon Airways",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Haneda_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q204853",
+   "note": "ANA and Japan Airlines share the airport closely; ANA has the larger slot share",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q204284",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DFW": {
+   "iata": "DFW",
+   "icao": "KDFW",
+   "airport": "Dallas Fort Worth International Airport",
+   "airline": "American Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Dallas_Fort_Worth_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q459096",
+   "note": "American's second-largest hub; the large majority of flights",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PVG": {
+   "iata": "PVG",
+   "icao": "ZSPD",
+   "airport": "Shanghai Pudong International Airport",
+   "airline": "China Eastern Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Shanghai_Pudong_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q36420",
+   "note": "main hub of China Eastern, about three times any other single carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291796",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "ORD": {
+   "iata": "ORD",
+   "icao": "KORD",
+   "airport": "Chicago O'Hare International Airport",
+   "airline": "United Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/O%27Hare_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q213717",
+   "note": "United and American both hub here; United is the larger",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LHR": {
+   "iata": "LHR",
+   "icao": "EGLL",
+   "airport": "London Heathrow Airport",
+   "airline": "British Airways",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Heathrow_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8691",
+   "note": "British Airways is the primary carrier, about half of the passengers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q8766",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "IST": {
+   "iata": "IST",
+   "icao": "LTFM",
+   "airport": "İstanbul Airport",
+   "airline": "Turkish Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Istanbul_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q3661908",
+   "note": "Turkish Airlines is the hub carrier, the large majority",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q4548",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CAN": {
+   "iata": "CAN",
+   "icao": "ZGGG",
+   "airport": "Guangzhou Baiyun International Airport",
+   "airline": "China Southern Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Guangzhou_Baiyun_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q44868",
+   "note": "main hub of China Southern, the large majority of flights",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291090",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DEN": {
+   "iata": "DEN",
+   "icao": "KDEN",
+   "airport": "Denver International Airport",
+   "airline": "United Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Denver_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q330015",
+   "note": "Wikipedia: United is the largest carrier, Southwest second",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DEL": {
+   "iata": "DEL",
+   "icao": "VIDP",
+   "airport": "Indira Gandhi International Airport",
+   "airline": "IndiGo",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Indira_Gandhi_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q821275",
+   "note": "IndiGo is the largest airline in India (64% domestic share) and its primary hub is Delhi (IndiGo article); Air India is the other large carrier",
+   "extraSource": "https://en.wikipedia.org/wiki/IndiGo",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1057110",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text",
+    "wikipedia-airline-article"
+   ]
+  },
+  "ICN": {
+   "iata": "ICN",
+   "icao": "RKSI",
+   "airport": "Incheon International Airport",
+   "airline": "Korean Air",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Incheon_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q20932",
+   "note": "Korean Air is the largest of several hub carriers (Asiana, Jeju Air, Jin Air)",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q213147",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LAX": {
+   "iata": "LAX",
+   "icao": "KLAX",
+   "airport": "Los Angeles International Airport",
+   "airline": "Delta Air Lines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Los_Angeles_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8731",
+   "note": "Delta, American and United are close; Delta has been the largest in recent years",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "CDG": {
+   "iata": "CDG",
+   "icao": "LFPG",
+   "airport": "Charles de Gaulle International Airport",
+   "airline": "Air France",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Paris_Charles_de_Gaulle_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q46280",
+   "note": "Air France is the principal hub carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q131005",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PEK": {
+   "iata": "PEK",
+   "icao": "ZBAA",
+   "airport": "Beijing Capital International Airport",
+   "airline": "Air China",
+   "dominant": true,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Beijing_Capital_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q32190",
+   "note": "Air China is the base carrier at Capital; the other big carriers moved to Daxing",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q51747",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SIN": {
+   "iata": "SIN",
+   "icao": "WSSS",
+   "airport": "Singapore Changi Airport",
+   "airline": "Singapore Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Changi_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q32159",
+   "note": "home base of Singapore Airlines; its group sister Scoot is the second largest",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32245",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "AMS": {
+   "iata": "AMS",
+   "icao": "EHAM",
+   "airport": "Amsterdam Airport Schiphol",
+   "airline": "KLM",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Amsterdam_Airport_Schiphol",
+   "wikidata": "https://www.wikidata.org/wiki/Q9694",
+   "note": "KLM is the principal hub carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q181912",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MAD": {
+   "iata": "MAD",
+   "icao": "LEMD",
+   "airport": "Adolfo Suárez Madrid–Barajas Airport",
+   "airline": "Iberia",
+   "dominant": true,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Madrid%E2%80%93Barajas_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q166276",
+   "note": "Iberia (with Iberia Express) is about twice Air Europa",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q187972",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SZX": {
+   "iata": "SZX",
+   "icao": "ZGSZ",
+   "airport": "Shenzhen Bao'an International Airport",
+   "airline": "Shenzhen Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Shenzhen_Bao%27an_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q842297",
+   "note": "Shenzhen Airlines and China Southern are the two large carriers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q974899",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "KUL": {
+   "iata": "KUL",
+   "icao": "WMKK",
+   "airport": "Kuala Lumpur International Airport",
+   "airline": "AirAsia",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Kuala_Lumpur_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q500253",
+   "note": "Wikipedia: AirAsia has about 35% of flights, followed by Malaysia Airlines",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q406643",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "FRA": {
+   "iata": "FRA",
+   "icao": "EDDF",
+   "airport": "Frankfurt Main Airport",
+   "airline": "Lufthansa",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Frankfurt_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q46033",
+   "note": "Lufthansa is the main hub carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q9325",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "BKK": {
+   "iata": "BKK",
+   "icao": "VTBS",
+   "airport": "Suvarnabhumi Airport",
+   "airline": "Thai Airways",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Suvarnabhumi_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q194316",
+   "note": "primary hub of Thai Airways; Thai VietJet and Bangkok Airways are the other bases",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188710",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "JFK": {
+   "iata": "JFK",
+   "icao": "KJFK",
+   "airport": "John F. Kennedy International Airport",
+   "airline": "Delta Air Lines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/John_F._Kennedy_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8685",
+   "note": "Delta and JetBlue are close at the top; American is third",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "HKG": {
+   "iata": "HKG",
+   "icao": "VHHH",
+   "airport": "Hong Kong International Airport",
+   "airline": "Cathay Pacific",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Hong_Kong_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q17704",
+   "note": "Cathay Pacific is the primary hub carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32141",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MCO": {
+   "iata": "MCO",
+   "icao": "KMCO",
+   "airport": "Orlando International Airport",
+   "airline": "Southwest Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Orlando_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q929859",
+   "note": "Wikipedia: Southwest is the largest carrier by passengers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "BCN": {
+   "iata": "BCN",
+   "icao": "LEBL",
+   "airport": "Josep Tarradellas Barcelona-El Prat Airport",
+   "airline": "Vueling",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Josep_Tarradellas_Barcelona%E2%80%93El_Prat_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q56973",
+   "note": "Vueling is the hub carrier; Ryanair is a distant second",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q646741",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "TFU": {
+   "iata": "TFU",
+   "icao": "ZUTF",
+   "airport": "Chengdu Tianfu International Airport",
+   "airline": "Air China",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Chengdu_Tianfu_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q11074678",
+   "note": "Wikipedia: major base for Air China; Sichuan Airlines is also large",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q51747",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "BOM": {
+   "iata": "BOM",
+   "icao": "VABB",
+   "airport": "Chhatrapati Shivaji Maharaj International Airport",
+   "airline": "Air India",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Chhatrapati_Shivaji_Maharaj_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q504368",
+   "note": "Air India is the hub carrier (Wikidata); IndiGo carries a similar share",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q69906",
+   "support": [
+    "wikidata-P113"
+   ]
+  },
+  "MIA": {
+   "iata": "MIA",
+   "icao": "KMIA",
+   "airport": "Miami International Airport",
+   "airline": "American Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Miami_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q127530",
+   "note": "American's hub, its primary gateway to Latin America",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LAS": {
+   "iata": "LAS",
+   "icao": "KLAS",
+   "airport": "Harry Reid International Airport",
+   "airline": "Southwest Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Harry_Reid_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q853886",
+   "note": "Wikipedia: Southwest is the dominant carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CGK": {
+   "iata": "CGK",
+   "icao": "WIII",
+   "airport": "Soekarno-Hatta International Airport",
+   "airline": "Garuda Indonesia",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Soekarno%E2%80%93Hatta_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q749497",
+   "note": "several Indonesian carriers share the hub: Garuda, Citilink, Batik Air, Lion Air",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q512468",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SFO": {
+   "iata": "SFO",
+   "icao": "KSFO",
+   "airport": "San Francisco International Airport",
+   "airline": "United Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/San_Francisco_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8688",
+   "note": "United hub, far ahead of the others",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DOH": {
+   "iata": "DOH",
+   "icao": "OTHH",
+   "airport": "Hamad International Airport",
+   "airline": "Qatar Airways",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Hamad_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1198791",
+   "note": "home hub of Qatar Airways",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q208033",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PKX": {
+   "iata": "PKX",
+   "icao": "ZBAD",
+   "airport": "Beijing Daxing International Airport",
+   "airline": "China Southern Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Beijing_Daxing_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1139574",
+   "note": "China Southern, China Eastern and China United each hold large slot shares",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291090",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "CLT": {
+   "iata": "CLT",
+   "icao": "KCLT",
+   "airport": "Charlotte Douglas International Airport",
+   "airline": "American Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Charlotte_Douglas_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q597649",
+   "note": "Wikipedia: fortress hub for American, which operates the majority of flights",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "JED": {
+   "iata": "JED",
+   "icao": "OEJN",
+   "airport": "King Abdulaziz International Airport",
+   "airline": "Saudia",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/King_Abdulaziz_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q153592",
+   "note": "Saudia's largest hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q541179",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SEA": {
+   "iata": "SEA",
+   "icao": "KSEA",
+   "airport": "Seattle–Tacoma International Airport",
+   "airline": "Alaska Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Seattle%E2%80%93Tacoma_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q14295",
+   "note": "primary hub of Alaska Airlines",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q822614",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MNL": {
+   "iata": "MNL",
+   "icao": "RPLL",
+   "airport": "Ninoy Aquino International Airport",
+   "airline": "Philippine Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Ninoy_Aquino_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q86446",
+   "note": "Philippine Airlines and Cebu Pacific are close",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q846910",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PHX": {
+   "iata": "PHX",
+   "icao": "KPHX",
+   "airport": "Phoenix Sky Harbor International Airport",
+   "airline": "American Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Phoenix_Sky_Harbor_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q912916",
+   "note": "American hub; Southwest carries a similar share",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "FCO": {
+   "iata": "FCO",
+   "icao": "LIRF",
+   "airport": "Rome–Fiumicino Leonardo da Vinci International Airport",
+   "airline": "ITA Airways",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Rome_Fiumicino_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q19101",
+   "note": "ITA Airways is the hub carrier; Ryanair is next",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q108251249",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "HGH": {
+   "iata": "HGH",
+   "icao": "ZSHC",
+   "airport": "Hangzhou Xiaoshan International Airport",
+   "airline": null,
+   "dominant": false,
+   "confidence": "low",
+   "source": "https://en.wikipedia.org/wiki/Hangzhou_Xiaoshan_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1197691",
+   "note": "no carrier is documented as the main one: Loong Air, China Eastern, Air China and others share the airport"
+  },
+  "SHA": {
+   "iata": "SHA",
+   "icao": "ZSSS",
+   "airport": "Shanghai Hongqiao International Airport",
+   "airline": "China Eastern Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Shanghai_Hongqiao_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q421811",
+   "note": "corporate headquarters and major hub of China Eastern",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291796",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CKG": {
+   "iata": "CKG",
+   "icao": "ZUCK",
+   "airport": "Chongqing Jiangbei International Airport",
+   "airline": "China Southern Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Chongqing_Jiangbei_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q788417",
+   "note": "China Southern (with Chongqing Airlines) is one of several large carriers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291090",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "KMG": {
+   "iata": "KMG",
+   "icao": "ZPPP",
+   "airport": "Kunming Changshui International Airport",
+   "airline": "China Eastern Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Kunming_Changshui_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1371636",
+   "note": "hub of China Eastern, with Lucky Air and Sichuan Airlines also large",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291796",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "XIY": {
+   "iata": "XIY",
+   "icao": "ZLXY",
+   "airport": "Xi'an Xianyang International Airport",
+   "airline": "China Eastern Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Xi%27an_Xianyang_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q141677",
+   "note": "Wikipedia: China Eastern continues to operate as a hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291796",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SAW": {
+   "iata": "SAW",
+   "icao": "LTFJ",
+   "airport": "Istanbul Sabiha Gökçen International Airport",
+   "airline": "Pegasus Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Sabiha_G%C3%B6k%C3%A7en_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q723622",
+   "note": "Pegasus is the main base; AJet is second",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1100424",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "IAH": {
+   "iata": "IAH",
+   "icao": "KIAH",
+   "airport": "George Bush Intercontinental Airport",
+   "airline": "United Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/George_Bush_Intercontinental_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q744748",
+   "note": "one of United's largest hubs",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "TPE": {
+   "iata": "TPE",
+   "icao": "RCTP",
+   "airport": "Taiwan Taoyuan International Airport",
+   "airline": "China Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Taoyuan_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q44856",
+   "note": "Wikipedia: main international hub for China Airlines, EVA Air and Starlux",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q51756",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "YYZ": {
+   "iata": "YYZ",
+   "icao": "CYYZ",
+   "airport": "Toronto Pearson International Airport",
+   "airline": "Air Canada",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Toronto_Pearson_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q242066",
+   "note": "Wikipedia: primary global hub for Air Canada",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q185339",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "GRU": {
+   "iata": "GRU",
+   "icao": "SBGR",
+   "airport": "São Paulo/Guarulhos–Governor André Franco Montoro International Airport",
+   "airline": "LATAM Airlines Brasil",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/S%C3%A3o_Paulo/Guarulhos_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q385406",
+   "note": "LATAM Brasil is the largest; Gol is second",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q690789",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "YVR": {
+   "iata": "YVR",
+   "icao": "CYVR",
+   "airport": "Vancouver International Airport",
+   "airline": "Air Canada",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Vancouver_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q321224",
+   "note": "hub for Air Canada and WestJet; Air Canada is larger",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q185339",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MUC": {
+   "iata": "MUC",
+   "icao": "EDDM",
+   "airport": "Munich Airport",
+   "airline": "Lufthansa",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Munich_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q131402",
+   "note": "Lufthansa hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q9325",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MAN": {
+   "iata": "MAN",
+   "icao": "EGCC",
+   "airport": "Manchester Airport",
+   "airline": "Ryanair",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Manchester_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8694",
+   "note": "Ryanair, easyJet and Jet2 are close",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q170614",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LGW": {
+   "iata": "LGW",
+   "icao": "EGKK",
+   "airport": "London Gatwick Airport",
+   "airline": "easyJet",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Gatwick_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8703",
+   "note": "Wikipedia: easyJet is the dominant airline",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q191551",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "STN": {
+   "iata": "STN",
+   "icao": "EGSS",
+   "airport": "London Stansted Airport",
+   "airline": "Ryanair",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/London_Stansted_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q8709",
+   "note": "Wikipedia: Ryanair's largest base",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q170614",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CAI": {
+   "iata": "CAI",
+   "icao": "HECA",
+   "airport": "Cairo International Airport",
+   "airline": "EgyptAir",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Cairo_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q461793",
+   "note": "primary hub of EgyptAir",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q374740",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "BNA": {
+   "iata": "BNA",
+   "icao": "KBNA",
+   "airport": "Nashville International Airport",
+   "airline": "Southwest Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Nashville_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1432146",
+   "note": "Wikipedia: Southwest has long been the dominant airline",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-text"
+   ]
+  },
+  "BOS": {
+   "iata": "BOS",
+   "icao": "KBOS",
+   "airport": "Boston Logan International Airport",
+   "airline": "JetBlue Airways",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Logan_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q671475",
+   "note": "Wikipedia: JetBlue is the largest carrier; Delta second",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q161086",
+   "support": [
+    "wikidata-P113"
+   ]
+  },
+  "BWI": {
+   "iata": "BWI",
+   "icao": "KBWI",
+   "airport": "Baltimore/Washington International Thurgood Marshall Airport",
+   "airline": "Southwest Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Baltimore/Washington_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q94895",
+   "note": "Wikipedia: Southwest is the largest carrier (56% in 2011)",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-text"
+   ]
+  },
+  "DCA": {
+   "iata": "DCA",
+   "icao": "KDCA",
+   "airport": "Ronald Reagan Washington National Airport",
+   "airline": "American Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Ronald_Reagan_Washington_National_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q676576",
+   "note": "American hub (Wikipedia)",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DTW": {
+   "iata": "DTW",
+   "icao": "KDTW",
+   "airport": "Detroit Metropolitan Wayne County Airport",
+   "airline": "Delta Air Lines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Detroit_Metropolitan_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q652505",
+   "note": "Delta's second-largest hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "EWR": {
+   "iata": "EWR",
+   "icao": "KEWR",
+   "airport": "Newark Liberty International Airport",
+   "airline": "United Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Newark_Liberty_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q466786",
+   "note": "Wikipedia: United serves about 63% of passengers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "FLL": {
+   "iata": "FLL",
+   "icao": "KFLL",
+   "airport": "Fort Lauderdale Hollywood International Airport",
+   "airline": "JetBlue Airways",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Fort_Lauderdale%E2%80%93Hollywood_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q635361",
+   "note": "JetBlue base; Spirit, Southwest and Delta also large",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q161086",
+   "support": [
+    "wikidata-P113"
+   ]
+  },
+  "IAD": {
+   "iata": "IAD",
+   "icao": "KIAD",
+   "airport": "Washington Dulles International Airport",
+   "airline": "United Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Dulles_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q466835",
+   "note": "Wikipedia: United holds the majority of the market",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174769",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LGA": {
+   "iata": "LGA",
+   "icao": "KLGA",
+   "airport": "LaGuardia Airport",
+   "airline": "Delta Air Lines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/LaGuardia_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q319654",
+   "note": "hub for both Delta and American; Delta is larger",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "MSP": {
+   "iata": "MSP",
+   "icao": "KMSP",
+   "airport": "Minneapolis–Saint Paul International Airport / Wold–Chamberlain Field",
+   "airline": "Delta Air Lines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Minneapolis%E2%80%93Saint_Paul_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q875749",
+   "note": "Delta hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PHL": {
+   "iata": "PHL",
+   "icao": "KPHL",
+   "airport": "Philadelphia International Airport",
+   "airline": "American Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Philadelphia_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q512128",
+   "note": "American's primary northeastern hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32396",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SAN": {
+   "iata": "SAN",
+   "icao": "KSAN",
+   "airport": "San Diego International Airport",
+   "airline": "Southwest Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/San_Diego_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1333923",
+   "note": "Southwest and Alaska are the two large carriers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SLC": {
+   "iata": "SLC",
+   "icao": "KSLC",
+   "airport": "Salt Lake City International Airport",
+   "airline": "Delta Air Lines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Salt_Lake_City_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q526488",
+   "note": "Delta hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q188920",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-text"
+   ]
+  },
+  "TPA": {
+   "iata": "TPA",
+   "icao": "KTPA",
+   "airport": "Tampa International Airport",
+   "airline": "Southwest Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Tampa_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q571536",
+   "note": "Southwest is the largest; no carrier dominates",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q503308",
+   "support": [
+    "wikipedia-airport-table"
+   ]
+  },
+  "AGP": {
+   "iata": "AGP",
+   "icao": "LEMG",
+   "airport": "Málaga-Costa del Sol Airport",
+   "airline": "Ryanair",
+   "dominant": true,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/M%C3%A1laga_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q690894",
+   "note": "Ryanair serves about four times the destinations of the next carrier",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q170614",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "PMI": {
+   "iata": "PMI",
+   "icao": "LEPA",
+   "airport": "Palma de Mallorca Airport",
+   "airline": "Ryanair",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Palma_de_Mallorca_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q656993",
+   "note": "Ryanair is the largest of several bases (Air Europa, Vueling, Eurowings, easyJet)",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q170614",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "ORY": {
+   "iata": "ORY",
+   "icao": "LFPO",
+   "airport": "Paris-Orly Airport",
+   "airline": "Transavia France",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Orly_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q223416",
+   "note": "Transavia France is the largest carrier after Air France left Orly in March 2026",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1188990",
+   "support": [
+    "wikidata-P113"
+   ]
+  },
+  "MXP": {
+   "iata": "MXP",
+   "icao": "LIMC",
+   "airport": "Milan Malpensa International Airport",
+   "airline": "easyJet",
+   "dominant": true,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Milan_Malpensa_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q60910",
+   "note": "Wikipedia: easyJet's main base in Italy",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q191551",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "VIE": {
+   "iata": "VIE",
+   "icao": "LOWW",
+   "airport": "Vienna International Airport",
+   "airline": "Austrian Airlines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Vienna_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q32999",
+   "note": "Austrian Airlines hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q781770",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "ZRH": {
+   "iata": "ZRH",
+   "icao": "LSZH",
+   "airport": "Zürich Airport",
+   "airline": "Swiss International Air Lines",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Zurich_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q15114",
+   "note": "Swiss hub",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q156776",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-text"
+   ]
+  },
+  "AYT": {
+   "iata": "AYT",
+   "icao": "LTAI",
+   "airport": "Antalya International Airport",
+   "airline": null,
+   "dominant": false,
+   "confidence": "low",
+   "source": "https://en.wikipedia.org/wiki/Antalya_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q827480",
+   "note": "leisure destination: SunExpress, Pegasus, Turkish, Corendon and charter airlines share the airport, none clearly ahead"
+  },
+  "MEX": {
+   "iata": "MEX",
+   "icao": "MMMX",
+   "airport": "Mexico City Benito Juárez International Airport",
+   "airline": "AeroMéxico",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Mexico_City_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q860559",
+   "note": "Wikipedia: primary hub of Aeroméxico; Volaris and Viva are next",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q381563",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CUN": {
+   "iata": "CUN",
+   "icao": "MMUN",
+   "airport": "Cancún International Airport",
+   "airline": null,
+   "dominant": false,
+   "confidence": "low",
+   "source": "https://en.wikipedia.org/wiki/Canc%C3%BAn_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q641967",
+   "note": "holiday destination served by many foreign and Mexican airlines; no main carrier"
+  },
+  "AUH": {
+   "iata": "AUH",
+   "icao": "OMAA",
+   "airport": "Zayed International Airport",
+   "airline": "Etihad Airways",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Zayed_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q643562",
+   "note": "hub of Etihad Airways",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q212304",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "NRT": {
+   "iata": "NRT",
+   "icao": "RJAA",
+   "airport": "Narita International Airport",
+   "airline": "Japan Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Narita_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q36454",
+   "note": "Japan Airlines, ANA and several low-cost carriers share the airport",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q213140",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "KIX": {
+   "iata": "KIX",
+   "icao": "RJBB",
+   "airport": "Kansai International Airport",
+   "airline": "Peach",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Kansai_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q193682",
+   "note": "Wikipedia: hub for Peach, ANA and Japan Airlines; Peach is the largest",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1376634",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CTS": {
+   "iata": "CTS",
+   "icao": "RJCC",
+   "airport": "New Chitose Airport",
+   "airline": "All Nippon Airways",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/New_Chitose_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q908296",
+   "note": "ANA (with ANA Wings) is the largest; Japan Airlines and Air Do next",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q204284",
+   "support": [
+    "wikipedia-airport-table"
+   ]
+  },
+  "FUK": {
+   "iata": "FUK",
+   "icao": "RJFF",
+   "airport": "Fukuoka Airport",
+   "airline": "Japan Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Fukuoka_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1137465",
+   "note": "Japan Airlines and ANA Wings are the two large carriers (airport article)",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q213140",
+   "support": [
+    "wikipedia-airport-table"
+   ]
+  },
+  "CJU": {
+   "iata": "CJU",
+   "icao": "RKPC",
+   "airport": "Jeju International Airport",
+   "airline": "Jeju Air",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Jeju_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q482497",
+   "note": "Wikipedia: home base of Jeju Air; Korean Air, Jin Air and Asiana also large",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q482642",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "GMP": {
+   "iata": "GMP",
+   "icao": "RKSS",
+   "airport": "Seoul Gimpo International Airport",
+   "airline": "Korean Air",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Gimpo_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q482493",
+   "note": "Korean Air and Asiana are the two large domestic carriers",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q213147",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SCL": {
+   "iata": "SCL",
+   "icao": "SCEL",
+   "airport": "Comodoro Arturo Merino Benítez International Airport",
+   "airline": "LATAM Airlines Chile",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Arturo_Merino_Ben%C3%ADtez_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q127671",
+   "note": "Wikipedia: LATAM accounts for about 82% of commercial operations",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q649178",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "BOG": {
+   "iata": "BOG",
+   "icao": "SKBO",
+   "airport": "El Dorado International Airport",
+   "airline": "Avianca",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/El_Dorado_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q201785",
+   "note": "Avianca is the hub carrier, several times the next",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q308911",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "LIM": {
+   "iata": "LIM",
+   "icao": "SPJC",
+   "airport": "Jorge Chávez International Airport",
+   "airline": "LATAM Airlines Peru",
+   "dominant": true,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Jorge_Ch%C3%A1vez_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1142219",
+   "note": "LATAM Peru carries the large majority",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1145155",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "SVO": {
+   "iata": "SVO",
+   "icao": "UUEE",
+   "airport": "Sheremetyevo International Airport",
+   "airline": "Aeroflot",
+   "dominant": true,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Sheremetyevo_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q192733",
+   "note": "Wikipedia: main hub of Aeroflot",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q58707",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "DMK": {
+   "iata": "DMK",
+   "icao": "VTBD",
+   "airport": "Don Mueang International Airport",
+   "airline": "Thai AirAsia",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Don_Mueang_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q1046755",
+   "note": "low-cost hub: Thai AirAsia, Thai Lion Air and Nok Air",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1148568",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "HAN": {
+   "iata": "HAN",
+   "icao": "VVNB",
+   "airport": "Noi Bai International Airport",
+   "airline": "Vietnam Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Noi_Bai_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q844098",
+   "note": "Wikipedia: main hub of Vietnam Airlines; VietJet next",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174386",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SGN": {
+   "iata": "SGN",
+   "icao": "VVTS",
+   "airport": "Tan Son Nhat International Airport",
+   "airline": "Vietnam Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Tan_Son_Nhat_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q478595",
+   "note": "Vietnam Airlines and VietJet are almost level",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q174386",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table"
+   ]
+  },
+  "MEL": {
+   "iata": "MEL",
+   "icao": "YMML",
+   "airport": "Melbourne Airport",
+   "airline": "Qantas Airways",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Melbourne_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q733738",
+   "note": "Qantas Group (Qantas, Jetstar) and Virgin Australia share the airport",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32491",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "SYD": {
+   "iata": "SYD",
+   "icao": "YSSY",
+   "airport": "Sydney Kingsford Smith International Airport",
+   "airline": "Qantas Airways",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Sydney_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q17581",
+   "note": "Wikipedia: main hub for Qantas",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q32491",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "NKG": {
+   "iata": "NKG",
+   "icao": "ZSNJ",
+   "airport": "Nanjing Lukou International Airport",
+   "airline": "China Eastern Airlines",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Nanjing_Lukou_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q559107",
+   "note": "Wikipedia: hub of China Eastern's Jiangsu company",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291796",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "CTU": {
+   "iata": "CTU",
+   "icao": "ZUUU",
+   "airport": "Chengdu Shuangliu International Airport",
+   "airline": "Sichuan Airlines",
+   "dominant": false,
+   "confidence": "high",
+   "source": "https://en.wikipedia.org/wiki/Chengdu_Shuangliu_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q387560",
+   "note": "Wikipedia: principal hub and headquarters of Sichuan Airlines; Air China is also large",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q291944",
+   "support": [
+    "wikidata-P113",
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "BLR": {
+   "iata": "BLR",
+   "icao": "VOBL",
+   "airport": "Kempegowda International Airport Bengaluru",
+   "airline": "IndiGo",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Kempegowda_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q503364",
+   "note": "IndiGo is the largest operating base; Air India group and Akasa follow",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q1057110",
+   "support": [
+    "wikipedia-airport-text"
+   ]
+  },
+  "BER": {
+   "iata": "BER",
+   "icao": "EDDB",
+   "airport": "Berlin Brandenburg Airport",
+   "airline": "easyJet",
+   "dominant": false,
+   "confidence": "medium",
+   "source": "https://en.wikipedia.org/wiki/Berlin_Brandenburg_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q160556",
+   "note": "easyJet, Ryanair and Eurowings are the three large bases",
+   "airlineWikidata": "https://www.wikidata.org/wiki/Q191551",
+   "support": [
+    "wikipedia-airport-table",
+    "wikipedia-airport-text"
+   ]
+  },
+  "TAO": {
+   "iata": "TAO",
+   "icao": "ZSQD",
+   "airport": "Qingdao Jiaodong International Airport",
+   "airline": null,
+   "dominant": false,
+   "confidence": "low",
+   "source": "https://en.wikipedia.org/wiki/Qingdao_Jiaodong_International_Airport",
+   "wikidata": "https://www.wikidata.org/wiki/Q15672491",
+   "note": "no carrier is documented as the main one: Shandong Airlines, Qingdao Airlines and China Eastern share the airport"
+  }
+ },
+ "airlines": {
+  "Delta Air Lines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q188920",
+   "label": "Delta Air Lines",
+   "dissolved": null
+  },
+  "Emirates": {
+   "wikidata": "https://www.wikidata.org/wiki/Q180432",
+   "label": "Emirates",
+   "dissolved": null
+  },
+  "All Nippon Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q204284",
+   "label": "All Nippon Airways",
+   "dissolved": null
+  },
+  "American Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q32396",
+   "label": "American Airlines",
+   "dissolved": null
+  },
+  "China Eastern Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q291796",
+   "label": "China Eastern Airlines",
+   "dissolved": null
+  },
+  "United Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q174769",
+   "label": "United Airlines",
+   "dissolved": null
+  },
+  "British Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q8766",
+   "label": "British Airways",
+   "dissolved": null
+  },
+  "Turkish Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q4548",
+   "label": "Turkish Airlines",
+   "dissolved": null
+  },
+  "China Southern Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q291090",
+   "label": "China Southern Airlines",
+   "dissolved": null
+  },
+  "IndiGo": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1057110",
+   "label": "IndiGo",
+   "dissolved": null
+  },
+  "Korean Air": {
+   "wikidata": "https://www.wikidata.org/wiki/Q213147",
+   "label": "Q213147",
+   "dissolved": null
+  },
+  "Air France": {
+   "wikidata": "https://www.wikidata.org/wiki/Q131005",
+   "label": "Air France",
+   "dissolved": null
+  },
+  "Air China": {
+   "wikidata": "https://www.wikidata.org/wiki/Q51747",
+   "label": "Air China",
+   "dissolved": null
+  },
+  "Singapore Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q32245",
+   "label": "Singapore Airlines",
+   "dissolved": null
+  },
+  "KLM": {
+   "wikidata": "https://www.wikidata.org/wiki/Q181912",
+   "label": "KLM",
+   "dissolved": null
+  },
+  "Iberia": {
+   "wikidata": "https://www.wikidata.org/wiki/Q187972",
+   "label": "Iberia",
+   "dissolved": null
+  },
+  "Shenzhen Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q974899",
+   "label": "Shenzhen Airlines",
+   "dissolved": null
+  },
+  "AirAsia": {
+   "wikidata": "https://www.wikidata.org/wiki/Q406643",
+   "label": "AirAsia",
+   "dissolved": null
+  },
+  "Lufthansa": {
+   "wikidata": "https://www.wikidata.org/wiki/Q9325",
+   "label": "Lufthansa",
+   "dissolved": null
+  },
+  "Thai Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q188710",
+   "label": "Thai Airways",
+   "dissolved": null
+  },
+  "Cathay Pacific": {
+   "wikidata": "https://www.wikidata.org/wiki/Q32141",
+   "label": "Cathay Pacific",
+   "dissolved": null
+  },
+  "Southwest Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q503308",
+   "label": "Southwest Airlines",
+   "dissolved": null
+  },
+  "Vueling": {
+   "wikidata": "https://www.wikidata.org/wiki/Q646741",
+   "label": "Vueling",
+   "dissolved": null
+  },
+  "Air India": {
+   "wikidata": "https://www.wikidata.org/wiki/Q69906",
+   "label": "Air India",
+   "dissolved": null
+  },
+  "Garuda Indonesia": {
+   "wikidata": "https://www.wikidata.org/wiki/Q512468",
+   "label": "Garuda Indonesia",
+   "dissolved": null
+  },
+  "Qatar Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q208033",
+   "label": "Qatar Airways",
+   "dissolved": null
+  },
+  "Saudia": {
+   "wikidata": "https://www.wikidata.org/wiki/Q541179",
+   "label": "Saudia",
+   "dissolved": null
+  },
+  "Alaska Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q822614",
+   "label": "Alaska Airlines",
+   "dissolved": null
+  },
+  "Philippine Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q846910",
+   "label": "Philippine Airlines",
+   "dissolved": null
+  },
+  "ITA Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q108251249",
+   "label": "ITA Airways",
+   "dissolved": null
+  },
+  "Pegasus Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1100424",
+   "label": "Pegasus Airlines",
+   "dissolved": null
+  },
+  "China Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q51756",
+   "label": "China Airlines",
+   "dissolved": null
+  },
+  "Air Canada": {
+   "wikidata": "https://www.wikidata.org/wiki/Q185339",
+   "label": "Air Canada",
+   "dissolved": null
+  },
+  "LATAM Airlines Brasil": {
+   "wikidata": "https://www.wikidata.org/wiki/Q690789",
+   "label": "LATAM Brasil",
+   "dissolved": null
+  },
+  "Ryanair": {
+   "wikidata": "https://www.wikidata.org/wiki/Q170614",
+   "label": "Ryanair",
+   "dissolved": null
+  },
+  "easyJet": {
+   "wikidata": "https://www.wikidata.org/wiki/Q191551",
+   "label": "easyJet",
+   "dissolved": null
+  },
+  "EgyptAir": {
+   "wikidata": "https://www.wikidata.org/wiki/Q374740",
+   "label": "EgyptAir",
+   "dissolved": null
+  },
+  "JetBlue Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q161086",
+   "label": "JetBlue Airways",
+   "dissolved": null
+  },
+  "Transavia France": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1188990",
+   "label": "Transavia France",
+   "dissolved": null
+  },
+  "Austrian Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q781770",
+   "label": "Austrian Airlines",
+   "dissolved": null
+  },
+  "Swiss International Air Lines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q156776",
+   "label": "Swiss International Air Lines",
+   "dissolved": null
+  },
+  "AeroMéxico": {
+   "wikidata": "https://www.wikidata.org/wiki/Q381563",
+   "label": "Aeroméxico",
+   "dissolved": null
+  },
+  "Etihad Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q212304",
+   "label": "Etihad Airways",
+   "dissolved": null
+  },
+  "Japan Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q213140",
+   "label": "Japan Airlines",
+   "dissolved": null
+  },
+  "Peach": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1376634",
+   "label": "Peach",
+   "dissolved": null
+  },
+  "Jeju Air": {
+   "wikidata": "https://www.wikidata.org/wiki/Q482642",
+   "label": "Jeju Air",
+   "dissolved": null
+  },
+  "LATAM Airlines Chile": {
+   "wikidata": "https://www.wikidata.org/wiki/Q649178",
+   "label": "LATAM Airlines",
+   "dissolved": null
+  },
+  "Avianca": {
+   "wikidata": "https://www.wikidata.org/wiki/Q308911",
+   "label": "Avianca",
+   "dissolved": null
+  },
+  "LATAM Airlines Peru": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1145155",
+   "label": "LATAM Airlines Peru",
+   "dissolved": null
+  },
+  "Aeroflot": {
+   "wikidata": "https://www.wikidata.org/wiki/Q58707",
+   "label": "Aeroflot",
+   "dissolved": null
+  },
+  "Thai AirAsia": {
+   "wikidata": "https://www.wikidata.org/wiki/Q1148568",
+   "label": "Thai AirAsia",
+   "dissolved": null
+  },
+  "Vietnam Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q174386",
+   "label": "Vietnam Airlines",
+   "dissolved": null
+  },
+  "Qantas Airways": {
+   "wikidata": "https://www.wikidata.org/wiki/Q32491",
+   "label": "Qantas Airways",
+   "dissolved": null
+  },
+  "Sichuan Airlines": {
+   "wikidata": "https://www.wikidata.org/wiki/Q291944",
+   "label": "Sichuan Airlines",
+   "dissolved": null
+  }
+ }
+}

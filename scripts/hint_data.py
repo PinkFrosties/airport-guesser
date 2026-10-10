@@ -38,17 +38,9 @@ MIN_AIRLINE_ROUTES = 5   # a Wikidata-only carrier that OpenFlights knows must h
 MARGIN = float(os.environ.get("HINT_MARGIN", "2.0"))          # the main airline needs this many times the routes of the runner-up (v1.3.6: was 1.5)
 MIN_ROUTES = 10       # OpenFlights fallback: the airport needs at least this many routes
 MIN_GRID_AIRPORTS = 5
-# Top-50 airports whose "main airline" the sources get wrong (OpenFlights routes are from 2014, Wikidata hub links are partial):
-# no airline hint is offered there; the region is used instead. Reviewed by hand, reason per airport.
-SUPPRESS_AIRLINE = {
-    "ICN": "Asiana (Wikidata hub, 2014 routes) is being merged into Korean Air, which is the larger carrier",
-    "MCO": "JetBlue is a Wikidata 'focus city' entry; Southwest is larger",
-    "LAS": "Allegiant is a Wikidata hub entry; Southwest is larger",
-    "BCN": "Ryanair from 2014 routes; Vueling is larger today",
-    "DEL": "Air India from 2014 routes; IndiGo is larger today",
-    "BOM": "Air India from 2014 routes; IndiGo is larger today",
-    "CGK": "Garuda from 2014 routes; the Lion Air group is larger today",
-}
+# The 100 Major hubs (Daily top 50 plus ranks 51-100) do not use the inferred airline: data/hub_airlines.json holds a curated main airline for each
+# (with a source URL), or confidence "low" where no carrier is clearly the main one (those use the region / position chain).
+HUB_FILE = os.path.join(ROOT, "data", "hub_airlines.json")
 refresh = "--refresh" in sys.argv
 
 
@@ -409,6 +401,10 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
             return "home country %s differs from the airport's %s and the network is small (%d airports)" % ("/".join(sorted(home)), airport_cc, net)
         return None
 
+    if not os.path.exists(HUB_FILE):
+        sys.exit("BUILD FAILED: data/hub_airlines.json is missing (the curated main airlines of the 100 Major hubs)")
+    HUBS = json.load(open(HUB_FILE, encoding="utf-8"))["hubs"]
+    HUB_BY_ICAO = {h["icao"]: h for h in HUBS.values()}
     rejected = []   # (airport, airline, reason)
     chosen = {}     # airport id -> (name, airline code) before the one-name pass
 
@@ -425,6 +421,17 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
         rc = routes.get(iata, Counter()) if iata else Counter()
         total = sum(rc.values())
         choice, source = None, None
+        hub = HUB_BY_ICAO.get(icao)
+        hub_low = False
+        if hub and iata == hub["iata"]:
+            name = hub.get("airline")
+            if name and hub["confidence"] != "low":
+                if norm(name) in BLOCK_AIRLINES or (iata, norm(name)) in BLOCK_AT:
+                    sys.exit("BUILD FAILED: the curated airline %s at %s is on the block list" % (name, iata))
+                out[aid] = ("airline|" if hub["dominant"] else "airlinec|") + name
+                why["airline: curated Major hub"] += 1
+                continue
+            hub_low = True  # no clear main carrier: region / position chain, never an inferred airline
         if iata and iata in os.environ.get('HINT_DEBUG', '').split(','):
             print('DEBUG', iata, [(i['name'], i['iata'], (of_airline(i) or {}).get('id'), rc.get((of_airline(i) or {}).get('id'), 0)) for i in cand.values()], 'top routes:', [(airlines[i]['name'], airlines[i]['active'], n) for i, n in rc.most_common(5) if i in airlines])
         # the leading airline by OpenFlights routes (still flying only)
@@ -460,9 +467,9 @@ SELECT ?airline ?airlineLabel ?aiata ?aicao ?diss ?end ?disc ?cc WHERE {
                 choice, source = {"name": it["name"], "of": of_airline(it), "item": it, "kind": "airline"}, "wikidata (only hub airline, little route data)"
             else:
                 why["airline: several hub airlines, little route data"] += 1
-        if choice and iata in SUPPRESS_AIRLINE and a.get("top"):
-            why["airline suppressed by review (top 50)"] += 1
+        if hub_low:
             choice = None
+            why["airline: curated Major hub with low confidence (region / position instead)"] += 1
         if choice:
             name = common_name(choice["name"])
             if norm(name) in BLOCK_AIRLINES or (iata, norm(name)) in BLOCK_AT:

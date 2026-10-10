@@ -297,6 +297,44 @@ def apply_tiers(kept, hard):
     return kept, keep_hard
 
 
+def check_hub_airlines(items):
+    """Every Major hub (tier 1) needs an entry in data/hub_airlines.json with a source URL; the build fails loudly otherwise. Also checks the hint that
+    the build wrote: a curated, non-low entry is shown as "Main airline" (dominant) or "A main airline here"; a low entry never gets an airline."""
+    path = os.path.join(ROOT, "data", "hub_airlines.json")
+    if not os.path.exists(path):
+        raise SystemExit("BUILD FAILED: data/hub_airlines.json is missing")
+    hubs = json.load(open(path, encoding="utf-8"))["hubs"]
+    airports = {a["icao"]: a for a in items if a["tier"] == 1}
+    problems = []
+    for icao, a in sorted(airports.items()):
+        e = next((h for h in hubs.values() if h["icao"] == icao), None)
+        code = a.get("iata") or icao
+        if not e:
+            problems.append("%s has no entry" % code)
+            continue
+        if not re.match(r"^https://", e.get("source") or "") or not re.match(r"^https://", e.get("wikidata") or ""):
+            problems.append("%s has no source URL" % code)
+        if e.get("confidence") not in ("high", "medium", "low"):
+            problems.append("%s has an invalid confidence" % code)
+        typ = (a.get("hint3") or "").split("|")[0]
+        if e.get("airline") and e["confidence"] != "low":
+            if not e.get("airlineWikidata") or not e.get("support"):
+                problems.append("%s: airline %s has no source" % (code, e["airline"]))
+            if typ != ("airline" if e["dominant"] else "airlinec") or (a["hint3"].split("|", 1)[1] != e["airline"]):
+                problems.append("%s: hint %s does not match the curated airline %s" % (code, a.get("hint3"), e["airline"]))
+        elif typ in ("airline", "airlinec"):
+            problems.append("%s: low-confidence entry but an airline hint %s" % (code, a.get("hint3")))
+    extra = [h["iata"] for h in hubs.values() if h["icao"] not in airports]
+    if extra:
+        problems.append("entries for airports that are not Major hubs: %s" % extra)
+    low = [h["iata"] for h in hubs.values() if h["confidence"] == "low"]
+    if len(low) > 10:
+        problems.append("%d low-confidence entries (maximum 10)" % len(low))
+    if problems:
+        raise SystemExit("BUILD FAILED: data/hub_airlines.json does not match the %d Major hubs:\n  %s" % (len(airports), "\n  ".join(problems)))
+    print("Major hubs: %d curated entries, %d with a main airline, %d low confidence (%s)" % (len(airports), len(airports) - len(low), len(low), " ".join(low)))
+
+
 def quality_filter(items, label):
     """Drop airports whose real imagery cannot show the airfield (see passes_quality)."""
     kept_items, dropped = [], Counter()
@@ -518,6 +556,7 @@ def main():
     if no_clue:  # the menu must never offer an empty clue: a record without one stops the build
         raise SystemExit("BUILD FAILED: %d airports have no third clue (run scripts/hint_data.py after changing the data): %s" % (len(no_clue), no_clue[:15]))
     kept, hard = apply_tiers(kept, hard)
+    check_hub_airlines(kept + hard)
 
     dump(OUT, kept, "OurAirports (public domain); tier proxy: OpenFlights route counts; nz = native Esri imagery level")
     dump(OUT_HARD, hard, "OurAirports (public domain); nz = native Esri imagery level")

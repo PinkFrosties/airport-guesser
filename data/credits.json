@@ -26,13 +26,13 @@
       "name": "Wikidata",
       "license": "CC0",
       "url": "https://www.wikidata.org/",
-      "purpose": "airline-hub relations (main-airline hint), Wikipedia article titles, passenger counts P3872 (Major hubs 51-100, mixed years 2019-2025), language-edition counts (playability score)"
+      "purpose": "airline-hub relations (main-airline hint; the curated main airline of the 100 Major hubs, data/hub_airlines.json), Wikipedia article titles, passenger counts P3872 (Major hubs 51-100, mixed years 2019-2025), language-edition counts (playability score)"
     },
     {
       "name": "Wikipedia",
-      "license": "link target only",
+      "license": "CC BY-SA 4.0 (facts only, no text copied); link target in the app",
       "url": "https://www.wikipedia.org/",
-      "purpose": "article link on the result card"
+      "purpose": "article link on the result card; at build time the current article of each Major hub was read to curate its main airline (airline names and source URLs only)"
     }
   ]
 }
