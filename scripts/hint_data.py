@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,7 +34,7 @@ REPORT = os.path.join(ROOT, "qa", "hint3-report.json")
 UA = "airport-guesser-build/1.0 (https://github.com/PinkFrosties/airport-guesser)"
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 OPENFLIGHTS = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/"
-MARGIN = 1.5          # the main airline needs this many times the routes of the runner-up
+MARGIN = 2.0          # the main airline needs this many times the routes of the runner-up (v1.3.6: was 1.5)
 MIN_ROUTES = 10       # OpenFlights fallback: the airport needs at least this many routes
 MIN_GRID_AIRPORTS = 5
 # Top-50 airports whose "main airline" the sources get wrong (OpenFlights routes are from 2014, Wikidata hub links are partial):
@@ -102,9 +103,35 @@ def common_name(name):
     return n
 
 
+SPECIAL = str.maketrans({"ı": "i", "ø": "o", "ł": "l", "đ": "d", "ð": "d", "þ": "th", "ß": "ss", "æ": "ae", "œ": "oe", "ħ": "h"})
+
+
+def fold(s):
+    return unicodedata.normalize("NFKD", s.translate(SPECIAL)).encode("ascii", "ignore").decode()
+
+
 def norm(s):
+    s = fold(s)
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
+
+# words that say nothing about WHICH place a name is (a region "Taoyuan City" and a city "Taoyuan" share "taoyuan")
+GENERIC = {"city", "province", "state", "region", "prefecture", "county", "district", "municipality", "metropolitan", "governorate", "autonomous", "capital",
+           "territory", "department", "community", "of", "the", "de", "new", "san", "santa", "saint", "st", "north", "south", "east", "west", "port", "fort", "lake", "mount", "great", "greater"}
+
+
+def words(s):
+    s = fold(s).lower()
+    return {w for w in re.findall(r"[a-z0-9]+", s) if w not in GENERIC and len(w) > 2}
+
+
+# regions that ARE one city (city-states, capital municipalities): the name of the region names the airport's city
+CITY_REGIONS = {norm(x) for x in (
+    "Berlin", "Hamburg", "Bremen", "Wien", "Vienna", "Madrid", "Brussels", "Bruxelles", "Hong Kong", "Macau", "Macao", "Singapore", "Monaco", "Vatican City",
+    "Gibraltar", "Delhi", "Shanghai", "Beijing", "Tianjin", "Chongqing", "Moscow", "Saint Petersburg", "Sevastopol", "Seoul", "Busan", "Daegu", "Incheon", "Daejeon", "Gwangju",
+    "Ulsan", "Sejong", "Tokyo", "Osaka", "Kyoto", "Taipei", "Kuala Lumpur", "Putrajaya", "Labuan", "Bangkok", "Jakarta", "Istanbul", "Ankara", "Paris", "Cairo", "Tehran", "Baghdad",
+    "Kabul", "Kinshasa", "Brazzaville", "Lagos", "Abuja", "Nairobi", "Addis Ababa", "Dubai", "Abu Dhabi", "Kuwait", "Doha", "Manama", "Muscat", "Riyadh", "Mexico City", "Lima", "Santiago",
+    "Buenos Aires", "Bogota", "Caracas", "Quito", "La Paz", "Montevideo", "Havana", "Panama City", "Guatemala City", "San Jose")}
 
 def main():
     data = {}
@@ -234,9 +261,19 @@ SELECT ?airlineLabel ?aiata WHERE {
         m = re.match(r"^(.*?)\s*\((.*)\)$", name)  # "Delhi (National Capital Territory)" -> "Delhi"; Korean "X-Gwangyeoksi (Y City)" -> "Y City"
         if m:
             name = m.group(2) if re.search(r"gwangyeoksi|teukbyeolsi|teukbyeoljachisi", m.group(1), re.I) else m.group(1)
+        full = regions.get(code, "")
         if not name or re.search(r"unassigned|unknown|not applicable|\(?no region\)?", name, re.I):
             return None
         if norm(name) == norm(country) or norm(name) in norm(country) or norm(country) in norm(name):
+            return None
+        # the region must not give the airport away: no municipality / city-state / capital territory ...
+        if re.search(r"municipality|metropolitan|capital|federal district|special administrative|autonomous city|city of|district of columbia|\bcity$", full, re.I):
+            return None
+        if norm(name) in CITY_REGIONS:
+            return None
+        # ... and nothing that contains the airport's own city (Madrid, New York, Beijing Municipality, ...)
+        city = (a.get("city") or "")
+        if city and (words(name) & words(city) or norm(name) == norm(city)):
             return None
         return name  # the app shows "<region>, <country>"
 
@@ -259,31 +296,32 @@ SELECT ?airlineLabel ?aiata WHERE {
         flying = [(n, airlines[i]) for i, n in rc.most_common() if i in airlines and still_flying(airlines[i])]
         leader = flying[0] if flying else None
         runner = flying[1][0] if len(flying) > 1 else 0
-        if cand:
-            groups = {}  # one entry per real airline (Emirates and Emirates SkyCargo are the same OpenFlights airline)
-            for item in cand.values():
-                of = of_airline(item)
-                key = of["id"] if of else "n:" + norm(item["name"])
-                g = groups.setdefault(key, {"of": of, "name": item["name"], "n": rc.get(of["id"], 0) if of else 0})
-                if of and norm(of["name"]) == norm(item["name"]):
-                    g["name"] = item["name"]
-                elif len(item["name"]) < len(g["name"]) and not (of and norm(of["name"]) == norm(g["name"])):
-                    g["name"] = item["name"]
-            ranked = sorted(groups.values(), key=lambda g: -g["n"])
-            pick = None
-            if len(ranked) == 1:
-                pick, source = ranked[0], "wikidata (only hub airline)"
-            elif ranked[0]["n"] > 0 and ranked[0]["n"] >= MARGIN * ranked[1]["n"]:
-                pick, source = ranked[0], "wikidata + routes"
+        # MAIN AIRLINE: only where ONE carrier is clearly dominant. With route data (10+ routes) the carrier with at least MARGIN x the
+        # routes of the runner-up; the Wikidata hub link only decides where there is too little route data to say.
+        hub_by_id = defaultdict(list)  # Wikidata names of the carriers that are the same OpenFlights airline
+        for item in cand.values():
+            of = of_airline(item)
+            if of:
+                hub_by_id[of["id"]].append(item["name"])
+        raw_top = [(n, airlines[i]) for i, n in rc.most_common(3) if i in airlines]
+        # the biggest carrier in the (2014) routes may be gone (Alitalia, US Airways, Air Berlin): then nobody can be called dominant
+        gone = [n for n, al in raw_top if not still_flying(al)]
+        if total >= MIN_ROUTES and leader and leader[0] >= 3:
+            if gone and gone[0] * 2 >= leader[0]:
+                why["airline: the biggest carrier in the route data no longer exists"] += 1
+            elif not runner or leader[0] >= MARGIN * runner:
+                names = hub_by_id.get(leader[1]["id"], [])
+                exact = [x for x in names if norm(x) == norm(leader[1]["name"])]
+                choice, source = {"name": (exact[0] if exact else min(names, key=len) if names else leader[1]["name"])}, "openflights routes (clear leader)"
             else:
-                why["several hub airlines, no clear leader"] += 1
-            if pick:
-                choice = {"name": pick["name"]}
-                # a hub link on Wikidata can be stale or minor: if OpenFlights clearly shows another airline leading, that one wins
-                if total >= MIN_ROUTES and leader and (not pick["of"] or leader[1]["id"] != pick["of"]["id"]) and leader[0] >= MARGIN * max(pick["n"], 1) and leader[0] >= 3:
-                    choice, source = {"name": leader[1]["name"]}, "openflights (overrides a minor Wikidata hub)"
-        elif total >= MIN_ROUTES and leader and leader[0] >= 3 and (not runner or leader[0] >= MARGIN * runner):
-            choice, source = {"name": leader[1]["name"]}, "openflights routes"
+                why["airline: no dominant carrier (close race)"] += 1
+        elif cand:
+            names = {norm(i["name"]) for i in cand.values()}
+            groups = {(of_airline(i) or {}).get("id") or "n:" + norm(i["name"]) for i in cand.values()}
+            if len(groups) == 1:
+                choice, source = {"name": min((i["name"] for i in cand.values()), key=len)}, "wikidata (only hub airline, little route data)"
+            else:
+                why["airline: several hub airlines, little route data"] += 1
         if choice and iata in SUPPRESS_AIRLINE and a.get("top"):
             why["airline suppressed by review (top 50)"] += 1
             choice = None

@@ -374,9 +374,36 @@ test('hint values: country, "Name starts with" the first character as the sugges
   const t3 = (type, v, a = {}) => C.hintInfo('extra', { country: 'Brazil', name: 'X', hint3: type + '|' + v, ...a });
   assert.deepEqual([t3('airline', 'Emirates').menu, t3('airline', 'Emirates').text()], ['Main airline', 'Emirates']);
   assert.deepEqual([t3('region', 'Washington', { country: 'United States' }).menu, t3('region', 'Washington', { country: 'United States' }).text()], ['Region', 'Washington, United States']);
-  assert.equal(t3('grid', 'north-west').text(), 'North-west of Brazil'); assert.equal(t3('grid', 'centre').text(), 'Centre of Brazil');
+  assert.equal(t3('grid', 'north-west').text(), 'North-west of Brazil'); assert.equal(t3('grid', 'centre').text(), 'Central part of Brazil');
   assert.equal(t3('elev', '100-500 m').text(), '100-500 m above sea level');
   assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y' }).available, false); assert.equal(C.hintInfo('extra', { country: 'X', name: 'Y', hint3: 'bogus|x' }).available, false);
+});
+test('the region clue never gives the airport away: not the country, not the city of the airport, not a city-state or municipality (v1.3.6)', () => {
+  const GENERIC = new Set(['city', 'province', 'state', 'region', 'prefecture', 'county', 'district', 'municipality', 'metropolitan', 'governorate', 'autonomous', 'capital', 'territory', 'department', 'community', 'of', 'the', 'de', 'new', 'san', 'santa', 'saint', 'st', 'north', 'south', 'east', 'west', 'port', 'fort', 'lake', 'mount', 'great', 'greater']);
+  const words = (s) => new Set(C.normalize(s).split(' ').filter((w) => w.length > 2 && !GENERIC.has(w)));
+  const bad = [];
+  for (const a of [...airports, ...hard]) {
+    const h = C.hint3Of(a); if (!h || h.type !== 'region') continue;
+    const rw = words(h.v), cw = words(a.city || '');
+    if (C.normalize(h.v) === C.normalize(a.country)) bad.push(a.iata + ' region = country: ' + h.v);
+    if ([...rw].some((w) => cw.has(w))) bad.push((a.iata || a.icao) + ' region ' + h.v + ' repeats the city ' + a.city);
+    if (/municipality|metropolitan|capital territory|federal district|special administrative/i.test(h.v)) bad.push(a.iata + ' municipal region ' + h.v);
+  }
+  assert.deepEqual(bad.slice(0, 8), []);
+  const by = (i) => airports.find((a) => a.iata === i);
+  for (const code of ['MAD', 'PKX', 'CKG', 'DEL', 'JFK', 'SHA', 'PEK']) assert.notEqual(C.hint3Of(by(code))?.type === 'region' && /madrid|beijing|chongqing|delhi|new york|shanghai/i.test(C.hint3Of(by(code)).v), true, code + ' third clue must not name its own city');
+});
+test('fallback order: region, then part of the country (countries with 5+ airports), then elevation; a grid clue only in a country with at least 5 airports', () => {
+  const per = new Map(); for (const a of [...airports, ...hard]) per.set(a.countryCode, (per.get(a.countryCode) || 0) + 1);
+  for (const a of [...airports, ...hard]) { const h = C.hint3Of(a); if (h && h.type === 'grid') assert.ok(per.get(a.countryCode) >= 5, a.name + ' grid in a small country'); }
+  const by = (i) => airports.find((a) => a.iata === i);
+  for (const code of ['MAD', 'PKX', 'CKG']) assert.equal(C.hint3Of(by(code)).type, 'grid', code + ' falls back to the position in the country');
+});
+test('no double information: after the country was bought the region / position clue does not repeat it', () => {
+  const reg = { country: 'United States', name: 'X', hint3: 'region|Texas' }, grid = { country: 'United States', name: 'X', hint3: 'grid|north-west' };
+  assert.equal(C.hintInfo('extra', reg, []).text(), 'Texas, United States'); assert.equal(C.hintInfo('extra', reg, ['country']).text(), 'Texas');
+  assert.equal(C.hintInfo('extra', grid, []).text(), 'North-west of the United States'); assert.equal(C.hintInfo('extra', grid, ['country']).text(), 'North-west part of the country');
+  assert.equal(C.hintInfo('extra', { country: 'Brazil', name: 'X', hint3: 'grid|centre' }, []).text(), 'Central part of Brazil');
 });
 test('the main-airline clue costs 2 attempts, every other hint 1; a purchase must leave an attempt to guess with', () => {
   const air = { country: 'X', name: 'N', hint3: 'airline|Emirates' }, reg = { country: 'X', name: 'N', hint3: 'region|Bahia' };
@@ -406,7 +433,7 @@ test('data: every airport has a valid hint3 (type|value), the Top 50 included; v
   }
   assert.ok(bad.length <= 1, bad.slice(0, 5).join(' | '));
   for (const a of topList) assert.ok(C.hint3Of(a), a.iata + ' has a third clue');
-  assert.ok(types.airline > 500 && types.region > 10000, JSON.stringify(types));
+  assert.ok(types.airline > 300 && types.region > 9000 && types.grid > 500, JSON.stringify(types));
 });
 test('attempt budget: guesses, hints and zoom share 5; hints need 2 left', () => {
   assert.equal(C.attemptsLeft(0), 5);

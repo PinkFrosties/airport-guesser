@@ -548,7 +548,7 @@ await test('hints: 3 kinds (country, first letter, third clue), each costs 1 gue
   await page.locator('#sheet [data-confirm]').click();
   const text = await used();
   assert.ok(/Name starts with/i.test(text) && text.includes(C.firstChar(a.name)), 'first letter ' + text);
-  assert.ok(text.toLowerCase().includes(third.label.toLowerCase()) && text.includes(third.text()), 'third clue ' + text); // labels are upper-cased by CSS
+  assert.ok(text.toLowerCase().includes(third.label.toLowerCase()) && text.includes(C.hintInfo('extra', a, ['country', 'letter']).text()), 'third clue ' + text); // labels are upper-cased by CSS
   assert.equal(await spentOf(page), 3);
   assert.equal(await page.locator('#pips .pip.aid').count(), 3);
   assert.match(await leftText(page), /2\s*of 5 attempts left/i);

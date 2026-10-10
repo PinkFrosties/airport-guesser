@@ -531,7 +531,7 @@ function renderAll(animateLast = false) {
   if (r.zoomed) chips.push(['View', 'Zoomed out']);
   for (const key of r.hints) {
     if (key === 'legacy') continue; // bought in an older version: its attempt counts, its text is gone
-    const h = C.hintInfo(key, r.answer);
+    const h = C.hintInfo(key, r.answer, r.hints);
     chips.push([h.label, h.text()]);
   }
   el.hintsUsed.hidden = chips.length === 0;

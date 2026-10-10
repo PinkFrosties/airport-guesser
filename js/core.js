@@ -368,6 +368,8 @@ export const zoomedOut = (z) => Math.max(2, z - ZOOM_OUT_LEVELS);
 // Exactly three, each costs 1 attempt: the country, the first letter of the name as shown in the suggestions, and a third clue
 // chosen per airport at build time ("hint3" = "type|value": main airline, region, part of the country or elevation band).
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const THE = /^(United |Czech Republic|Netherlands|Philippines|Bahamas|Gambia|Maldives|Seychelles|Comoros|Marshall Islands|Cayman Islands|Falkland Islands|Cook Islands|Solomon Islands|Faroe Islands|Central African Republic|Dominican Republic|Democratic Republic|Republic of)/;
+const the = (country) => (THE.test(country) ? `the ${country}` : country);
 /** The first character of the airport name exactly as the suggestions show it ("H" for "Heathrow", "9" for "9 de Maio"). */
 export const firstChar = (name) => { const c = [...String(name).trim()][0] || ''; return c.toLocaleUpperCase('en'); };
 export function hint3Of(a) {
@@ -376,8 +378,9 @@ export function hint3Of(a) {
 }
 const HINT3 = {
   airline: { menu: 'Main airline', label: 'Main airline', text: (v) => v },
-  region: { menu: 'Region', label: 'Region', text: (v, a) => `${v}, ${a.country}` },
-  grid: { menu: 'Part of the country', label: 'Part of the country', text: (v, a) => `${cap(v)} of ${a.country}` },
+  // once the country was bought, the clue does not repeat it
+  region: { menu: 'Region', label: 'Region', text: (v, a, used) => (used.includes('country') ? v : `${v}, ${a.country}`) },
+  grid: { menu: 'Part of the country', label: 'Part of the country', text: (v, a, used) => (used.includes('country') ? `${v === 'centre' ? 'Central' : cap(v)} part of the country` : v === 'centre' ? `Central part of ${the(a.country)}` : `${cap(v)} of ${the(a.country)}`) },
   elev: { menu: 'Elevation', label: 'Elevation', text: (v) => `${v} above sea level` },
 };
 export const HINTS = [{ key: 'country' }, { key: 'letter' }, { key: 'extra' }];
@@ -385,12 +388,12 @@ export const HINTS = [{ key: 'country' }, { key: 'letter' }, { key: 'extra' }];
 export const AIRLINE_HINT_COST = 2;
 export const hintCost = (key, a) => (key === 'extra' && hint3Of(a)?.type === 'airline' ? AIRLINE_HINT_COST : 1);
 /** Menu label (what it is), chip label + text (the answer, only ever built after the hint was bought) and availability. */
-export function hintInfo(key, a) {
+export function hintInfo(key, a, used = []) {
   if (key === 'country') return { key, menu: 'Country', label: 'Country', available: !!a.country, cost: 1, text: () => a.country };
   if (key === 'letter') return { key, menu: 'First letter of the name', label: 'Name starts with', available: !!firstChar(a.name), cost: 1, text: () => firstChar(a.name) };
   const h = hint3Of(a), d = h && HINT3[h.type];
   if (!d) return { key, menu: 'Extra clue', label: 'Extra clue', available: false, cost: 1, text: () => '' };
-  return { key, menu: d.menu, label: d.label, available: true, type: h.type, cost: hintCost(key, a), text: () => d.text(h.v, a) };
+  return { key, menu: d.menu, label: d.label, available: true, type: h.type, cost: hintCost(key, a), text: () => d.text(h.v, a, used) };
 }
 export const hintAvailable = (h, a) => hintInfo(h.key, a).available;
 /** 'ok' | 'used' | 'covered' (its information is already in a hint bought: the region and part-of-country clues contain the country) | 'unavailable'. */
